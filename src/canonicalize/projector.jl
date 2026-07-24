@@ -45,43 +45,51 @@ end
 # Power iteration: find dominant left/right environments
 # ------------------------------------------------------------------------------
 
-function find_L(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
+function find_L(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical, log::ProjectorLog) where {E,S}
     L = id(E, right_virtualspace(mps[pos.n]))
     steps = 0
-    err = [Inf]
+    err = Inf
     N = length(mps)
-    while steps < alg.maxiter && abs(err[end]) > alg.tol
+    pos_errors = Float64[]
+    while steps < alg.maxiter && abs(err) > alg.tol
         new_L = copy(L)
         for i in (pos.n + 1):(pos.n + N)
             new_L = QR_L(new_L, mps[i])
         end
         new_L = new_L / norm(new_L, Inf)
         if space(new_L) == space(L)
-            push!(err, norm(new_L - L))
+            err = norm(new_L - L)
         end
+        push!(pos_errors, err)
         L = new_L
         steps += 1
     end
+    log.error_history[pos] = pos_errors
+    log.iterations = max(log.iterations, steps)
     return L
 end
 
-function find_R(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
+function find_R(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical, log::ProjectorLog) where {E,S}
     R = id(E, right_virtualspace(mps[pos.n]))
     steps = 0
-    err = [Inf]
+    err = Inf
     N = length(mps)
-    while steps < alg.maxiter && abs(err[end]) > alg.tol
+    pos_errors = Float64[]
+    while steps < alg.maxiter && abs(err) > alg.tol
         new_R = copy(R)
         for i in (pos.n):-1:(pos.n - N + 1)
             new_R = QR_R(new_R, mps[i])
         end
         new_R = new_R / norm(new_R, Inf)
         if space(new_R) == space(R)
-            push!(err, norm(new_R - R))
+            err = norm(new_R - R)
         end
+        push!(pos_errors, err)
         R = new_R
         steps += 1
     end
+    log.error_history[pos] = pos_errors
+    log.iterations = max(log.iterations, steps)
     return R
 end
 
@@ -110,10 +118,10 @@ end
 # Full projector computation at every site
 # ------------------------------------------------------------------------------
 
-function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical)
+function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical, log::ProjectorLog)
     N = length(mps)
-    L1 = find_L(HalfInt(1), mps, alg)
-    R1 = find_R(HalfInt(1), mps, alg)
+    L1 = find_L(HalfInt(1), mps, alg, log)
+    R1 = find_R(HalfInt(1), mps, alg, log)
     PR0, PL0 = P_decomp(R1, L1, alg.trscheme)
     PR_vec = Vector{typeof(PR0)}(undef, N)
     PL_vec = Vector{typeof(PL0)}(undef, N)
@@ -121,8 +129,8 @@ function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical)
     PL = PeriodicVector(PL_vec)
     PR[1], PL[2] = PR0, PL0
     for i in 2:N
-        L = find_L(HalfInt(i), mps, alg)
-        R = find_R(HalfInt(i), mps, alg)
+        L = find_L(HalfInt(i), mps, alg, log)
+        R = find_R(HalfInt(i), mps, alg, log)
         PR[i], PL[i + 1] = P_decomp(R, L, alg.trscheme)
     end
     return PR, PL

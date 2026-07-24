@@ -10,6 +10,8 @@ struct HalfInt
     n::Int  # represents n + 1/2, i.e. the bond between site n and site n+1
 end
 Base.convert(::Type{HalfInt}, n::Int) = HalfInt(n)
+Base.hash(h::HalfInt, h0::UInt) = hash(h.n, h0)
+Base.:(==)(a::HalfInt, b::HalfInt) = a.n == b.n
 Base.:+(h::HalfInt, n::Int) = HalfInt(h.n + n)
 Base.:-(h::HalfInt, n::Int) = HalfInt(h.n - n)
 
@@ -28,12 +30,15 @@ using MPSKit: MPSTensor
 const TwoSiteMPS{S} = PeriodicMPS{GenericMPSTensor{S, 3}}              # GenericMPSTensor{S, 2}
 const OneSiteMPS{S}  = PeriodicMPS{GenericMPSTensor{S, 2}}
 
-@kwdef struct ConvergenceLog
-    converged::Bool
-    iterations::Int
-    sweep_times::Vector{Float64}
-    error_history::Vector{Float64}
-    cost_history::Vector{Float64}
+# Each algorithm has its own log type — not a single generic struct.
+# This allows future front-end progress visualization per phase.
+abstract type ConvergenceLog end
+
+@kwdef mutable struct ProjectorLog <: ConvergenceLog
+    converged::Bool = false
+    iterations::Int = 0
+    sweep_times::Vector{Float64} = Float64[]
+    error_history::Dict{HalfInt, Vector{Float64}} = Dict{HalfInt, Vector{Float64}}()
 end
 
 # ------------------------------------------------------------------------------
@@ -57,6 +62,7 @@ end
     ξ_min::Float64 = 1e-7
 end
 
+
 # Absorb projectors into 2-site MPS tensor: T_i = PL_i * T_i * PR_i
 function _absorb_projectors!(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, PL_vec, PR_vec) where {E,S}
     N = length(mps)
@@ -75,9 +81,10 @@ end
 
 function canonicalize!(mps::PeriodicMPS, alg::ProjectorCanonical)
     t_start = time()
-    PR_vec, PL_vec = find_projectors(mps, alg)
+    log = ProjectorLog()
+    PR_vec, PL_vec = find_projectors(mps, alg, log)
     _absorb_projectors!(mps, PL_vec, PR_vec)
-    elapsed = time() - t_start
-    return ConvergenceLog(; converged=true, iterations=0,
-        sweep_times=[elapsed], error_history=Float64[], cost_history=Float64[])
+    log.sweep_times = [time() - t_start]
+    log.converged = log.iterations < alg.maxiter
+    return log
 end

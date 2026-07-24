@@ -132,11 +132,12 @@ end
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
 
     pos = HalfInt(2)
-    L = find_L(pos, mps, alg)
+    log = ProjectorLog()
+    L = find_L(pos, mps, alg, log)
     @test numout(L) == 1
     @test numin(L) == 1
 
-    R = find_R(pos, mps, alg)
+    R = find_R(pos, mps, alg, log)
     @test numout(R) == 1
     @test numin(R) == 1
 end
@@ -151,8 +152,9 @@ end
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
 
     pos = HalfInt(2)
-    L = find_L(pos, mps, alg)
-    R = find_R(pos, mps, alg)
+    log = ProjectorLog()
+    L = find_L(pos, mps, alg, log)
+    R = find_R(pos, mps, alg, log)
     @test numout(L) == 1 && numin(L) == 1
     @test numout(R) == 1 && numin(R) == 1
 end
