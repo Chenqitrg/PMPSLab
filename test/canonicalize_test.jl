@@ -24,6 +24,18 @@ end
     @test_throws TensorKit.SpaceMismatch assertconsistency(mps_bad)
 end
 
+@testset "assertconsistency — Z2Irrep" begin
+    V = Z2Space(0 => 3, 1 => 2)
+    P = Z2Space(0 => 2)
+    tvec = [rand(ComplexF64, V ⊗ P ← V) for _ in 1:4]
+    mps = PeriodicMPS(PeriodicVector(tvec))
+    @test assertconsistency(mps) === nothing
+    tvec_bad = copy(tvec)
+    tvec_bad[2] = rand(ComplexF64, V ⊗ P ← Z2Space(0 => 3, 1 => 3))
+    mps_bad = PeriodicMPS(PeriodicVector(tvec_bad))
+    @test_throws TensorKit.SpaceMismatch assertconsistency(mps_bad)
+end
+
 @testset "QR_L — 2-site" begin
     Ld, Pd, Rd = 3, 2, 4
     T = TensorMap(randn(ComplexF64, Ld * Pd, Rd), ℂ^Ld ⊗ ℂ^Pd, ℂ^Rd)
@@ -43,6 +55,16 @@ end
     @test numin(new_L) == 1
 end
 
+@testset "QR_L — 3-site Z2Irrep" begin
+    V  = Z2Space(0 => 3, 1 => 2)
+    P1 = Z2Space(0 => 2)
+    P2 = Z2Space(0 => 1, 1 => 1)
+    T3 = rand(ComplexF64, V ⊗ P1 ⊗ P2 ← V)
+    L  = rand(ComplexF64, V ← V)
+    new_L = QR_L(L, T3)
+    @test numout(new_L) == 1 && numin(new_L) == 1
+end
+
 @testset "QR_R — 2-site" begin
     Ld, Pd, Rd = 3, 2, 4
     T = TensorMap(randn(ComplexF64, Ld * Pd, Rd), ℂ^Ld ⊗ ℂ^Pd, ℂ^Rd)
@@ -50,6 +72,16 @@ end
     new_R = QR_R(R, T)
     @test numout(new_R) == 1
     @test numin(new_R) == 1
+end
+
+@testset "QR_R — 3-site Z2Irrep" begin
+    V  = Z2Space(0 => 3, 1 => 2)
+    P1 = Z2Space(0 => 2)
+    P2 = Z2Space(0 => 1, 1 => 1)
+    T3 = rand(ComplexF64, V ⊗ P1 ⊗ P2 ← V)
+    R  = rand(ComplexF64, V ← V)
+    new_R = QR_R(R, T3)
+    @test numout(new_R) == 1 && numin(new_R) == 1
 end
 
 @testset "P_decomp — PR * PL ≈ I (ComplexF64)" begin
