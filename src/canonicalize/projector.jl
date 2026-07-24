@@ -45,15 +45,15 @@ end
 # Power iteration: find dominant left/right environments
 # ------------------------------------------------------------------------------
 
-function find_L(pos::HalfInt, tensors::PeriodicVector{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
-    L = id(E, right_virtualspace(tensors[pos.n]))
+function find_L(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
+    L = id(E, right_virtualspace(mps[pos.n]))
     steps = 0
     err = [Inf]
-    N = length(tensors)
+    N = length(mps)
     while steps < alg.maxiter && abs(err[end]) > alg.tol
         new_L = copy(L)
         for i in (pos.n + 1):(pos.n + N)
-            new_L = QR_L(new_L, tensors[i])
+            new_L = QR_L(new_L, mps[i])
         end
         new_L = new_L / norm(new_L, Inf)
         if space(new_L) == space(L)
@@ -65,15 +65,15 @@ function find_L(pos::HalfInt, tensors::PeriodicVector{<:AbstractTensorMap{E,S}},
     return L
 end
 
-function find_R(pos::HalfInt, tensors::PeriodicVector{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
-    R = id(E, right_virtualspace(tensors[pos.n]))
+function find_R(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
+    R = id(E, right_virtualspace(mps[pos.n]))
     steps = 0
     err = [Inf]
-    N = length(tensors)
+    N = length(mps)
     while steps < alg.maxiter && abs(err[end]) > alg.tol
         new_R = copy(R)
         for i in (pos.n):-1:(pos.n - N + 1)
-            new_R = QR_R(new_R, tensors[i])
+            new_R = QR_R(new_R, mps[i])
         end
         new_R = new_R / norm(new_R, Inf)
         if space(new_R) == space(R)
@@ -110,15 +110,20 @@ end
 # Full projector computation at every site
 # ------------------------------------------------------------------------------
 
-function find_projectors(tensors::PeriodicVector{<:GenericMPSTensor}, alg::ProjectorCanonical)
-    N = length(tensors)
-    PR_vec = PeriodicMPS([similar(tensors[i], domain(tensors[i])[1], domain(tensors[i])[1]) for i in 1:N])
-    PL_vec = PeriodicMPS([similar(tensors[i], codomain(tensors[i])[1], codomain(tensors[i])[1]) for i in 1:N])
-    for i in 1:N
-        pos = HalfInt(i)  # bond between site i and i+1
-        L = find_L(pos, tensors, alg)
-        R = find_R(pos, tensors, alg)
-        PR_vec[i], PL_vec[i + 1] = P_decomp(R, L, alg.trscheme)
+function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical)
+    N = length(mps)
+    L1 = find_L(HalfInt(1), mps, alg)
+    R1 = find_R(HalfInt(1), mps, alg)
+    PR0, PL0 = P_decomp(R1, L1, alg.trscheme)
+    PR_vec = Vector{typeof(PR0)}(undef, N)
+    PL_vec = Vector{typeof(PL0)}(undef, N)
+    PR = PeriodicVector(PR_vec)
+    PL = PeriodicVector(PL_vec)
+    PR[1], PL[2] = PR0, PL0
+    for i in 2:N
+        L = find_L(HalfInt(i), mps, alg)
+        R = find_R(HalfInt(i), mps, alg)
+        PR[i], PL[i + 1] = P_decomp(R, L, alg.trscheme)
     end
-    return PR_vec, PL_vec
+    return PR, PL
 end

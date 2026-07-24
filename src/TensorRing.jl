@@ -5,13 +5,14 @@ using KrylovKit
 using MPSKit
 
 export HalfInt, QR_L, QR_R, find_L, find_R, P_decomp, find_projectors,
-       PeriodicMPS, ConvergenceLog,
+       PeriodicMPS, TwoSiteMPS, OneSiteMPS, ConvergenceLog,
        AbstractLoopCanonical, ProjectorCanonical, NuclearNormCanonical,
-       assertconsistency
+       assertconsistency, canonicalize!, dense
 
 include("canonicalize/interface.jl")
 include("assert.jl")
 include("canonicalize/projector.jl")
 include("canonicalize/nuclearnorm.jl")
+include("dense.jl")
 
 end

@@ -127,16 +127,16 @@ end
 @testset "find_L / find_R convergence" begin
     N, d, D = 4, 2, 3
     tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
-    tensors = PeriodicVector(tvec)
+    mps = PeriodicMPS(PeriodicVector(tvec))
 
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
 
     pos = HalfInt(2)
-    L = find_L(pos, tensors, alg)
+    L = find_L(pos, mps, alg)
     @test numout(L) == 1
     @test numin(L) == 1
 
-    R = find_R(pos, tensors, alg)
+    R = find_R(pos, mps, alg)
     @test numout(R) == 1
     @test numin(R) == 1
 end
@@ -146,14 +146,57 @@ end
     V = Z2Space(0 => 3, 1 => 2)
     P = Z2Space(0 => d)
     tvec = [rand(ComplexF64, V ⊗ P ← V) for _ in 1:N]
-    tensors = PeriodicVector(tvec)
+    mps = PeriodicMPS(PeriodicVector(tvec))
 
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
 
     pos = HalfInt(2)
-    L = find_L(pos, tensors, alg)
-    R = find_R(pos, tensors, alg)
+    L = find_L(pos, mps, alg)
+    R = find_R(pos, mps, alg)
     @test numout(L) == 1 && numin(L) == 1
     @test numout(R) == 1 && numin(R) == 1
 end
+
+@testset "canonicalize! — integration" begin
+    N, d, D = 4, 2, 3
+    tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
+    mps = PeriodicMPS(PeriodicVector(copy(tvec)))
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
+    log = canonicalize!(mps, alg)
+    @test log.converged
+    @test length(log.sweep_times) == 1
+    # After canonicalization, consistency should still hold
+    @test assertconsistency(mps) === nothing
+    # Tensors should have been modified
+    for i in 1:N
+        @test !(mps[i] ≈ tvec[i])
+    end
+end
+
+@testset "canonicalize! — Z2Irrep" begin
+    N = 4
+    V = Z2Space(0 => 3, 1 => 2)
+    P = Z2Space(0 => 2)
+    tvec = [rand(ComplexF64, V ⊗ P ← V) for _ in 1:N]
+    mps = PeriodicMPS(PeriodicVector(copy(tvec)))
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
+    log = canonicalize!(mps, alg)
+    @test log.converged
+    @test assertconsistency(mps) === nothing
+    for i in 1:N
+        @test !(mps[i] ≈ tvec[i])
+    end
+end
+
+# TODO: uncomment when dense() is implemented
+# @testset "canonicalize! — self-consistency" begin
+#     N, d, D = 4, 2, 2
+#     tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
+#     mps = PeriodicMPS(PeriodicVector(copy(tvec)))
+#     dense_before = dense(mps)
+#     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
+#     canonicalize!(mps, alg)
+#     dense_after = dense(mps)
+#     @test norm(dense_before - dense_after) < 1e-10
+# end
 
