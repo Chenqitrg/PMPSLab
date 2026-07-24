@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "e4619fd567184069b600e12dc68c517f1234b505"
+project_hash = "1c088651693fdf680169a0ea438f491a8ed37660"
 
 [[deps.Accessors]]
 deps = ["CompositionsBase", "ConstructionBase", "Dates", "InverseFunctions", "MacroTools"]
@@ -342,12 +342,6 @@ version = "1.0.2"
     Requires = "ae029012-a4dd-5104-9daa-d747884805df"
     TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
-[[deps.PeriodicMPS]]
-deps = ["MPSKit", "TensorKit"]
-path = "."
-uuid = "00000000-0000-0000-0000-000000000000"
-version = "0.1.0"
-
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
 git-tree-sha1 = "edbeefc7a4889f528644251bdb5fc9ab5348bc2c"
@@ -540,6 +534,12 @@ version = "5.6.2"
     JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
     Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
     cuTENSOR = "011b41b2-24ef-40a8-b3eb-fa098493e9e1"
+
+[[deps.TensorRing]]
+deps = ["KrylovKit", "MPSKit", "TensorKit"]
+path = "."
+uuid = "dd4302de-b7e4-496a-84b6-645ce13c7f0e"
+version = "0.1.0"
 
 [[deps.TimerOutputs]]
 deps = ["ExprTools", "Printf"]

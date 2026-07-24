@@ -1,5 +1,5 @@
 using Test
-using PeriodicMPS
+using TensorRing
 using TensorKit
 using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace
 import MPSKit
@@ -9,6 +9,19 @@ import MPSKit
     @test h.n == 3
     @test (h + 2).n == 5
     @test (h - 1).n == 2
+end
+
+@testset "assertconsistency — valid and invalid" begin
+    D = 3
+    tvec = [TensorMap(randn(ComplexF64, D*2, D), ℂ^D ⊗ ℂ^2, ℂ^D) for _ in 1:4]
+    mps = PeriodicMPS(PeriodicVector(tvec))
+    @test assertconsistency(mps) === nothing
+
+    # Mismatched: change one site's right virtual space
+    tvec_bad = copy(tvec)
+    tvec_bad[2] = TensorMap(randn(ComplexF64, D*2, D+1), ℂ^D ⊗ ℂ^2, ℂ^(D+1))
+    mps_bad = PeriodicMPS(PeriodicVector(tvec_bad))
+    @test_throws TensorKit.SpaceMismatch assertconsistency(mps_bad)
 end
 
 @testset "QR_L — 2-site" begin
