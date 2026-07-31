@@ -48,7 +48,7 @@ function dense(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}) where {E,S}
 end
 
 """
-    pair_constraction(mps::PeriodicMPS) -> PeriodicMPS
+    pair_contraction(mps::PeriodicMPS) -> PeriodicMPS
 
 Coarse-grain `mps` by contracting adjacent pairs of sites: (1,2), (3,4), ….
 Each pair (T_{2k-1}, T_{2k}) becomes one two-site tensor
@@ -59,10 +59,10 @@ summing over the shared virtual leg (R_{2k-1} = L_{2k}). The result is a
 two-site MPS with N/2 sites, each carrying two physical legs in loop order.
 Requires N even.
 
-The full loop product is preserved: `dense(pair_constraction(mps))` equals
+The full loop product is preserved: `dense(pair_contraction(mps))` equals
 `dense(mps)` with the same physical leg order.
 """
-function pair_constraction(mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}}) where {E,S}
+function pair_contraction(mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}}) where {E,S}
     N = length(mps)
     iseven(N) || throw(ArgumentError(
         "pair contraction requires an even number of sites, got $N"

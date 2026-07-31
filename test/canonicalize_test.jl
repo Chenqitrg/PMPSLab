@@ -5,7 +5,7 @@ using PeriodicMPS:
     assertconsistency,
     canonicalize!,
     dense,
-    pair_constraction,
+    pair_contraction,
     ProjectorCanonical,
     ProjectorLog,
     PowerIterLog,
@@ -280,15 +280,15 @@ end
 end
 
 # ==============================================================================
-# pair_constraction — adjacent-pair coarse graining
+# pair_contraction — adjacent-pair coarse graining
 # ==============================================================================
 
-@testset "pair_constraction" begin
+@testset "pair_contraction" begin
     @testset "structure — N=4 gives N/2 two-site tensors" begin
         D, d, N = 2, 2, 4
         tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
         mps = PeriodicMPS(PeriodicVector(tvec))
-        paired = pair_constraction(mps)
+        paired = pair_contraction(mps)
 
         @test length(paired) == N ÷ 2
         for T in paired
@@ -305,7 +305,7 @@ end
         D, d = 2, 2
         tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:2]
         mps = PeriodicMPS(PeriodicVector(tvec))
-        paired = pair_constraction(mps)
+        paired = pair_contraction(mps)
 
         @test length(paired) == 1
         @plansor manual[-1 -2 -3; -4] := tvec[1][-1 -2; 1] * tvec[2][1 -3; -4]
@@ -318,7 +318,7 @@ end
             tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
             mps = PeriodicMPS(PeriodicVector(tvec))
             # Same physical leg order as dense(mps) — the loop product is preserved.
-            @test dense(pair_constraction(mps)) ≈ dense(mps)
+            @test dense(pair_contraction(mps)) ≈ dense(mps)
         end
     end
 
@@ -326,7 +326,7 @@ end
         D, d = 2, 2
         tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:3]
         mps = PeriodicMPS(PeriodicVector(tvec))
-        @test_throws ArgumentError pair_constraction(mps)
+        @test_throws ArgumentError pair_contraction(mps)
     end
 
     @testset "Z2Irrep — dense invariant and structure" begin
@@ -335,7 +335,7 @@ end
         P = Z2Space(0 => 2)
         tvec = [rand(ComplexF64, V ⊗ P ← V) for _ in 1:N]
         mps = PeriodicMPS(PeriodicVector(tvec))
-        paired = pair_constraction(mps)
+        paired = pair_contraction(mps)
 
         @test length(paired) == 2
         @test codomain(paired[1]) == V ⊗ P ⊗ P
@@ -346,7 +346,7 @@ end
         D, d, N = 2, 2, 4
         tvec = [TensorMap(randn(Float64, D * d, D), ℝ^D ⊗ ℝ^d, ℝ^D) for _ in 1:N]
         mps = PeriodicMPS(PeriodicVector(tvec))
-        paired = pair_constraction(mps)
+        paired = pair_contraction(mps)
         @test scalartype(paired[1]) == Float64
         @test dense(paired) ≈ dense(mps)
     end
@@ -368,7 +368,7 @@ end
         tvec = [TensorMap(randn(ComplexF64, D * d * d, D), ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D) for _ in 1:2]
         mps = PeriodicMPS(PeriodicVector(tvec))
         result = dense(mps)
-        # dense leg order: P_{1,b}, P_{1,a}, P_{2,a}, P_{2,b}
+        # dense leg order: P_{1,a}, P_{1,b}, P_{2,a}, P_{2,b}
         @plansor manual[-1 -2 -3 -4; ()] := tvec[1][circ -1 -2; mid] *
                                             tvec[2][mid -3 -4; circ]
         @test norm(result - manual) < 1e-12
