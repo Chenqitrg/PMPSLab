@@ -118,7 +118,8 @@ end
 # Full projector computation at every site
 # ------------------------------------------------------------------------------
 
-function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical, log::ProjectorLog)
+function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical,
+                         log::ProjectorLog, observer = nothing)
     N = length(mps)
     L1 = find_L(HalfInt(1), mps, alg, log)
     R1 = find_R(HalfInt(1), mps, alg, log)
@@ -128,10 +129,12 @@ function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical, log::Project
     PR = PeriodicVector(PR_vec)
     PL = PeriodicVector(PL_vec)
     PR[1], PL[2] = PR0, PL0
+    observer === nothing || observer(log)
     for i in 2:N
         L = find_L(HalfInt(i), mps, alg, log)
         R = find_R(HalfInt(i), mps, alg, log)
         PR[i], PL[i + 1] = P_decomp(R, L, alg.trscheme)
+        observer === nothing || observer(log)
     end
     return PR, PL
 end

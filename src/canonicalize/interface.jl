@@ -18,12 +18,14 @@ function _absorb_projectors!(mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}}, PL_
     end
 end
 
-function canonicalize!(mps::PeriodicMPS, alg::ProjectorCanonical)
+function canonicalize!(mps::PeriodicMPS, alg::ProjectorCanonical;
+                       log::ProjectorLog = ProjectorLog(),
+                       observer = nothing)
     t_start = time()
-    log = ProjectorLog()
-    PR_vec, PL_vec = find_projectors(mps, alg, log)
+    PR_vec, PL_vec = find_projectors(mps, alg, log, observer)
     _absorb_projectors!(mps, PL_vec, PR_vec)
     log.sweep_times = [time() - t_start]
     log.converged = log.iterations < alg.maxiter
+    observer === nothing || observer(log)
     return log
 end
