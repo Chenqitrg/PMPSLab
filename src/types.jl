@@ -25,9 +25,7 @@ Base.getindex(mps::PeriodicMPS, i::Int) = mps.tensors[i]
 Base.setindex!(mps::PeriodicMPS, v, i::Int) = (mps.tensors[i] = v)
 Base.iterate(mps::PeriodicMPS, args...) = iterate(mps.tensors, args...)
 
-# Type aliases: dispatch on # of physical legs using GenericMPSTensor{S, N}
-const TwoSiteMPS{S} = PeriodicMPS{GenericMPSTensor{S, 3}}
-const OneSiteMPS{S}  = PeriodicMPS{GenericMPSTensor{S, 2}}
+
 
 # ------------------------------------------------------------------------------
 # Convergence log
