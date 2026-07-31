@@ -8,6 +8,7 @@
 using Test
 using PeriodicMPS:
     PeriodicMPS,
+    random_mps,
     LoopMonoid,
     LoopTransferMatrix,
     RingCache,
@@ -172,8 +173,7 @@ end
 
 @testset "LoopTransferMatrix integration" begin
     N, d, D = 4, 2, 2
-    tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
-    mps = PeriodicMPS(PeriodicVector(tvec))
+    mps = random_mps(ComplexF64, N, d, D)
     ltm = LoopTransferMatrix(mps)
     v = build_cache(ltm, 2)
 

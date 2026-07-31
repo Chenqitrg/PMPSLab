@@ -16,6 +16,7 @@ export RingCache, build_cache, environment, left_cache, right_cache
 
 # Public API
 export canonicalize!, assertconsistency, dense, pair_contraction, approximate
+export random_mps, one_mps
 
 include("canonicalize/halfint.jl")
 include("mps.jl")
