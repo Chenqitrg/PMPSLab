@@ -190,15 +190,14 @@ end
     end
 end
 
-# TODO: uncomment when dense() is implemented
-# @testset "canonicalize! — self-consistency" begin
-#     N, d, D = 4, 2, 2
-#     tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
-#     mps = PeriodicMPS(PeriodicVector(copy(tvec)))
-#     dense_before = dense(mps)
-#     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
-#     canonicalize!(mps, alg)
-#     dense_after = dense(mps)
-#     @test norm(dense_before - dense_after) < 1e-10
-# end
+@testset "canonicalize! — self-consistency" begin
+    N, d, D = 4, 2, 2
+    tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
+    mps = PeriodicMPS(PeriodicVector(copy(tvec)))
+    dense_before = dense(mps)
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
+    canonicalize!(mps, alg)
+    dense_after = dense(mps)
+    @test norm(dense_before - dense_after) < 1e-10
+end
 
