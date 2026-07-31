@@ -62,3 +62,16 @@ end
     ξ_init::Float64 = 1e-5
     ξ_min::Float64 = 1e-7
 end
+
+# ------------------------------------------------------------------------------
+# 2-to-1 site approximation
+# ------------------------------------------------------------------------------
+
+abstract type AbstractLoopApproximation <: Algorithm end
+
+@kwdef mutable struct ApproximationLog <: ConvergenceLog
+    converged::Bool = false
+    iterations::Int = 0
+    sweep_times::Vector{Float64} = Float64[]
+    cost_history::Vector{Float64} = Float64[]
+end
