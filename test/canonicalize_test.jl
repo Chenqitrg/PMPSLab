@@ -8,6 +8,8 @@ using PeriodicMPS:
     pair_contraction,
     random_mps,
     one_mps,
+    random_mps2,
+    one_mps2,
     ProjectorCanonical,
     ProjectorLog,
     PowerIterLog,
@@ -51,6 +53,33 @@ end
     @test length(mps_g) == 3
     @test assertconsistency(mps_g) === nothing
     @test assertconsistency(one_mps(ComplexF64, 3, P, V)) === nothing
+end
+
+@testset "random_mps2 / one_mps2 — two-site tensors" begin
+    mps = random_mps2(ComplexF64, 4, 2, 3)
+    @test length(mps) == 4
+    @test assertconsistency(mps) === nothing
+    @test scalartype(mps[1]) == ComplexF64
+    @test numout(mps[1]) == 3
+    @test codomain(mps[1])[1] == ℂ^3           # virtual ℂ^D
+    @test codomain(mps[1])[2] == ℂ^2           # physical ℂ^d (site a)
+    @test codomain(mps[1])[3] == ℂ^2           # physical ℂ^d (site b)
+    @test domain(mps[1])[1] == ℂ^3
+
+    # deterministic: one_mps2 is the uniform all-ones two-site MPS
+    mps_a = one_mps2(ComplexF64, 3, 2, 2)
+    mps_b = one_mps2(ComplexF64, 3, 2, 2)
+    @test all(mps_a[i] ≈ mps_b[i] for i in 1:3)
+    @test assertconsistency(one_mps2(Float64, 4, 2, 2)) === nothing
+    @test scalartype(one_mps2(Float64, 4, 2, 2)[1]) == Float64
+
+    # graded spaces
+    V = Z2Space(0 => 2, 1 => 2)
+    P = Z2Space(0 => 2)
+    mps_g = random_mps2(ComplexF64, 3, P, V)
+    @test length(mps_g) == 3
+    @test assertconsistency(mps_g) === nothing
+    @test assertconsistency(one_mps2(ComplexF64, 3, P, V)) === nothing
 end
 
 @testset "assertconsistency — valid and invalid" begin
@@ -368,8 +397,8 @@ end
 @testset "dense — TwoSiteMPS" begin
     @testset "N=1 (partial trace)" begin
         D, d = 2, 2
-        T = TensorMap(randn(ComplexF64, D * d * d, D), ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D)
-        mps = PeriodicMPS(PeriodicVector([T]))
+        mps = random_mps2(ComplexF64, 1, d, D)
+        T = mps[1]
         result = dense(mps)
         @test length(codomain(result)) == 2
         @plansor manual[-1 -2; ()] := T[1 -1 -2; 1]
@@ -378,23 +407,21 @@ end
 
     @testset "N=2 vs manual @plansor" begin
         D, d = 2, 2
-        tvec = [TensorMap(randn(ComplexF64, D * d * d, D), ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D) for _ in 1:2]
-        mps = PeriodicMPS(PeriodicVector(tvec))
+        mps = random_mps2(ComplexF64, 2, d, D)
         result = dense(mps)
         # dense leg order: P_{1,a}, P_{1,b}, P_{2,a}, P_{2,b}
-        @plansor manual[-1 -2 -3 -4; ()] := tvec[1][circ -1 -2; mid] *
-                                            tvec[2][mid -3 -4; circ]
+        @plansor manual[-1 -2 -3 -4; ()] := mps[1][circ -1 -2; mid] *
+                                            mps[2][mid -3 -4; circ]
         @test norm(result - manual) < 1e-12
     end
 
     @testset "Z2Irrep N=2 vs manual @plansor" begin
         V = Z2Space(0 => 3, 1 => 2)
         P = Z2Space(0 => 2)
-        tvec = [rand(ComplexF64, V ⊗ P ⊗ P ← V) for _ in 1:2]
-        mps = PeriodicMPS(PeriodicVector(tvec))
+        mps = random_mps2(ComplexF64, 2, P, V)
         result = dense(mps)
-        @plansor manual[-1 -2 -3 -4; ()] := tvec[1][circ -1 -2; mid] *
-                                            tvec[2][mid -3 -4; circ]
+        @plansor manual[-1 -2 -3 -4; ()] := mps[1][circ -1 -2; mid] *
+                                            mps[2][mid -3 -4; circ]
         @test norm(result - manual) < 1e-12
     end
 end

@@ -54,3 +54,44 @@ function one_mps(elt, N::Int, P::ElementarySpace, V::ElementarySpace)
     tensors = [ones(elt, V ⊗ P ← V) for _ in 1:N]
     return PeriodicMPS(PeriodicVector(tensors))
 end
+
+"""
+    random_mps2(elt, N, d, D) -> PeriodicMPS
+
+Random two-site periodic MPS with `N` sites: each site carries two physical
+legs `ℂ^d` (loop order: site a, site b) and virtual space `ℂ^D`. The tensors
+live in `ℂ^D ⊗ ℂ^d ⊗ ℂ^d ← ℂ^D`, as produced by `pair_contraction`.
+
+    random_mps2(elt, N, P, V) -> PeriodicMPS
+
+Same with graded spaces `P` (physical) and `V` (virtual), e.g. Z2Irrep.
+"""
+function random_mps2(elt, N::Int, d::Int, D::Int)
+    tensors = [TensorMap(randn(elt, D * d * d, D), ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D) for _ in 1:N]
+    return PeriodicMPS(PeriodicVector(tensors))
+end
+
+function random_mps2(elt, N::Int, P::ElementarySpace, V::ElementarySpace)
+    tensors = [rand(elt, V ⊗ P ⊗ P ← V) for _ in 1:N]
+    return PeriodicMPS(PeriodicVector(tensors))
+end
+
+"""
+    one_mps2(elt, N, d, D) -> PeriodicMPS
+
+Uniform two-site periodic MPS whose tensors are all-ones matrices (two
+physical legs `ℂ^d` each, virtual space `ℂ^D`). Deterministic.
+
+    one_mps2(elt, N, P, V) -> PeriodicMPS
+
+Same with graded spaces `P` (physical) and `V` (virtual).
+"""
+function one_mps2(elt, N::Int, d::Int, D::Int)
+    tensors = [TensorMap(ones(elt, D * d * d, D), ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D) for _ in 1:N]
+    return PeriodicMPS(PeriodicVector(tensors))
+end
+
+function one_mps2(elt, N::Int, P::ElementarySpace, V::ElementarySpace)
+    tensors = [ones(elt, V ⊗ P ⊗ P ← V) for _ in 1:N]
+    return PeriodicMPS(PeriodicVector(tensors))
+end
