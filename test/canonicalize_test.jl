@@ -1,5 +1,17 @@
 using Test
-using TensorRing
+using PeriodicMPS:
+    PeriodicMPS,
+    HalfInt,
+    assertconsistency,
+    canonicalize!,
+    dense,
+    ProjectorCanonical,
+    ProjectorLog,
+    QR_L,
+    QR_R,
+    P_decomp,
+    find_L,
+    find_R
 using TensorKit
 using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace
 import MPSKit
