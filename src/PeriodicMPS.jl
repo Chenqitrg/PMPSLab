@@ -1,6 +1,7 @@
 module PeriodicMPS
 
 using TensorKit
+import TensorKit: scalartype
 using KrylovKit
 using MPSKit: left_virtualspace, right_virtualspace, physicalspace,
               Algorithm, GenericMPSTensor, TruncationStrategy, PeriodicVector
@@ -11,6 +12,7 @@ export ConvergenceLog, PowerIterLog, SweepLog, ProjectorLog, ApproximationLog
 export AbstractLoopCanonical, ProjectorCanonical, NuclearNormCanonical
 export AbstractLoopApproximation
 export LoopTransferMatrix
+export RingCache, build_cache, environment, left_cache, right_cache
 
 # Public API
 export canonicalize!, assertconsistency, dense, approximate
@@ -19,6 +21,7 @@ include("canonicalize/halfint.jl")
 include("mps.jl")
 include("logs.jl")
 include("circularupdate/loopmonoid.jl")
+include("circularupdate/cache.jl")
 include("transfermatrix.jl")
 include("canonicalize/projector.jl")
 include("canonicalize/nuclearnorm.jl")
