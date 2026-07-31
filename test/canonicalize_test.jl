@@ -7,6 +7,8 @@ using PeriodicMPS:
     dense,
     ProjectorCanonical,
     ProjectorLog,
+    PowerIterLog,
+    SweepLog,
     QR_L,
     QR_R,
     P_decomp,
@@ -144,14 +146,15 @@ end
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
 
     pos = HalfInt(2)
-    log = ProjectorLog()
-    L = find_L(pos, mps, alg, log)
+    L, logL = find_L(pos, mps, alg)
     @test numout(L) == 1
     @test numin(L) == 1
+    @test logL isa PowerIterLog
 
-    R = find_R(pos, mps, alg, log)
+    R, logR = find_R(pos, mps, alg)
     @test numout(R) == 1
     @test numin(R) == 1
+    @test logR isa PowerIterLog
 end
 
 @testset "find_L / find_R convergence — Z2Irrep" begin
@@ -164,9 +167,8 @@ end
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
 
     pos = HalfInt(2)
-    log = ProjectorLog()
-    L = find_L(pos, mps, alg, log)
-    R = find_R(pos, mps, alg, log)
+    L, _ = find_L(pos, mps, alg)
+    R, _ = find_R(pos, mps, alg)
     @test numout(L) == 1 && numin(L) == 1
     @test numout(R) == 1 && numin(R) == 1
 end
@@ -178,7 +180,7 @@ end
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
     log = canonicalize!(mps, alg)
     @test log.converged
-    @test length(log.sweep_times) == 1
+    @test length(log.sweeps) == 1
     # After canonicalization, consistency should still hold
     @test assertconsistency(mps) === nothing
     # Tensors should have been modified

@@ -45,7 +45,7 @@ end
 # Power iteration: find dominant left/right environments
 # ------------------------------------------------------------------------------
 
-function find_L(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical, log::ProjectorLog) where {E,S}
+function find_L(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
     L = id(E, right_virtualspace(mps[pos.n]))
     steps = 0
     err = Inf
@@ -64,12 +64,11 @@ function find_L(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::P
         L = new_L
         steps += 1
     end
-    log.error_history[pos] = pos_errors
-    log.iterations = max(log.iterations, steps)
-    return L
+    converged = steps < alg.maxiter
+    return L, PowerIterLog(pos, pos_errors, steps, converged)
 end
 
-function find_R(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical, log::ProjectorLog) where {E,S}
+function find_R(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
     R = id(E, right_virtualspace(mps[pos.n]))
     steps = 0
     err = Inf
@@ -88,9 +87,8 @@ function find_R(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::P
         R = new_R
         steps += 1
     end
-    log.error_history[pos] = pos_errors
-    log.iterations = max(log.iterations, steps)
-    return R
+    converged = steps < alg.maxiter
+    return R, PowerIterLog(pos, pos_errors, steps, converged)
 end
 
 # ------------------------------------------------------------------------------
@@ -118,23 +116,26 @@ end
 # Full projector computation at every site
 # ------------------------------------------------------------------------------
 
-function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical,
-                         log::ProjectorLog, observer = nothing)
+function find_projectors(mps::PeriodicMPS, alg::ProjectorCanonical; observer = nothing)
+    t_start = time()
     N = length(mps)
-    L1 = find_L(HalfInt(1), mps, alg, log)
-    R1 = find_R(HalfInt(1), mps, alg, log)
+    L1, logL1 = find_L(HalfInt(1), mps, alg)
+    R1, logR1 = find_R(HalfInt(1), mps, alg)
     PR0, PL0 = P_decomp(R1, L1, alg.trscheme)
     PR_vec = Vector{typeof(PR0)}(undef, N)
     PL_vec = Vector{typeof(PL0)}(undef, N)
     PR = PeriodicVector(PR_vec)
     PL = PeriodicVector(PL_vec)
     PR[1], PL[2] = PR0, PL0
-    observer === nothing || observer(log)
+    site_logs = PowerIterLog[logL1, logR1]
+    observer === nothing || observer(logL1, logR1)
     for i in 2:N
-        L = find_L(HalfInt(i), mps, alg, log)
-        R = find_R(HalfInt(i), mps, alg, log)
+        L, logL = find_L(HalfInt(i), mps, alg)
+        R, logR = find_R(HalfInt(i), mps, alg)
         PR[i], PL[i + 1] = P_decomp(R, L, alg.trscheme)
-        observer === nothing || observer(log)
+        push!(site_logs, logL, logR)
+        observer === nothing || observer(logL, logR)
     end
-    return PR, PL
+    sweep_log = SweepLog(site_logs, time() - t_start)
+    return PR, PL, sweep_log
 end

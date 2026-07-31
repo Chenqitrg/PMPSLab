@@ -22,10 +22,15 @@ function site_transfer_matrix(T::AbstractTensorMap{E,S,2,1}) where {E,S}
     return site_transfer_matrix(T, T)
 end
 
+abstract type LoopMonoid end
+
 # Collection of transfer matrices wrapping a full loop.
-struct LoopTransferMatrix{T <: AbstractTensorMap}
+struct LoopTransferMatrix{T <: AbstractTensorMap} <: LoopMonoid
     matrices::PeriodicVector{T}
 end
+
+Base.length(v::LoopTransferMatrix) = length(v.matrices)
+Base.getindex(v::LoopTransferMatrix, i::Int) = v.matrices[i]
 
 # Construct from a PeriodicMPS
 function LoopTransferMatrix(mps1::PeriodicMPS, mps2::PeriodicMPS)
@@ -45,19 +50,9 @@ function Base.:*(ltm::LoopTransferMatrix)
     return result
 end
 
-# Apply the full loop transfer matrix to a vector
-function Base.:*(ltm::LoopTransferMatrix, vec::AbstractTensorMap)
-    return *(ltm) * vec
+function expectation(ltm::LoopTransferMatrix)
+    return tr(*(ltm))
 end
 
-# Product over a range [i, j] with periodic wrap
-function product_range(ltm::LoopTransferMatrix, i::Int, j::Int)
-    N = length(ltm.matrices)
-    result = ltm.matrices[i]
-    k = i
-    while k != j
-        k = mod1(k + 1, N)
-        result = result * ltm.matrices[k]
-    end
-    return result
-end
+range_prod(v::LoopTransferMatrix, r::AbstractUnitRange) = reduce(*, (v[i] for i in r))
+

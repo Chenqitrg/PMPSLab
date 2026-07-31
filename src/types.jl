@@ -28,18 +28,30 @@ Base.iterate(mps::PeriodicMPS, args...) = iterate(mps.tensors, args...)
 
 
 # ------------------------------------------------------------------------------
-# Convergence log
+# Convergence logs — layered, immutable inner → mutable outer
 # ------------------------------------------------------------------------------
 
-# Each algorithm has its own log type — not a single generic struct.
-# This allows future front-end progress visualization per phase.
 abstract type ConvergenceLog end
 
-@kwdef mutable struct ProjectorLog <: ConvergenceLog
-    converged::Bool = false
-    iterations::Int = 0
-    sweep_times::Vector{Float64} = Float64[]
-    error_history::Dict{HalfInt, Vector{Float64}} = Dict{HalfInt, Vector{Float64}}()
+# Per-site power-iteration log (immutable snapshot)
+struct PowerIterLog
+    pos::HalfInt
+    errors::Vector{Float64}
+    steps::Int
+    converged::Bool
+end
+
+# One full projector-computation sweep (immutable)
+struct SweepLog
+    site_logs::Vector{PowerIterLog}
+    sweep_time::Float64
+end
+
+# Top-level: accumulates sweeps across algorithm steps (mutable)
+mutable struct ProjectorLog <: ConvergenceLog
+    sweeps::Vector{SweepLog}
+    converged::Bool
+    ProjectorLog() = new(SweepLog[], false)
 end
 
 # ------------------------------------------------------------------------------
@@ -70,8 +82,7 @@ end
 abstract type AbstractLoopApproximation <: Algorithm end
 
 @kwdef mutable struct ApproximationLog <: ConvergenceLog
+    sweeps::Vector{SweepLog} = SweepLog[]
     converged::Bool = false
-    iterations::Int = 0
-    sweep_times::Vector{Float64} = Float64[]
     cost_history::Vector{Float64} = Float64[]
 end

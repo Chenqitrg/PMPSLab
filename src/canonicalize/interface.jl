@@ -28,36 +28,32 @@ tensors. Modifies `mps` in place and returns a [`ProjectorLog`](@ref).
 
 # Keyword arguments
 - `log::ProjectorLog`: external log for live progress polling.
-  Pass a pre-allocated `ProjectorLog` and read `log.iterations`,
-  `log.error_history`, or `log.converged` from another task.
-- `observer`: callable `f(log::ProjectorLog)` fired after each bond's
-  projector computation and once at completion. Use for progress bars,
-  logging, or early termination.
+  Pass a pre-allocated `ProjectorLog` and read `log.sweeps`,
+  `log.converged` from another task.
+- `observer`: callable `f(logL::PowerIterLog, logR::PowerIterLog)` fired after
+  each bond's L/R computation. Use for progress bars or live monitoring.
 
 # Examples
 # === Basic usage ===
 log = canonicalize!(mps, alg)
 
 # === Live polling from another task ===
-# @async (concurrent task) polls the log while canonicalize! runs
 log = ProjectorLog()
 @async while !log.converged
-    println("iter: \$(log.iterations), bonds: \$(length(log.error_history))")
+    println("sweeps: \$(length(log.sweeps))")
     sleep(0.1)
 end
 canonicalize!(mps, alg; log = log)
 
-# === Observer callback (alternative to polling) ===
-canonicalize!(mps, alg; observer = log -> @info "bond done" log.iterations)
+# === Observer callback ===
+canonicalize!(mps, alg; observer = (logL, logR) -> @info "bond done" logL.pos)
 """
 function canonicalize!(mps::PeriodicMPS, alg::ProjectorCanonical;
                        log::ProjectorLog = ProjectorLog(),
                        observer = nothing)
-    t_start = time()
-    PR_vec, PL_vec = find_projectors(mps, alg, log, observer)
+    PR_vec, PL_vec, sweep_log = find_projectors(mps, alg; observer)
     _absorb_projectors!(mps, PL_vec, PR_vec)
-    log.sweep_times = [time() - t_start]
-    log.converged = log.iterations < alg.maxiter
-    observer === nothing || observer(log)
+    push!(log.sweeps, sweep_log)
+    log.converged = all(l -> l.converged, sweep_log.site_logs)
     return log
 end

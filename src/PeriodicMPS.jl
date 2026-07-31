@@ -6,7 +6,7 @@ using MPSKit: left_virtualspace, right_virtualspace, physicalspace
 
 # Types
 export PeriodicMPS, HalfInt
-export ConvergenceLog, ProjectorLog, ApproximationLog
+export ConvergenceLog, PowerIterLog, SweepLog, ProjectorLog, ApproximationLog
 export AbstractLoopCanonical, ProjectorCanonical, NuclearNormCanonical
 export AbstractLoopApproximation
 export LoopTransferMatrix
