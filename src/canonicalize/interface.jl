@@ -18,6 +18,38 @@ function _absorb_projectors!(mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}}, PL_
     end
 end
 
+"""
+    canonicalize!(mps::PeriodicMPS, alg::ProjectorCanonical;
+                  log = ProjectorLog(), observer = nothing)
+
+Absorb the transfer-matrix fixed-point environments into `mps` by iteratively
+computing left/right projectors at every bond and folding them into the site
+tensors. Modifies `mps` in place and returns a [`ProjectorLog`](@ref).
+
+# Keyword arguments
+- `log::ProjectorLog`: external log for live progress polling.
+  Pass a pre-allocated `ProjectorLog` and read `log.iterations`,
+  `log.error_history`, or `log.converged` from another task.
+- `observer`: callable `f(log::ProjectorLog)` fired after each bond's
+  projector computation and once at completion. Use for progress bars,
+  logging, or early termination.
+
+# Examples
+# === Basic usage ===
+log = canonicalize!(mps, alg)
+
+# === Live polling from another task ===
+# @async (concurrent task) polls the log while canonicalize! runs
+log = ProjectorLog()
+@async while !log.converged
+    println("iter: \$(log.iterations), bonds: \$(length(log.error_history))")
+    sleep(0.1)
+end
+canonicalize!(mps, alg; log = log)
+
+# === Observer callback (alternative to polling) ===
+canonicalize!(mps, alg; observer = log -> @info "bond done" log.iterations)
+"""
 function canonicalize!(mps::PeriodicMPS, alg::ProjectorCanonical;
                        log::ProjectorLog = ProjectorLog(),
                        observer = nothing)
