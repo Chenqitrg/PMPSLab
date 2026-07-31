@@ -1,6 +1,14 @@
-# Projector-based canonicalization: TNRKit's find_L/find_R/P_decomp approach.
-# Power-iterate around the loop with rank-3 QR orthogonalization,
-# then absorb projectors into site tensors.
+# ------------------------------------------------------------------------------
+# Projector-based canonicalization
+# ------------------------------------------------------------------------------
+
+abstract type AbstractLoopCanonical <: Algorithm end
+
+@kwdef struct ProjectorCanonical <: AbstractLoopCanonical
+    tol::Float64 = 1e-12
+    maxiter::Int = 100
+    trscheme::TruncationStrategy = TruncationStrategy()
+end
 
 # Pseudo-power: suppresses small singular values to avoid 1/0 blowup
 function pseudopow(t::DiagonalTensorMap, a::Real; tol = eps(scalartype(t))^(3 / 4))

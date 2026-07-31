@@ -2,6 +2,8 @@
 # 2-to-1 site approximation — convert TwoSite MPS → OneSite MPS
 # ------------------------------------------------------------------------------
 
+abstract type AbstractLoopApproximation <: Algorithm end
+
 """
     approximate(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, alg::AbstractLoopApproximation)
 

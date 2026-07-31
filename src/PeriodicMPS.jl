@@ -2,7 +2,8 @@ module PeriodicMPS
 
 using TensorKit
 using KrylovKit
-using MPSKit: left_virtualspace, right_virtualspace, physicalspace
+using MPSKit: left_virtualspace, right_virtualspace, physicalspace,
+              Algorithm, GenericMPSTensor, TruncationStrategy, PeriodicVector
 
 # Types
 export PeriodicMPS, HalfInt
@@ -14,13 +15,16 @@ export LoopTransferMatrix
 # Public API
 export canonicalize!, assertconsistency, dense, approximate
 
-include("types.jl")
+include("canonicalize/halfint.jl")
+include("mps.jl")
+include("logs.jl")
+include("circularupdate/loopmonoid.jl")
 include("transfermatrix.jl")
-include("canonicalize/interface.jl")
-include("assert.jl")
 include("canonicalize/projector.jl")
 include("canonicalize/nuclearnorm.jl")
-include("dense.jl")
+include("canonicalize/interface.jl")
+include("assert.jl")
 include("approximate/interface.jl")
+include("dense.jl")
 
 end

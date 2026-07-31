@@ -22,8 +22,6 @@ function site_transfer_matrix(T::AbstractTensorMap{E,S,2,1}) where {E,S}
     return site_transfer_matrix(T, T)
 end
 
-abstract type LoopMonoid end
-
 # Collection of transfer matrices wrapping a full loop.
 struct LoopTransferMatrix{T <: AbstractTensorMap} <: LoopMonoid
     matrices::PeriodicVector{T}
@@ -53,6 +51,3 @@ end
 function expectation(ltm::LoopTransferMatrix)
     return tr(*(ltm))
 end
-
-range_prod(v::LoopTransferMatrix, r::AbstractUnitRange) = reduce(*, (v[i] for i in r))
-
