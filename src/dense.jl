@@ -46,3 +46,34 @@ function dense(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}) where {E,S}
         1.0, 0.0)
     return result
 end
+
+"""
+    pair_constraction(mps::PeriodicMPS) -> PeriodicMPS
+
+Coarse-grain `mps` by contracting adjacent pairs of sites: (1,2), (3,4), ….
+Each pair (T_{2k-1}, T_{2k}) becomes one two-site tensor
+
+    T_k' : L_{2k-1} ⊗ P_{2k-1} ⊗ P_{2k} ← R_{2k}
+
+summing over the shared virtual leg (R_{2k-1} = L_{2k}). The result is a
+two-site MPS with N/2 sites, each carrying two physical legs in loop order.
+Requires N even.
+
+The full loop product is preserved: `dense(pair_constraction(mps))` equals
+`dense(mps)` with the same physical leg order.
+"""
+function pair_constraction(mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}}) where {E,S}
+    N = length(mps)
+    iseven(N) || throw(ArgumentError(
+        "pair contraction requires an even number of sites, got $N"
+    ))
+    paired = [_pair_contract(mps[2k - 1], mps[2k]) for k in 1:(N ÷ 2)]
+    return PeriodicMPS(PeriodicVector(paired))
+end
+
+# Contract two adjacent one-site tensors into one two-site tensor,
+# summing over the shared virtual leg.
+function _pair_contract(T1, T2)
+    @plansor T12[-1 -2 -3; -4] := T1[-1 -2; 1] * T2[1 -3; -4]
+    return T12
+end

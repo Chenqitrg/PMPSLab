@@ -5,6 +5,7 @@ using PeriodicMPS:
     assertconsistency,
     canonicalize!,
     dense,
+    pair_constraction,
     ProjectorCanonical,
     ProjectorLog,
     PowerIterLog,
@@ -275,6 +276,79 @@ end
         mps = PeriodicMPS(PeriodicVector(tvec))
         result = dense(mps)
         @test codomain(result) == (ℂ^d ⊗ ℂ^d ⊗ ℂ^d)
+    end
+end
+
+# ==============================================================================
+# pair_constraction — adjacent-pair coarse graining
+# ==============================================================================
+
+@testset "pair_constraction" begin
+    @testset "structure — N=4 gives N/2 two-site tensors" begin
+        D, d, N = 2, 2, 4
+        tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        paired = pair_constraction(mps)
+
+        @test length(paired) == N ÷ 2
+        for T in paired
+            @test length(codomain(T)) == 3          # L_{2k-1} ⊗ P_{2k-1} ⊗ P_{2k}
+            @test codomain(T)[1] == ℂ^D             # left virtual leg survives
+            @test codomain(T)[2] == ℂ^d             # P_{2k-1}
+            @test codomain(T)[3] == ℂ^d             # P_{2k}
+            @test length(domain(T)) == 1
+            @test domain(T)[1] == ℂ^D               # right virtual leg
+        end
+    end
+
+    @testset "pair matches manual @plansor" begin
+        D, d = 2, 2
+        tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:2]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        paired = pair_constraction(mps)
+
+        @test length(paired) == 1
+        @plansor manual[-1 -2 -3; -4] := tvec[1][-1 -2; 1] * tvec[2][1 -3; -4]
+        @test paired[1] ≈ manual
+    end
+
+    @testset "dense invariant — N ∈ {2, 4, 6}" begin
+        D, d = 2, 2
+        for N in [2, 4, 6]
+            tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
+            mps = PeriodicMPS(PeriodicVector(tvec))
+            # Same physical leg order as dense(mps) — the loop product is preserved.
+            @test dense(pair_constraction(mps)) ≈ dense(mps)
+        end
+    end
+
+    @testset "odd number of sites throws" begin
+        D, d = 2, 2
+        tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:3]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        @test_throws ArgumentError pair_constraction(mps)
+    end
+
+    @testset "Z2Irrep — dense invariant and structure" begin
+        N = 4
+        V = Z2Space(0 => 2, 1 => 2)
+        P = Z2Space(0 => 2)
+        tvec = [rand(ComplexF64, V ⊗ P ← V) for _ in 1:N]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        paired = pair_constraction(mps)
+
+        @test length(paired) == 2
+        @test codomain(paired[1]) == V ⊗ P ⊗ P
+        @test dense(paired) ≈ dense(mps)
+    end
+
+    @testset "Float64 element type" begin
+        D, d, N = 2, 2, 4
+        tvec = [TensorMap(randn(Float64, D * d, D), ℝ^D ⊗ ℝ^d, ℝ^D) for _ in 1:N]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        paired = pair_constraction(mps)
+        @test scalartype(paired[1]) == Float64
+        @test dense(paired) ≈ dense(mps)
     end
 end
 
