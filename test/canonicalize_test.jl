@@ -213,3 +213,100 @@ end
     @test norm(dense_before - dense_after) < 1e-10
 end
 
+# ==============================================================================
+# dense — comprehensive tests
+# ==============================================================================
+
+@testset "dense — OneSiteMPS" begin
+    @testset "N=1 (partial trace)" begin
+        D, d = 2, 3
+        T = TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D)
+        mps = PeriodicMPS(PeriodicVector([T]))
+        result = dense(mps)
+        @test codomain(result)[1] == ℂ^d
+        @plansor manual[-1; ()] := T[1 -1; 1]
+        @test norm(result - manual) < 1e-12
+    end
+
+    @testset "N=2 vs manual @plansor" begin
+        D, d = 2, 2
+        tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:2]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        result = dense(mps)
+        @plansor manual[-1 -2; ()] := tvec[1][1 -1; 2] * tvec[2][2 -2; 1]
+        @test norm(result - manual) < 1e-12
+    end
+
+    @testset "N=3 vs manual @plansor" begin
+        D, d = 2, 2
+        tvec = [TensorMap(randn(ComplexF64, D * d, D), ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:3]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        result = dense(mps)
+        @plansor manual[-1 -2 -3; ()] := tvec[1][1 -1; 2] * tvec[2][2 -2; 3] *
+                                        tvec[3][3 -3; 1]
+        @test norm(result - manual) < 1e-12
+    end
+
+    @testset "Float64 element type" begin
+        D, d = 2, 2
+        tvec = [TensorMap(randn(Float64, D * d, D), ℝ^D ⊗ ℝ^d, ℝ^D) for _ in 1:2]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        result = dense(mps)
+        @plansor manual[-1 -2; ()] := tvec[1][1 -1; 2] * tvec[2][2 -2; 1]
+        @test norm(result - manual) < 1e-12
+    end
+
+    @testset "Z2Irrep N=3 vs manual @plansor" begin
+        V = Z2Space(0 => 2, 1 => 2)
+        P = Z2Space(0 => 2)
+        tvec = [rand(ComplexF64, V ⊗ P ← V) for _ in 1:3]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        result = dense(mps)
+        @plansor manual[-1 -2 -3; ()] := tvec[1][1 -1; 2] * tvec[2][2 -2; 3] *
+                                        tvec[3][3 -3; 1]
+        @test norm(result - manual) < 1e-12
+    end
+
+    @testset "D=1 trivial bond" begin
+        d = 3
+        tvec = [TensorMap(randn(ComplexF64, d, 1), ℂ^1 ⊗ ℂ^d, ℂ^1) for _ in 1:3]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        result = dense(mps)
+        @test codomain(result) == (ℂ^d ⊗ ℂ^d ⊗ ℂ^d)
+    end
+end
+
+@testset "dense — TwoSiteMPS" begin
+    @testset "N=1 (partial trace)" begin
+        D, d = 2, 2
+        T = TensorMap(randn(ComplexF64, D * d * d, D), ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D)
+        mps = PeriodicMPS(PeriodicVector([T]))
+        result = dense(mps)
+        @test length(codomain(result)) == 2
+        @plansor manual[-1 -2; ()] := T[1 -1 -2; 1]
+        @test norm(result - manual) < 1e-12
+    end
+
+    @testset "N=2 vs manual @plansor" begin
+        D, d = 2, 2
+        tvec = [TensorMap(randn(ComplexF64, D * d * d, D), ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D) for _ in 1:2]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        result = dense(mps)
+        # dense leg order: P_{1,b}, P_{1,a}, P_{2,a}, P_{2,b}
+        @plansor manual[-1 -2 -3 -4; ()] := tvec[1][circ -1 -2; mid] *
+                                            tvec[2][mid -3 -4; circ]
+        @test norm(result - manual) < 1e-12
+    end
+
+    @testset "Z2Irrep N=2 vs manual @plansor" begin
+        V = Z2Space(0 => 3, 1 => 2)
+        P = Z2Space(0 => 2)
+        tvec = [rand(ComplexF64, V ⊗ P ⊗ P ← V) for _ in 1:2]
+        mps = PeriodicMPS(PeriodicVector(tvec))
+        result = dense(mps)
+        @plansor manual[-1 -2 -3 -4; ()] := tvec[1][circ -1 -2; mid] *
+                                            tvec[2][mid -3 -4; circ]
+        @test norm(result - manual) < 1e-12
+    end
+end
+
