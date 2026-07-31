@@ -13,12 +13,15 @@ using PeriodicMPS:
     LoopTransferMatrix,
     RingCache,
     build_cache,
+    advance!,
     environment,
     left_cache,
     left_right_space,
     left_right_unit,
     range_prod,
-    right_cache
+    right_cache,
+    ZipSweep,
+    CircularSweep
 using TensorKit
 using MPSKit: PeriodicVector
 
@@ -193,4 +196,60 @@ end
 
     # Sanity: the full loop product helper agrees with a direct product.
     @test *(ltm) ≈ naive_range_prod(ltm, 1:N)
+end
+
+@testset "ZipSweep — 往返顺序" begin
+    # 1, 2, …, N, N-1, …, 2（不重复访问 1）
+    @test collect(site for (site, _) in ZipSweep(4)) == [1, 2, 3, 4, 3, 2]
+    @test collect(site for (site, _) in ZipSweep(5)) == [1, 2, 3, 4, 5, 4, 3, 2]
+    # 掉头处 dir 变号：前滑 +1，掉头后 -1
+    @test collect(dir for (_, dir) in ZipSweep(4)) == [1, 1, 1, -1, -1, -1]
+    # N = 1 只访问一次
+    @test collect(site for (site, _) in ZipSweep(1)) == [1]
+end
+
+@testset "CircularSweep — 循环与最大趟数" begin
+    cs = CircularSweep(4; maximal_sweep = 2)
+    @test collect(site for (site, _) in cs) == [1, 2, 3, 4, 1, 2, 3, 4]
+    @test cs.n_sweep == 2
+    # 单向循环：dir 恒为 +1
+    @test all(dir == 1 for (_, dir) in CircularSweep(4; maximal_sweep = 2))
+    # 一趟 N 个 site
+    @test length(collect(CircularSweep(3; maximal_sweep = 1))) == 3
+    @test length(collect(CircularSweep(1; maximal_sweep = 3))) == 3
+end
+
+@testset "advance! — 滑动缓存" begin
+    # 前滑：cut 2 更新 site 2 → cut 3
+    loop = random_loop(3, 5)
+    new2 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
+    loop2 = MatrixLoop([i == 2 ? new2 : loop[i] for i in 1:5])
+    v = build_cache(loop, 2)
+    advance!(v, loop2, new2, 1)
+    @test v.site == 3
+    @test environment(v) ≈ naive_complement(loop2, 3)
+
+    # 后滑：cut 4 更新 site 4 → cut 3
+    new4 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
+    loop4 = MatrixLoop([i == 4 ? new4 : loop[i] for i in 1:5])
+    v = build_cache(loop, 4)
+    advance!(v, loop4, new4, -1)
+    @test v.site == 3
+    @test environment(v) ≈ naive_complement(loop4, 3)
+
+    # 回卷 N→1：更新 site 5 后整个缓存重建
+    new5 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
+    loop5 = MatrixLoop([i == 5 ? new5 : loop[i] for i in 1:5])
+    v = build_cache(loop, 5)
+    advance!(v, loop5, new5, 1)
+    @test v.site == 1
+    @test environment(v) ≈ naive_complement(loop5, 1)
+
+    # 前滑 cut 1 → cut 2（无前缀可乘，直接写入）
+    new1 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
+    loop1 = MatrixLoop([i == 1 ? new1 : loop[i] for i in 1:5])
+    v = build_cache(loop, 1)
+    advance!(v, loop1, new1, 1)
+    @test v.site == 2
+    @test environment(v) ≈ naive_complement(loop1, 2)
 end

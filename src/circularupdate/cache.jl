@@ -167,3 +167,34 @@ plus one multiplication. This is the "environment" felt by site `site`,
 the input to a local update rule in a sweep.
 """
 environment(v::RingCache) = right_cache(v) * left_cache(v)
+
+"""
+    advance!(v::RingCache, loop, new_value, dir::Int)
+
+Slide the cut of `v` from `site` to the next position (dir = +1 forward,
+-1 backward), after the element at the current cut was replaced by
+`new_value` (the fresh element already stored in `loop`).
+
+Interior moves are O(1): exactly one slot changes meaning — forward, slot
+`s` becomes the new prefix `w[1] * … * w[s] = cache[s-1] * new_value`;
+backward, slot `s-1` becomes the new suffix `w[s] * … * w[N] = new_value * cache[s]`.
+
+Wrapping around (N → 1 or 1 → N) rebuilds the whole cache in O(N) from
+`loop`, which must reflect the updated elements.
+"""
+function advance!(v::RingCache, loop::LoopMonoid, new_value, dir::Int)
+    N = length(v)
+    s = v.site
+    if dir == 1 && s < N
+        v.cache[s] = s == 1 ? new_value : v.cache[s-1] * new_value
+        v.site = s + 1
+    elseif dir == -1 && s > 1
+        v.cache[s-1] = s == N ? new_value : new_value * v.cache[s]
+        v.site = s - 1
+    else
+        fresh = build_cache(loop, dir == 1 ? 1 : N)
+        copyto!(v.cache, fresh.cache)
+        v.site = fresh.site
+    end
+    return v
+end
