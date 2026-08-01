@@ -16,8 +16,6 @@ using PeriodicMPS:
     advance!,
     environment,
     left_cache,
-    left_right_space,
-    left_right_unit,
     range_prod,
     right_cache,
     SweepState,
@@ -33,6 +31,9 @@ end
 
 Base.length(v::MatrixLoop) = length(v.sites)
 Base.getindex(v::MatrixLoop, i::Int) = v.sites[i]
+
+# Category unit for a MatrixLoop — identity on the common bond space.
+unit_for(loop::MatrixLoop) = id(scalartype(loop[1]), codomain(loop[1]))
 
 # Random loop of D×D matrices with trivial (ℂ^D) bond spaces.
 random_loop(D::Int, N::Int) = MatrixLoop(
@@ -68,12 +69,12 @@ end
 @testset "build_cache — cache contents vs naive products" begin
     for N in [2, 3, 5, 8], site in 1:N
         loop = random_loop(3, N)
-        v = build_cache(loop, site)
+        v = build_cache(loop, site, unit_for(loop))
 
         @test v isa RingCache
         @test length(v) == N
         @test lastindex(v) == N
-        @test scalartype(v) == ComplexF64
+        @test scalartype(v.cache[1]) == ComplexF64
 
         # Prefix ranges v[1:k] with k < site.
         for k in 1:(site - 1)
@@ -89,7 +90,7 @@ end
 
 @testset "range queries — invalid ranges throw" begin
     loop = random_loop(3, 5)
-    v = build_cache(loop, 3)
+    v = build_cache(loop, 3, unit_for(loop))
 
     # Any range that crosses the cut site is not representable.
     @test_throws ArgumentError v[1:3]   # contains the cut
@@ -110,13 +111,13 @@ end
     loop = random_loop(D, N)
 
     for site in 1:N
-        v = build_cache(loop, site)
+        v = build_cache(loop, site, unit_for(loop))
 
         expected_left = site == 1 ?
-                        left_right_unit(v) :
+                        v.unit :
                         naive_range_prod(loop, 1:(site - 1))
         expected_right = site == N ?
-                         left_right_unit(v) :
+                         v.unit :
                          naive_range_prod(loop, (site + 1):N)
 
         @test left_cache(v) ≈ expected_left
@@ -129,47 +130,41 @@ end
     end
 
     # The default site argument is 1.
-    v_default = build_cache(loop)
+    v_default = build_cache(loop, 1, unit_for(loop))
     @test environment(v_default) ≈ naive_complement(loop, 1)
 end
 
 @testset "units and spaces" begin
     D = 3
     loop = random_loop(D, 4)
+    unit = unit_for(loop)
 
-    # site > 1: the unit lives at the codomain of the first prefix product.
-    # (TensorKit wraps single legs in a ProductSpace, hence the comparison.)
-    @test left_right_space(build_cache(loop, 2)) == ProductSpace(ℂ^D)
-    # site == 1: the unit lives at the domain of the last suffix product.
-    @test left_right_space(build_cache(loop, 1)) == ProductSpace(ℂ^D)
-    @test dim(left_right_space(build_cache(loop, 2))) == D
-    @test left_right_unit(build_cache(loop, 2)) ≈ id(ComplexF64, ℂ^D)
+    v2 = build_cache(loop, 2, unit)
+    @test v2.unit ≈ id(ComplexF64, ℂ^D)
+    @test dim(codomain(v2.unit)) == D
 
-    # Empty halves return the category unit.
-    @test left_cache(build_cache(loop, 1)) ≈ id(ComplexF64, ℂ^D)
-    @test right_cache(build_cache(loop, 4)) ≈ id(ComplexF64, ℂ^D)
+    # Empty halves return the unit.
+    @test left_cache(build_cache(loop, 1, unit)) ≈ unit
+    @test right_cache(build_cache(loop, 4, unit)) ≈ unit
 end
 
 @testset "Z2Irrep — unit space and environment" begin
     V = Z2Space(0 => 2, 1 => 2)
     loop = random_loop(V, 4)
+    unit = unit_for(loop)
 
-    v = build_cache(loop, 2)
-    @test left_right_space(v) == ProductSpace(V)
-    @test left_right_unit(v) ≈ id(ComplexF64, V)
-
-    v1 = build_cache(loop, 1)
-    @test left_right_space(v1) == ProductSpace(V)
+    v = build_cache(loop, 2, unit)
+    @test v.unit ≈ id(ComplexF64, V)
 
     for site in 1:4
-        @test environment(build_cache(loop, site)) ≈ naive_complement(loop, site)
+        @test environment(build_cache(loop, site, unit)) ≈ naive_complement(loop, site)
     end
 end
 
 @testset "Float64 element type" begin
     loop = MatrixLoop([TensorMap(randn(Float64, 2, 2), ℝ^2, ℝ^2) for _ in 1:4])
-    v = build_cache(loop, 2)
-    @test scalartype(v) == Float64
+    unit = unit_for(loop)
+    v = build_cache(loop, 2, unit)
     @test v[1:1] ≈ loop[1]
     @test v[3:4] ≈ naive_range_prod(loop, 3:4)
     @test environment(v) ≈ naive_complement(loop, 2)
@@ -179,12 +174,11 @@ end
     N, d, D = 4, 2, 2
     mps = random_mps(ComplexF64, N, d, D)
     ltm = LoopTransferMatrix(mps)
-    v = build_cache(ltm, 2)
+    unit_ltm = id(ComplexF64, ℂ^D ⊗ (ℂ^D)')
+    v = build_cache(ltm, 2, unit_ltm)
 
     @test length(v) == N
-    # Transfer matrices live in (L ⊗ L̄) ← (R ⊗ R̄), with L = R = ℂ^D here
-    # (L̄ is the dual space).
-    @test left_right_space(v) == ℂ^D ⊗ (ℂ^D)'
+    @test v.unit ≈ unit_ltm
 
     # Every representable range matches a direct ordered product.
     @test v[1:1] ≈ range_prod(ltm, 1:1)
@@ -224,11 +218,13 @@ end
 end
 
 @testset "advance! — 滑动缓存" begin
+    unit = id(ComplexF64, ℂ^3)
+
     # 前滑：cut 2 更新 site 2 → cut 3
     loop = random_loop(3, 5)
     new2 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     loop2 = MatrixLoop([i == 2 ? new2 : loop[i] for i in 1:5])
-    v = build_cache(loop, 2)
+    v = build_cache(loop, 2, unit)
     advance!(v, loop2, SweepState(2, 1, 0))
     @test v.site == 3
     @test environment(v) ≈ naive_complement(loop2, 3)
@@ -236,7 +232,7 @@ end
     # 后滑：cut 4 更新 site 4 → cut 3
     new4 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     loop4 = MatrixLoop([i == 4 ? new4 : loop[i] for i in 1:5])
-    v = build_cache(loop, 4)
+    v = build_cache(loop, 4, unit)
     advance!(v, loop4, SweepState(4, -1, 0))
     @test v.site == 3
     @test environment(v) ≈ naive_complement(loop4, 3)
@@ -244,7 +240,7 @@ end
     # 回卷 N→1：更新 site 5 后整个缓存重建
     new5 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     loop5 = MatrixLoop([i == 5 ? new5 : loop[i] for i in 1:5])
-    v = build_cache(loop, 5)
+    v = build_cache(loop, 5, unit)
     advance!(v, loop5, SweepState(5, 1, 0))
     @test v.site == 1
     @test environment(v) ≈ naive_complement(loop5, 1)
@@ -252,7 +248,7 @@ end
     # 前滑 cut 1 → cut 2（无前缀可乘，直接写入）
     new1 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     loop1 = MatrixLoop([i == 1 ? new1 : loop[i] for i in 1:5])
-    v = build_cache(loop, 1)
+    v = build_cache(loop, 1, unit)
     advance!(v, loop1, SweepState(1, 1, 0))
     @test v.site == 2
     @test environment(v) ≈ naive_complement(loop1, 2)

@@ -26,15 +26,16 @@ The full environment at `site` (product of everything except `v[site]`) is:
 
 # Fields
 - `site::Int`: the active cut position (1 ≤ site ≤ N)
+- `unit::T`: the category identity, used when a half-loop is empty
 """
 mutable struct RingCache{T}
     cache::Vector{T}
     site::Int
+    unit::T
 end
 
 Base.length(v::RingCache) = length(v.cache) + 1
 Base.lastindex(v::RingCache) = length(v)
-scalartype(v::RingCache) = scalartype(v.cache[1])
 
 """
     v[r::AbstractUnitRange] -> product
@@ -59,43 +60,14 @@ function Base.getindex(v::RingCache, r::AbstractUnitRange)
 end
 
 """
-    left_right_space(v::RingCache)
-
-The space on which the identity morphism used as unit lives.
-
-Since a `LoopMonoid` is a 1-category (not a plain monoid), the unit
-must live in the correct hom-space. For `site == 1` the empty prefix
-is `v[1] : A → B`'s codomain-side neighbor, resolved from `cache[end]`
-(the last suffix product); otherwise the unit sits at the codomain of
-`cache[1]` (the first prefix product).
-"""
-function left_right_space(v::RingCache)
-    if v.site == 1
-        return domain(v.cache[end])
-    else
-        return codomain(v.cache[1])
-    end
-end
-
-"""
-    left_right_unit(v::RingCache)
-
-Identity morphism on [`left_right_space`](@ref) — the unit of the
-(1-)category, used when the left or right half of the loop is empty.
-"""
-function left_right_unit(v::RingCache)
-    return id(scalartype(v), left_right_space(v))
-end
-
-"""
     left_cache(v::RingCache)
 
 Product `v[1] * ... * v[site-1]` (the "left half" of the loop, O(1)).
-Returns the category unit `id` when `site == 1` (empty half).
+Returns `v.unit` when `site == 1` (empty half).
 """
 function left_cache(v::RingCache)
     i = v.site
-    i == 1 && return left_right_unit(v)
+    i == 1 && return v.unit
     return v[1 : i - 1]
 end
 
@@ -103,18 +75,19 @@ end
     right_cache(v::RingCache)
 
 Product `v[site+1] * ... * v[N]` (the "right half" of the loop, O(1)).
-Returns the category unit `id` when `site == length(v)` (empty half).
+Returns `v.unit` when `site == length(v)` (empty half).
 """
 function right_cache(v::RingCache)
     i = v.site
-    i == length(v) && return left_right_unit(v)
+    i == length(v) && return v.unit
     return v[i + 1 : end]
 end
 
 """
-    build_cache(v::LoopMonoid, site::Int = 1) -> RingCache
+    build_cache(v::LoopMonoid, site::Int, unit) -> RingCache
 
 Build the O(N) partial-product cache for loop `v` cut at `site`.
+`unit` is the category identity for empty half-loops (provided by caller).
 
 Cache layout (N = length(v)):
 
@@ -131,7 +104,7 @@ Cache layout (N = length(v)):
 Filled with two passes (prefix from the left, suffix from the right),
 totalling N-2 multiplications for N > 1.
 """
-function build_cache(v::LoopMonoid, site::Int = 1)
+function build_cache(v::LoopMonoid, site::Int, unit)
     N = length(v)
     T = eltype(v)
     cache = Vector{T}(undef, N - 1)
@@ -152,7 +125,7 @@ function build_cache(v::LoopMonoid, site::Int = 1)
         end
     end
 
-    return RingCache(cache, site)
+    return RingCache(cache, site, unit)
 end
 
 """
@@ -188,7 +161,7 @@ function advance!(v::RingCache, loop::LoopMonoid, st::SweepState)
         v.cache[s-1] = s == N ? loop[s] : loop[s] * v.cache[s]
         v.site = s - 1
     else
-        fresh = build_cache(loop, st.dir == 1 ? 1 : N)
+        fresh = build_cache(loop, st.dir == 1 ? 1 : N, v.unit)
         copyto!(v.cache, fresh.cache)
         v.site = fresh.site
     end

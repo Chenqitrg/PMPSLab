@@ -33,8 +33,8 @@ include("canonicalize/interface.jl")
 include("assert.jl")
 include("split/interface.jl")
 include("circularupdate/sweep.jl")
-include("split/context.jl")
 include("solve.jl")
+include("split/context.jl")
 include("dense.jl")
 
 end

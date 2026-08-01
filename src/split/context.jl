@@ -29,21 +29,18 @@ function SplitContext(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::
     braketBB = LoopTransferMatrix(mpsB, mpsB)
     braketAB = LoopTransferMatrix(mpsA, mpsB)
     braketAA = LoopTransferMatrix(mpsA, mpsA)
+    unit = id(E, codomain(braketBB[1]))
     return SplitContext(mpsA, mpsB, braketAA, braketBB, braketAB,
-                        build_cache(braketBB, 1),
-                        build_cache(braketAB, 1),
+                        build_cache(braketBB, 1, unit),
+                        build_cache(braketAB, 1, unit),
                         expectation(braketAA),
                         SplitLog())
 end
 
 function construct_equation(ctx::SplitContext)
     N = transpose(environment(ctx.cacheBB), ((1, 2), (3, 4)))   # N = E₁ * ... * E_N
-    ABenv = environment(ctx.cacheAB)
-    if iseven(site(ctx))
-        @planar W[-1 -2; -3] := abc # TODO: the real contraction
-    else
-        @planar W[-1 -2; -3] := acb # TODO: the real contraction
-    end
+    # TODO: build W from ABenv and this_A, with even/odd parity
+    W = zero(this_B(ctx))
     return this_B(ctx), N, W
 end
 
