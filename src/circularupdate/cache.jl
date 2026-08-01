@@ -26,12 +26,12 @@ The full environment at `site` (product of everything except `v[site]`) is:
 
 # Fields
 - `site::Int`: the active cut position (1 ≤ site ≤ N)
-- `unit::T`: the category identity, used when a half-loop is empty
+- `edge_unit::T`: the category identity, used when a half-loop is empty
 """
 mutable struct RingCache{T}
     cache::Vector{T}
     site::Int
-    unit::T
+    edge_unit::T
 end
 
 Base.length(v::RingCache) = length(v.cache) + 1
@@ -63,11 +63,11 @@ end
     left_cache(v::RingCache)
 
 Product `v[1] * ... * v[site-1]` (the "left half" of the loop, O(1)).
-Returns `v.unit` when `site == 1` (empty half).
+Returns `v.edge_unit` when `site == 1` (empty half).
 """
 function left_cache(v::RingCache)
     i = v.site
-    i == 1 && return v.unit
+    i == 1 && return v.edge_unit
     return v[1 : i - 1]
 end
 
@@ -75,11 +75,11 @@ end
     right_cache(v::RingCache)
 
 Product `v[site+1] * ... * v[N]` (the "right half" of the loop, O(1)).
-Returns `v.unit` when `site == length(v)` (empty half).
+Returns `v.edge_unit` when `site == length(v)` (empty half).
 """
 function right_cache(v::RingCache)
     i = v.site
-    i == length(v) && return v.unit
+    i == length(v) && return v.edge_unit
     return v[i + 1 : end]
 end
 
@@ -87,7 +87,7 @@ end
     build_cache(v::LoopMonoid, site::Int = 1) -> RingCache
 
 Build the O(N) partial-product cache for loop `v` cut at `site`.
-The category unit for empty half-loops is obtained via `unit(v)`.
+The category unit for empty half-loops is obtained via `edge_unit(v)`.
 
 Cache layout (N = length(v)):
 
@@ -123,7 +123,7 @@ function build_cache(v::LoopMonoid, site::Int = 1)
         end
     end
 
-    return RingCache(cache, site, unit(v))
+    return RingCache(cache, site, edge_unit(v))
 end
 
 """
@@ -159,7 +159,7 @@ function advance!(v::RingCache, loop::LoopMonoid, st::SweepState)
         v.cache[s-1] = s == N ? loop[s] : loop[s] * v.cache[s]
         v.site = s - 1
     else
-        fresh = build_cache(loop, st.dir == 1 ? 1 : N, v.unit)
+        fresh = build_cache(loop, st.dir == 1 ? 1 : N)
         copyto!(v.cache, fresh.cache)
         v.site = fresh.site
     end

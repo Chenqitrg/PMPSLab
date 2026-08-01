@@ -7,6 +7,17 @@
 # Block-wise implementation follows TNRKit/src/utility/hermitian_tensor.jl
 # ------------------------------------------------------------------------------
 
+# Pseudo-power: suppresses small singular values to avoid 1/0 blowup
+function pseudopow(t::DiagonalTensorMap, a::Real; tol = eps(scalartype(t))^(3 / 4))
+    t′ = copy(t)
+    for (c, b) in blocks(t′)
+        @inbounds for i in 1:size(b, 1)
+            b.diag[i] = abs(b.diag[i]) < tol ? b.diag[i] : b.diag[i]^a
+        end
+    end
+    return t′
+end
+
 abstract type DenseSolve <: AbstractSolve end
 
 struct LUSolve <: DenseSolve end
@@ -21,7 +32,7 @@ end
 # Block-wise direct solvers
 # ---------------------------------------------------------------------------
 
-function _block_solve(f, A::AbstractTensorMap, b::AbstractTensorMap)
+function _block_ldiv(f, A::AbstractTensorMap, b::AbstractTensorMap)
     codomain(A) == codomain(b) ||
         throw(SpaceMismatch("non-matching codomains"))
     T = float(promote_type(scalartype(A), scalartype(b)))
@@ -32,32 +43,76 @@ function _block_solve(f, A::AbstractTensorMap, b::AbstractTensorMap)
     return x
 end
 
-solve(::LUSolve, A::AbstractTensorMap, b::AbstractTensorMap) = A \ b
-solve(::LUSolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap) = x + A \ (b - A * x)
+ldiv(::LUSolve, A::AbstractTensorMap, b::AbstractTensorMap) = A \ b
+ldiv(::LUSolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap) = x + A \ (b - A * x)
 
-function solve(::LDLTSolve, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U)
-    return _block_solve(A, b) do M, R
+function ldiv(::LDLTSolve, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U)
+    return _block_ldiv(A, b) do M, R
         Hermitian(M, uplo) \ R
     end
 end
 
-solve(::LDLTSolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U) = x + solve(LDLTSolve(), A, b - A * x; uplo=uplo)
+ldiv(::LDLTSolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U) = x + ldiv(LDLTSolve(), A, b - A * x; uplo=uplo)
 
-function solve(::CholeskySolve, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U)
-    return _block_solve(A, b) do M, R
+function ldiv(::CholeskySolve, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U)
+    return _block_ldiv(A, b) do M, R
         cholesky(Hermitian(M, uplo)) \ R
     end
 end
 
-solve(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U) = x + solve(CholeskySolve(), A, b - A * x; uplo=uplo)
+ldiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U) = x + ldiv(CholeskySolve(), A, b - A * x; uplo=uplo)
 
 # ---------------------------------------------------------------------------
 # Krylov solver — delegates to KrylovKit.linsolve
 # ---------------------------------------------------------------------------
 
-function solve(sol::KrylovSolve, A::AbstractTensorMap, b::AbstractTensorMap,
+function ldiv(sol::KrylovSolve, A::AbstractTensorMap, b::AbstractTensorMap,
                x0::AbstractTensorMap)
     x, info = linsolve(x -> A * x, b, x0, sol.alg)
+    info.converged == 0 && @warn "Krylov linsolve did not converge."
+    return x
+end
+
+# ---------------------------------------------------------------------------
+# Right-division: solve x * A = b  →  x = b / A
+# ---------------------------------------------------------------------------
+
+function _block_rdiv(f, A::AbstractTensorMap, b::AbstractTensorMap)
+    domain(A) == domain(b) ||
+        throw(SpaceMismatch("non-matching domains"))
+    T = float(promote_type(scalartype(A), scalartype(b)))
+    x = similar(b, T, codomain(b) ← codomain(A))
+    for (c, block_x) in blocks(x)
+        copy!(block_x, f(block(b, c), block(A, c)))
+    end
+    return x
+end
+
+rdiv(::LUSolve, A::AbstractTensorMap, b::AbstractTensorMap) = b / A
+rdiv(::LUSolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap) =
+    x + (b - x * A) / A
+
+function rdiv(::LDLTSolve, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U)
+    return _block_rdiv(A, b) do R, M
+        R / Hermitian(M, uplo)
+    end
+end
+
+rdiv(::LDLTSolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U) =
+    x + rdiv(LDLTSolve(), A, b - x * A; uplo=uplo)
+
+function rdiv(::CholeskySolve, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U)
+    return _block_rdiv(A, b) do R, M
+        R / cholesky(Hermitian(M, uplo))
+    end
+end
+
+rdiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U) =
+    x + rdiv(CholeskySolve(), A, b - x * A; uplo=uplo)
+
+function rdiv(sol::KrylovSolve, A::AbstractTensorMap, b::AbstractTensorMap,
+               x0::AbstractTensorMap)
+    x, info = linsolve(x -> x * A, b, x0, sol.alg)
     info.converged == 0 && @warn "Krylov linsolve did not converge."
     return x
 end

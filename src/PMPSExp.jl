@@ -1,4 +1,4 @@
-module PeriodicMPS
+module PMPSExp
 
 using TensorKit
 import TensorKit: scalartype
@@ -13,13 +13,13 @@ export ConvergenceLog, PowerIterLog, SweepLog, ProjectorLog, SplitLog
 export AbstractLoopCanonical, ProjectorCanonical, NuclearNormCanonical
 export AbstractLoopSplit
 export LoopTransferMatrix
-export RingCache, build_cache, environment, left_cache, right_cache
+export RingCache, build_cache, environment, left_cache, right_cache, edge_unit
 
 # Public API
 export canonicalize!, assertconsistency, dense, pair_contraction, split
-export random_mps, one_mps, random_mps2, one_mps2
+export random_mps, one_mps, random_mps2, one_mps2, lift
 export SweepState, AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, SplitContext, update!
-export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, solve
+export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 
 include("canonicalize/halfint.jl")
 include("mps.jl")

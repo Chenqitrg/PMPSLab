@@ -9,6 +9,7 @@ Base.length(mps::PeriodicMPS) = length(mps.tensors)
 Base.getindex(mps::PeriodicMPS, i::Int) = mps.tensors[i]
 Base.setindex!(mps::PeriodicMPS, v, i::Int) = (mps.tensors[i] = v)
 Base.iterate(mps::PeriodicMPS, args...) = iterate(mps.tensors, args...)
+Base.eltype(::Type{<:PeriodicMPS{A}}) where {A} = A
 
 # ------------------------------------------------------------------------------
 # Constructors — random and uniform (all-ones) periodic MPS
@@ -94,4 +95,28 @@ end
 function one_mps2(elt, N::Int, P::ElementarySpace, V::ElementarySpace)
     tensors = [ones(elt, V ⊗ P ⊗ P ← V) for _ in 1:N]
     return PeriodicMPS(PeriodicVector(tensors))
+end
+
+# ------------------------------------------------------------------------------
+# lift — replicate unit cell (finite → larger finite, or ∞ → infinite)
+# ------------------------------------------------------------------------------
+
+"""
+    lift(mps::PeriodicMPS, fold::Int) -> PeriodicMPS
+
+Replicate the unit cell `fold` times by concatenation.
+Corresponds to lifting a loop S¹ → cover.
+"""
+function lift(mps::PeriodicMPS, fold::Int)
+    tensors = repeat(collect(mps), fold)
+    return PeriodicMPS(PeriodicVector(tensors))
+end
+
+"""
+    lift(mps::PeriodicMPS, ::Val{Inf}) -> InfiniteMPS
+
+Lift to an infinite MPS (MPSKit.InfiniteMPS) by repeating the unit cell.
+"""
+function lift(mps::PeriodicMPS, ::Val{Inf})
+    return MPSKit.InfiniteMPS(collect(mps))
 end

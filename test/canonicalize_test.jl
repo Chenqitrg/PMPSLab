@@ -1,5 +1,5 @@
 using Test
-using PeriodicMPS:
+using PMPSExp:
     PeriodicMPS,
     HalfInt,
     assertconsistency,

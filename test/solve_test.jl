@@ -2,7 +2,7 @@
 # Each solver is tested against the naive backslash on a dense matrix.
 
 using Test
-using PeriodicMPS: LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, solve
+using PMPSExp: LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv
 using TensorKit
 using LinearAlgebra: Hermitian, I
 using KrylovKit: GMRES
@@ -15,7 +15,7 @@ using KrylovKit: GMRES
     A = TensorMap(M + M', ℂ^2 ⊗ ℂ^2, ℂ^2 ⊗ ℂ^2)   # Hermitian PSD
     b = randn(ComplexF64, ℂ^2 ⊗ ℂ^2, ℂ^1)
 
-    x = solve(LUSolve(), A, b)
+    x = ldiv(LUSolve(), A, b)
     @test x ≈ A \ b
 end
 
@@ -25,7 +25,7 @@ end
     b = randn(ComplexF64, ℂ^2 ⊗ ℂ^2, ℂ^1)
 
     x_lu = A \ b
-    x_ldlt = solve(LDLTSolve(), A, b)
+    x_ldlt = ldiv(LDLTSolve(), A, b)
     @test x_ldlt ≈ x_lu rtol=1e-10
 end
 
@@ -35,7 +35,7 @@ end
     b = randn(ComplexF64, ℂ^2 ⊗ ℂ^2, ℂ^1)
 
     x_lu = A \ b
-    x_chol = solve(CholeskySolve(), A, b)
+    x_chol = ldiv(CholeskySolve(), A, b)
     @test x_chol ≈ x_lu rtol=1e-10
 end
 
@@ -46,7 +46,7 @@ end
     x0 = zero(b)
 
     x_lu = A \ b
-    x_kry = solve(KrylovSolve(GMRES(; maxiter=100, tol=1e-12)), A, b, x0)
+    x_kry = ldiv(KrylovSolve(GMRES(; maxiter=100, tol=1e-12)), A, b, x0)
     @test x_kry ≈ x_lu rtol=1e-10
 end
 
@@ -58,8 +58,8 @@ end
     b = rand(ComplexF64, V ← R)
 
     x_lu = A \ b
-    @test solve(LUSolve(), A, b) ≈ x_lu
-    @test solve(LDLTSolve(), A, b) ≈ x_lu rtol=1e-10
+    @test ldiv(LUSolve(), A, b) ≈ x_lu
+    @test ldiv(LDLTSolve(), A, b) ≈ x_lu rtol=1e-10
 end
 
 @testset "solve! via __solve" begin
@@ -69,7 +69,7 @@ end
     b = TensorMap(randn(ComplexF64, 3, 1), ℂ^1 ⊗ ℂ^3, ℂ^1)
 
     for solver in (LUSolve(), LDLTSolve(), CholeskySolve())
-        x = solve(solver, A, b)
+        x = ldiv(solver, A, b)
         @test x ≈ A \ b rtol=1e-10
     end
 end

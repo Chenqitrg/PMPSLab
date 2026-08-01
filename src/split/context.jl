@@ -22,6 +22,7 @@ end
 
 site(ctx::SplitContext) = ctx.cacheBB.site
 this_B(ctx::SplitContext) = ctx.mpsB[site(ctx)]
+other_B(ctx::SplitContext) = iseven(site(ctx)) ? ctx.mpsB[site(ctx) - 1] : ctx.mpsB[site(ctx) + 1]
 pa_from_pb(pb::Int) = (pb + 1) ÷ 2
 this_A(ctx::SplitContext) = ctx.mpsA[pa_from_pb(site(ctx))]
 
@@ -36,16 +37,11 @@ function SplitContext(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::
                         SplitLog())
 end
 
-function construct_equation(ctx::SplitContext)
-    N = transpose(environment(ctx.cacheBB), ((1, 2), (3, 4)))   # N = E₁ * ... * E_N
-    # TODO: build W from ABenv and this_A, with even/odd parity
-    W = zero(this_B(ctx))
-    return this_B(ctx), N, W
-end
-
-function _update_rule(ctx::SplitContext, alg::LUSolve)
-    x, N, W = construct_equation(ctx)
-    return solve(alg, x, N, W)
+function update(ctx::SplitContext, alg::AbstractSolve)
+    N = transpose(environment(ctx.cacheBB), ((2, 4), (1, 3)))   # N = E₁ * ... * E_N
+    AB_env = environment(ctx.cacheAB)
+    @planar W[-1; -2 -3] := AB_env[1 2; 3 -2] * this_A(ctx)[3 -1 4; 1] * other_B(ctx)'[2; -3 4]
+    return rdiv(alg, this_B(ctx), N, W)
 end
 
 """
@@ -55,9 +51,9 @@ One site's update + cache advance. Environment (O(1)) → update rule →
 write back the new B tensor and transfer matrices → slide both caches.
 """
 function update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
-    this_B(ctx) != st.site && throw(ArgumentError("sweep state site $(st.site) does not match context site $(this_B(ctx))"))
+    site(ctx) != st.site && throw(ArgumentError("sweep state site $(st.site) does not match context site $(site(ctx))"))
 
-    new = _update_rule(ctx, solve)
+    new = update(ctx, solve)
     ctx.mpsB[st.site] = new
     ctx.braketBB[st.site] = site_transfer_matrix(new)
     advance!(ctx.cacheBB, ctx.braketBB, st)
@@ -73,9 +69,6 @@ end
 # 初始 1-site 近似的构造 —— 物理内容，后续实现
 _initial_approximation(mps, alg) =
     error("TODO: initial 1-site approximation not implemented yet")
-
-# 每 site 的更新规则 —— 物理内容，后续实现
-
 
 # 工厂：从 MPS 构造迭代器（sweep.jl 只依赖 N，不依赖 PeriodicMPS）
 ZigzagSweep(mps::PeriodicMPS; maximal_sweep::Int)   = ZigzagSweep(length(mps); maximal_sweep)

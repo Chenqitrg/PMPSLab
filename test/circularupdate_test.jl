@@ -6,7 +6,7 @@
 # ordering mistake in the cache shows up as a failing test.
 
 using Test
-using PeriodicMPS:
+using PMPSExp:
     PeriodicMPS,
     random_mps,
     LoopMonoid,
@@ -18,6 +18,7 @@ using PeriodicMPS:
     left_cache,
     range_prod,
     right_cache,
+    edge_unit,
     SweepState,
     ZigzagSweep,
     CircularSweep
@@ -33,7 +34,7 @@ Base.length(v::MatrixLoop) = length(v.sites)
 Base.getindex(v::MatrixLoop, i::Int) = v.sites[i]
 
 # Category unit for a MatrixLoop — identity on the common bond space.
-PeriodicMPS.unit(loop::MatrixLoop) = id(scalartype(loop[1]), codomain(loop[1]))
+PMPSExp.edge_unit(loop::MatrixLoop) = id(scalartype(loop[1]), codomain(loop[1]))
 
 # Random loop of D×D matrices with trivial (ℂ^D) bond spaces.
 random_loop(D::Int, N::Int) = MatrixLoop(
@@ -114,10 +115,10 @@ end
         v = build_cache(loop, site)
 
         expected_left = site == 1 ?
-                        v.unit :
+                        v.edge_unit :
                         naive_range_prod(loop, 1:(site - 1))
         expected_right = site == N ?
-                         v.unit :
+                         v.edge_unit :
                          naive_range_prod(loop, (site + 1):N)
 
         @test left_cache(v) ≈ expected_left
@@ -138,19 +139,19 @@ end
     D = 3
     loop = random_loop(D, 4)
     v2 = build_cache(loop, 2)
-    @test v2.unit ≈ id(ComplexF64, ℂ^D)
-    @test dim(codomain(v2.unit)) == D
+    @test v2.edge_unit ≈ id(ComplexF64, ℂ^D)
+    @test dim(codomain(v2.edge_unit)) == D
 
     # Empty halves return the unit.
-    @test left_cache(build_cache(loop, 1)) ≈ unit(loop)
-    @test right_cache(build_cache(loop, 4)) ≈ unit(loop)
+    @test left_cache(build_cache(loop, 1)) ≈ edge_unit(loop)
+    @test right_cache(build_cache(loop, 4)) ≈ edge_unit(loop)
 end
 
 @testset "Z2Irrep — unit space and environment" begin
     V = Z2Space(0 => 2, 1 => 2)
     loop = random_loop(V, 4)
     v = build_cache(loop, 2)
-    @test v.unit ≈ id(ComplexF64, V)
+    @test v.edge_unit ≈ id(ComplexF64, V)
 
     for site in 1:4
         @test environment(build_cache(loop, site)) ≈ naive_complement(loop, site)
@@ -172,7 +173,7 @@ end
     v = build_cache(ltm, 2)
 
     @test length(v) == N
-    @test v.unit ≈ id(ComplexF64, ℂ^D ⊗ (ℂ^D)')
+    @test v.edge_unit ≈ id(ComplexF64, ℂ^D ⊗ (ℂ^D)')
 
     # Every representable range matches a direct ordered product.
     @test v[1:1] ≈ range_prod(ltm, 1:1)
