@@ -1,76 +1,85 @@
 # ------------------------------------------------------------------------------
 # Sweep schemes — scanning orders as stateful iterators
 #
-# Each scheme is a mutable iterator yielding `(site, dir)` pairs:
+# Each scheme is an iterator yielding `(site, dir)` pairs:
 #   site — the position to update next
 #   dir  — the direction (+1/-1) in which the cache cut slides after the update
-# Both stop on their own: Zip after one round trip, Circular after
-# `maximal_sweep` full laps (n_sweep counts completed laps).
+#
+# Iteration state is an immutable tuple, separate from the container, so the
+# same scheme can be iterated repeatedly from the start.
 # ------------------------------------------------------------------------------
 
-abstract type AbstractSweep <: AbstractLoopApproximation end
+abstract type AbstractSweep <: AbstractLoopSplit end
+
+# ---------------------------------------------------------------------------
+# ZigzagSweep — 往返扫描
+# ---------------------------------------------------------------------------
 
 """
-    ZipSweep(N) — 往返（拉链式）扫描
+    ZigzagSweep(N; maximal_sweep)
 
-Yields sites `1, 2, …, N, N-1, …, 2` once, then ends. The turn at `N` flips
-`dir` to -1.
+Yields sites `1, 2, …, N, N-1, …, 2` per round trip, repeating up to
+`maximal_sweep` trips. The turn at `N` flips `dir` to -1.
 """
-@kwdef mutable struct ZipSweep <: AbstractSweep
+struct ZigzagSweep <: AbstractSweep
     N::Int
-    site::Int = 1
-    dir::Int = 1
-    turned::Bool = false
+    maximal_sweep::Int
 end
 
-ZipSweep(N::Int) = ZipSweep(N, 1, 1, false)
+ZigzagSweep(N::Int; maximal_sweep::Int) = ZigzagSweep(N, maximal_sweep)
 
-Base.IteratorSize(::Type{<:ZipSweep}) = Base.HasLength()
-Base.IteratorEltype(::Type{<:ZipSweep}) = Base.HasEltype()
-Base.eltype(::Type{<:ZipSweep}) = Tuple{Int, Int}
-Base.length(z::ZipSweep) = z.N == 1 ? 1 : 2z.N - 2
+Base.IteratorSize(::Type{<:ZigzagSweep}) = Base.HasLength()
+Base.IteratorEltype(::Type{<:ZigzagSweep}) = Base.HasEltype()
+Base.eltype(::Type{<:ZigzagSweep}) = Tuple{Int, Int}
 
-function Base.iterate(z::ZipSweep, state = z)
-    z.turned && return nothing
-    site, dir = z.site, z.dir
-    next = site + dir
-    if next > z.N
-        dir = -1
-        next = z.N - 1
-        next < 1 && (z.turned = true)   # N = 1：只访问一次
-    elseif next < 1
-        z.turned = true                 # 回到起点，结束（不重复访问 1）
-        next = 1
+function Base.length(z::ZigzagSweep)
+    z.N == 1 && return z.maximal_sweep
+    return (2z.N - 2) * z.maximal_sweep
+end
+
+function Base.iterate(z::ZigzagSweep, (site, dir, n) = (1, 1, 0))
+    n >= z.maximal_sweep && return nothing
+    if z.N == 1
+        return ((1, 1), (1, 1, n + 1))
     end
-    z.site, z.dir = next, dir
-    return ((site, dir), state)
+    if site == z.N && dir == 1
+        # 峰值：掉头，slide 方向翻为 -1
+        return ((site, -1), (z.N - 1, -1, n))
+    elseif site == 2 && dir == -1
+        # 一趟结束（不重访 site 1）
+        return ((site, dir), (1, 1, n + 1))
+    elseif dir == 1
+        return ((site, dir), (site + 1, 1, n))
+    else
+        return ((site, dir), (site - 1, -1, n))
+    end
 end
 
-"""
-    CircularSweep(N; maximal_sweep = 40) — 循环扫描
+# ---------------------------------------------------------------------------
+# CircularSweep — 循环扫描
+# ---------------------------------------------------------------------------
 
-Yields sites `1, 2, …, N` repeatedly, `maximal_sweep` laps in total; `n_sweep`
-counts completed laps. `dir` is always +1.
 """
-@kwdef mutable struct CircularSweep <: AbstractSweep
+    CircularSweep(N; maximal_sweep)
+
+Yields sites `1, 2, …, N` repeatedly, `maximal_sweep` laps in total.
+`dir` is always +1.
+"""
+struct CircularSweep <: AbstractSweep
     N::Int
-    maximal_sweep::Int = 40
-    n_sweep::Int = 0
-    site::Int = 1
+    maximal_sweep::Int
 end
 
-CircularSweep(N::Int; maximal_sweep::Int = 40) =
-    CircularSweep(N, maximal_sweep, 0, 1)
+CircularSweep(N::Int; maximal_sweep::Int) = CircularSweep(N, maximal_sweep)
 
 Base.IteratorSize(::Type{<:CircularSweep}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:CircularSweep}) = Base.HasEltype()
 Base.eltype(::Type{<:CircularSweep}) = Tuple{Int, Int}
 Base.length(cs::CircularSweep) = cs.N * cs.maximal_sweep
 
-function Base.iterate(cs::CircularSweep, state = cs)
-    cs.n_sweep >= cs.maximal_sweep && return nothing
-    site = cs.site
-    cs.site = mod1(cs.site + 1, cs.N)
-    cs.site == 1 && (cs.n_sweep += 1)
-    return ((site, 1), state)
+function Base.iterate(cs::CircularSweep, (site, n) = (1, 0))
+    n >= cs.maximal_sweep && return nothing
+    next_site = mod1(site + 1, cs.N)
+    next_n = next_site == 1 ? n + 1 : n
+    return ((site, 1), (next_site, next_n))
 end

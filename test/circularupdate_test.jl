@@ -20,7 +20,7 @@ using PeriodicMPS:
     left_right_unit,
     range_prod,
     right_cache,
-    ZipSweep,
+    ZigzagSweep,
     CircularSweep
 using TensorKit
 using MPSKit: PeriodicVector
@@ -198,20 +198,23 @@ end
     @test *(ltm) ≈ naive_range_prod(ltm, 1:N)
 end
 
-@testset "ZipSweep — 往返顺序" begin
+@testset "ZigzagSweep — 往返顺序" begin
     # 1, 2, …, N, N-1, …, 2（不重复访问 1）
-    @test collect(site for (site, _) in ZipSweep(4)) == [1, 2, 3, 4, 3, 2]
-    @test collect(site for (site, _) in ZipSweep(5)) == [1, 2, 3, 4, 5, 4, 3, 2]
+    @test collect(site for (site, _) in ZigzagSweep(4; maximal_sweep=1)) == [1, 2, 3, 4, 3, 2]
+    @test collect(site for (site, _) in ZigzagSweep(5; maximal_sweep=1)) == [1, 2, 3, 4, 5, 4, 3, 2]
     # 掉头处 dir 变号：前滑 +1，掉头后 -1
-    @test collect(dir for (_, dir) in ZipSweep(4)) == [1, 1, 1, -1, -1, -1]
+    @test collect(dir for (_, dir) in ZigzagSweep(4; maximal_sweep=1)) == [1, 1, 1, -1, -1, -1]
     # N = 1 只访问一次
-    @test collect(site for (site, _) in ZipSweep(1)) == [1]
+    @test collect(site for (site, _) in ZigzagSweep(1; maximal_sweep=1)) == [1]
+    # 多趟：maximal_sweep=2 重复两趟
+    @test collect(site for (site, _) in ZigzagSweep(3; maximal_sweep=2)) ==
+          [1, 2, 3, 2, 1, 2, 3, 2]
+    @test collect(site for (site, _) in ZigzagSweep(1; maximal_sweep=3)) == [1, 1, 1]
 end
 
 @testset "CircularSweep — 循环与最大趟数" begin
     cs = CircularSweep(4; maximal_sweep = 2)
     @test collect(site for (site, _) in cs) == [1, 2, 3, 4, 1, 2, 3, 4]
-    @test cs.n_sweep == 2
     # 单向循环：dir 恒为 +1
     @test all(dir == 1 for (_, dir) in CircularSweep(4; maximal_sweep = 2))
     # 一趟 N 个 site

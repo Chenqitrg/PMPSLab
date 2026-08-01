@@ -25,8 +25,8 @@ mutable struct ProjectorLog <: ConvergenceLog
     ProjectorLog() = new(SweepLog[], false)
 end
 
-# Approximation log (mutable)
-@kwdef mutable struct ApproximationLog <: ConvergenceLog
+# Split log (mutable)
+@kwdef mutable struct SplitLog <: ConvergenceLog
     sweeps::Vector{SweepLog} = SweepLog[]
     converged::Bool = false
     cost_history::Vector{Float64} = Float64[]

@@ -8,16 +8,16 @@ using MPSKit: left_virtualspace, right_virtualspace, physicalspace,
 
 # Types
 export PeriodicMPS, HalfInt
-export ConvergenceLog, PowerIterLog, SweepLog, ProjectorLog, ApproximationLog
+export ConvergenceLog, PowerIterLog, SweepLog, ProjectorLog, SplitLog
 export AbstractLoopCanonical, ProjectorCanonical, NuclearNormCanonical
-export AbstractLoopApproximation
+export AbstractLoopSplit
 export LoopTransferMatrix
 export RingCache, build_cache, environment, left_cache, right_cache
 
 # Public API
-export canonicalize!, assertconsistency, dense, pair_contraction, approximate
+export canonicalize!, assertconsistency, dense, pair_contraction, split
 export random_mps, one_mps, random_mps2, one_mps2
-export AbstractSweep, ZipSweep, CircularSweep, ApproximationContext, update!
+export AbstractSweep, ZigzagSweep, CircularSweep, SplitContext, update!
 
 include("canonicalize/halfint.jl")
 include("mps.jl")
@@ -29,9 +29,9 @@ include("canonicalize/projector.jl")
 include("canonicalize/nuclearnorm.jl")
 include("canonicalize/interface.jl")
 include("assert.jl")
-include("approximate/interface.jl")
+include("split/interface.jl")
 include("circularupdate/sweep.jl")
-include("approximate/context.jl")
+include("split/context.jl")
 include("dense.jl")
 
 end

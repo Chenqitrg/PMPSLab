@@ -1,32 +1,32 @@
 # ------------------------------------------------------------------------------
-# ApproximationContext — state of one 2-site → 1-site approximation run
+# SplitContext — state of one 2-site → 1-site split run
 #
 # The context is the single mutable state object; `update!` performs one site's
-# update in place. The sweep scheme (ZipSweep / CircularSweep) supplies the
+# update in place. The sweep scheme (ZigzagSweep / CircularSweep) supplies the
 # visit order; the update rule itself is the physics, filled in per algorithm.
 # ------------------------------------------------------------------------------
 
-mutable struct ApproximationContext
+mutable struct SplitContext
     mps_original :: PeriodicMPS      # 原始 2-site mps（只读参考）
     mps          :: PeriodicMPS      # 当前 1-site 近似，update! 就地修改
     ltm          :: LoopTransferMatrix  # mps 的转移矩阵环（cache 的元素源）
     cache        :: RingCache        # 滑动缓存，site 字段即当前位置
-    log          :: ApproximationLog
+    log          :: SplitLog
 end
 
-function ApproximationContext(mps_original::PeriodicMPS, mps::PeriodicMPS, alg::AbstractSweep)
+function SplitContext(mps_original::PeriodicMPS, mps::PeriodicMPS, alg::AbstractSweep)
     ltm = LoopTransferMatrix(mps)
-    return ApproximationContext(mps_original, mps, ltm, build_cache(ltm, alg.site),
-                                ApproximationLog())
+    return SplitContext(mps_original, mps, ltm, build_cache(ltm, 1),
+                                SplitLog())
 end
 
 """
-    update!(ctx::ApproximationContext, alg::AbstractSweep, site::Int)
+    update!(ctx::SplitContext, alg::AbstractSweep, site::Int)
 
 One site's update: environment at the current cut (O(1)) → update rule →
 write back the new tensor and its transfer matrix. Returns the new tensor.
 """
-function update!(ctx::ApproximationContext, alg::AbstractSweep, site::Int)
+function update!(ctx::SplitContext, alg::AbstractSweep, site::Int)
     env = environment(ctx.cache)              # cut == site
     new = _update_rule(ctx, alg, env)         # TODO: 物理规则（按算法类型实现）
     ctx.mps[site] = new
@@ -42,12 +42,16 @@ _initial_approximation(mps, alg) =
 _update_rule(ctx, alg, env) =
     error("TODO: site update rule not implemented yet")
 
+# 工厂：从 MPS 构造迭代器（sweep.jl 只依赖 N，不依赖 PeriodicMPS）
+ZigzagSweep(mps::PeriodicMPS; maximal_sweep::Int)   = ZigzagSweep(length(mps); maximal_sweep)
+CircularSweep(mps::PeriodicMPS; maximal_sweep::Int) = CircularSweep(length(mps); maximal_sweep)
+
 # ------------------------------------------------------------------------------
 # Driver — the sweep scheme iterates itself
 # ------------------------------------------------------------------------------
 
-function _approximate(mps::PeriodicMPS, alg::AbstractSweep)
-    ctx = ApproximationContext(mps, _initial_approximation(mps, alg), alg)
+function _split(mps::PeriodicMPS, alg::AbstractSweep)
+    ctx = SplitContext(mps, _initial_approximation(mps, alg), alg)
     for (site, dir) in alg
         update!(ctx, alg, site)
         advance!(ctx.cache, ctx.ltm, ctx.ltm[site], dir)

@@ -171,16 +171,12 @@ environment(v::RingCache) = right_cache(v) * left_cache(v)
 """
     advance!(v::RingCache, loop, new_value, dir::Int)
 
-Slide the cut of `v` from `site` to the next position (dir = +1 forward,
--1 backward), after the element at the current cut was replaced by
-`new_value` (the fresh element already stored in `loop`).
+Slide the cut of `v` after `site` was updated to `new_value` (the fresh
+element already stored in `loop`). `dir` = +1 slides forward, -1 backward.
 
-Interior moves are O(1): exactly one slot changes meaning — forward, slot
-`s` becomes the new prefix `w[1] * … * w[s] = cache[s-1] * new_value`;
-backward, slot `s-1` becomes the new suffix `w[s] * … * w[N] = new_value * cache[s]`.
-
-Wrapping around (N → 1 or 1 → N) rebuilds the whole cache in O(N) from
-`loop`, which must reflect the updated elements.
+Interior moves are O(1): forward, slot `s` becomes `cache[s-1] * new_value`;
+backward, slot `s-1` becomes `new_value * cache[s]`. Wrapping around
+(N → 1 or 1 → N) rebuilds the whole cache in O(N) from `loop`.
 """
 function advance!(v::RingCache, loop::LoopMonoid, new_value, dir::Int)
     N = length(v)

@@ -73,7 +73,7 @@ end
 
 # Contract two adjacent one-site tensors into one two-site tensor,
 # summing over the shared virtual leg.
-function _pair_contract(T1, T2)
+function _pair_contract(T1::TensorMap{E, S, 2, 1}, T2::TensorMap{E, S, 2, 1}) where {E, S}
     @plansor T12[-1 -2 -3; -4] := T1[-1 -2; 1] * T2[1 -3; -4]
     return T12
 end
