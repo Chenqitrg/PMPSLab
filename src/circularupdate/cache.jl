@@ -169,26 +169,26 @@ the input to a local update rule in a sweep.
 environment(v::RingCache) = right_cache(v) * left_cache(v)
 
 """
-    advance!(v::RingCache, loop, new_value, dir::Int)
+    advance!(v::RingCache, loop, st::SweepState)
 
-Slide the cut of `v` after `site` was updated to `new_value` (the fresh
-element already stored in `loop`). `dir` = +1 slides forward, -1 backward.
+Slide the cut of `v` after `st.site` was updated (the fresh element is
+already stored in `loop[site]`). `st.dir` = +1 slides forward, -1 backward.
 
-Interior moves are O(1): forward, slot `s` becomes `cache[s-1] * new_value`;
-backward, slot `s-1` becomes `new_value * cache[s]`. Wrapping around
+Interior moves are O(1): forward, slot `s` becomes `cache[s-1] * loop[s]`;
+backward, slot `s-1` becomes `loop[s] * cache[s]`. Wrapping around
 (N → 1 or 1 → N) rebuilds the whole cache in O(N) from `loop`.
 """
-function advance!(v::RingCache, loop::LoopMonoid, new_value, dir::Int)
+function advance!(v::RingCache, loop::LoopMonoid, st::SweepState)
     N = length(v)
     s = v.site
-    if dir == 1 && s < N
-        v.cache[s] = s == 1 ? new_value : v.cache[s-1] * new_value
+    if st.dir == 1 && s < N
+        v.cache[s] = s == 1 ? loop[s] : v.cache[s-1] * loop[s]
         v.site = s + 1
-    elseif dir == -1 && s > 1
-        v.cache[s-1] = s == N ? new_value : new_value * v.cache[s]
+    elseif st.dir == -1 && s > 1
+        v.cache[s-1] = s == N ? loop[s] : loop[s] * v.cache[s]
         v.site = s - 1
     else
-        fresh = build_cache(loop, dir == 1 ? 1 : N)
+        fresh = build_cache(loop, st.dir == 1 ? 1 : N)
         copyto!(v.cache, fresh.cache)
         v.site = fresh.site
     end

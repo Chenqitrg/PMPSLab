@@ -20,6 +20,7 @@ using PeriodicMPS:
     left_right_unit,
     range_prod,
     right_cache,
+    SweepState,
     ZigzagSweep,
     CircularSweep
 using TensorKit
@@ -200,23 +201,23 @@ end
 
 @testset "ZigzagSweep — 往返顺序" begin
     # 1, 2, …, N, N-1, …, 2（不重复访问 1）
-    @test collect(site for (site, _) in ZigzagSweep(4; maximal_sweep=1)) == [1, 2, 3, 4, 3, 2]
-    @test collect(site for (site, _) in ZigzagSweep(5; maximal_sweep=1)) == [1, 2, 3, 4, 5, 4, 3, 2]
+    @test collect(st.site for st in ZigzagSweep(4; maximal_sweep=1)) == [1, 2, 3, 4, 3, 2]
+    @test collect(st.site for st in ZigzagSweep(5; maximal_sweep=1)) == [1, 2, 3, 4, 5, 4, 3, 2]
     # 掉头处 dir 变号：前滑 +1，掉头后 -1
-    @test collect(dir for (_, dir) in ZigzagSweep(4; maximal_sweep=1)) == [1, 1, 1, -1, -1, -1]
+    @test collect(st.dir for st in ZigzagSweep(4; maximal_sweep=1)) == [1, 1, 1, -1, -1, -1]
     # N = 1 只访问一次
-    @test collect(site for (site, _) in ZigzagSweep(1; maximal_sweep=1)) == [1]
+    @test collect(st.site for st in ZigzagSweep(1; maximal_sweep=1)) == [1]
     # 多趟：maximal_sweep=2 重复两趟
-    @test collect(site for (site, _) in ZigzagSweep(3; maximal_sweep=2)) ==
+    @test collect(st.site for st in ZigzagSweep(3; maximal_sweep=2)) ==
           [1, 2, 3, 2, 1, 2, 3, 2]
-    @test collect(site for (site, _) in ZigzagSweep(1; maximal_sweep=3)) == [1, 1, 1]
+    @test collect(st.site for st in ZigzagSweep(1; maximal_sweep=3)) == [1, 1, 1]
 end
 
 @testset "CircularSweep — 循环与最大趟数" begin
     cs = CircularSweep(4; maximal_sweep = 2)
-    @test collect(site for (site, _) in cs) == [1, 2, 3, 4, 1, 2, 3, 4]
+    @test collect(st.site for st in cs) == [1, 2, 3, 4, 1, 2, 3, 4]
     # 单向循环：dir 恒为 +1
-    @test all(dir == 1 for (_, dir) in CircularSweep(4; maximal_sweep = 2))
+    @test all(st.dir == 1 for st in CircularSweep(4; maximal_sweep = 2))
     # 一趟 N 个 site
     @test length(collect(CircularSweep(3; maximal_sweep = 1))) == 3
     @test length(collect(CircularSweep(1; maximal_sweep = 3))) == 3
@@ -228,7 +229,7 @@ end
     new2 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     loop2 = MatrixLoop([i == 2 ? new2 : loop[i] for i in 1:5])
     v = build_cache(loop, 2)
-    advance!(v, loop2, new2, 1)
+    advance!(v, loop2, SweepState(2, 1, 0))
     @test v.site == 3
     @test environment(v) ≈ naive_complement(loop2, 3)
 
@@ -236,7 +237,7 @@ end
     new4 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     loop4 = MatrixLoop([i == 4 ? new4 : loop[i] for i in 1:5])
     v = build_cache(loop, 4)
-    advance!(v, loop4, new4, -1)
+    advance!(v, loop4, SweepState(4, -1, 0))
     @test v.site == 3
     @test environment(v) ≈ naive_complement(loop4, 3)
 
@@ -244,7 +245,7 @@ end
     new5 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     loop5 = MatrixLoop([i == 5 ? new5 : loop[i] for i in 1:5])
     v = build_cache(loop, 5)
-    advance!(v, loop5, new5, 1)
+    advance!(v, loop5, SweepState(5, 1, 0))
     @test v.site == 1
     @test environment(v) ≈ naive_complement(loop5, 1)
 
@@ -252,7 +253,7 @@ end
     new1 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     loop1 = MatrixLoop([i == 1 ? new1 : loop[i] for i in 1:5])
     v = build_cache(loop, 1)
-    advance!(v, loop1, new1, 1)
+    advance!(v, loop1, SweepState(1, 1, 0))
     @test v.site == 2
     @test environment(v) ≈ naive_complement(loop1, 2)
 end

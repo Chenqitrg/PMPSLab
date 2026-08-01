@@ -17,7 +17,7 @@ export RingCache, build_cache, environment, left_cache, right_cache
 # Public API
 export canonicalize!, assertconsistency, dense, pair_contraction, split
 export random_mps, one_mps, random_mps2, one_mps2
-export AbstractSweep, ZigzagSweep, CircularSweep, SplitContext, update!
+export SweepState, AbstractSweep, ZigzagSweep, CircularSweep, SplitContext, update!
 
 include("canonicalize/halfint.jl")
 include("mps.jl")

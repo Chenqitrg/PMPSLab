@@ -19,7 +19,7 @@ w[range]    -> product       # reduct: product over a periodic range
 sweep(w::PeriodicWord, updaterule, order::Vector{Int})
     # For each i in order:
     #   W_i := w[i+1 : i-1]          # product of everything except w[i]
-    #   w[i] = updaterule(W_i, i)     # assign back
+    #   w[i] = updaterule(W_i)     # assign back
     # Returns nothing; w is mutated in-place, log is accumulated internally.
 ```
 
