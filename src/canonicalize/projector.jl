@@ -43,7 +43,7 @@ end
 # ------------------------------------------------------------------------------
 
 function find_L(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
-    L = id(E, right_virtualspace(mps[pos.n]))
+    L = id(E, mps[pos])
     steps = 0
     err = Inf
     N = length(mps)
@@ -66,7 +66,7 @@ function find_L(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::P
 end
 
 function find_R(pos::HalfInt, mps::PeriodicMPS{<:AbstractTensorMap{E,S}}, alg::ProjectorCanonical) where {E,S}
-    R = id(E, right_virtualspace(mps[pos.n]))
+    R = id(E, mps[pos])
     steps = 0
     err = Inf
     N = length(mps)

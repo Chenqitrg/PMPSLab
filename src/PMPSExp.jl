@@ -4,11 +4,12 @@ using TensorKit
 import TensorKit: scalartype
 using KrylovKit
 using LinearAlgebra
-using MPSKit: left_virtualspace, right_virtualspace, physicalspace,
+using MPSKit: left_virtualspace, right_virtualspace,
               Algorithm, GenericMPSTensor, TruncationStrategy, PeriodicVector
+import MPSKit: physicalspace
 
 # Types
-export PeriodicMPS, HalfInt
+export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
 export ConvergenceLog, PowerIterLog, SweepLog, ProjectorLog, SplitLog
 export AbstractLoopCanonical, ProjectorCanonical, NuclearNormCanonical
 export AbstractLoopSplit
@@ -21,7 +22,6 @@ export random_mps, one_mps, random_mps2, one_mps2, lift
 export SweepState, AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, SplitContext, update!
 export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 
-include("canonicalize/halfint.jl")
 include("mps.jl")
 include("logs.jl")
 include("circularupdate/loopmonoid.jl")

@@ -86,7 +86,7 @@ periodic MPS with 1 physical leg per site (2 codim legs) that best approximates
 the loop state. Returns `(mps_1site, log)`.
 """
 function split(mps::PeriodicMPS, alg::LoopSplit)
-    ctx = SplitContext(mps, _initial_approximation(mps, alg))
+    ctx = SplitContext(mps, initial_approximation(mps, alg.ansatz))
     for st in alg.sweep
         update!(ctx, alg.solve, st)
     end

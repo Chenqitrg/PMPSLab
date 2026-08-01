@@ -68,7 +68,7 @@ function pair_contraction(mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}}) where 
         "pair contraction requires an even number of sites, got $N"
     ))
     paired = [_pair_contract(mps[2k - 1], mps[2k]) for k in 1:(N ÷ 2)]
-    return PeriodicMPS(PeriodicVector(paired))
+    return PeriodicMPS(paired)
 end
 
 # Contract two adjacent one-site tensors into one two-site tensor,
