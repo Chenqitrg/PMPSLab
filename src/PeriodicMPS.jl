@@ -18,7 +18,7 @@ export RingCache, build_cache, environment, left_cache, right_cache
 # Public API
 export canonicalize!, assertconsistency, dense, pair_contraction, split
 export random_mps, one_mps, random_mps2, one_mps2
-export SweepState, AbstractSweep, ZigzagSweep, CircularSweep, SplitContext, update!
+export SweepState, AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, SplitContext, update!
 export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, solve
 
 include("canonicalize/halfint.jl")
@@ -34,6 +34,7 @@ include("assert.jl")
 include("split/interface.jl")
 include("circularupdate/sweep.jl")
 include("solve.jl")
+include("algorithm_context.jl")
 include("split/context.jl")
 include("dense.jl")
 

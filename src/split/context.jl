@@ -8,7 +8,7 @@
 
 # A site (2 physical legs) maps to two B sites (1 physical leg each):
 #   pa = (pb + 1) ÷ 2, and A[pa] couples to B[2pa-1], B[2pa].
-mutable struct SplitContext{E, S}
+mutable struct SplitContext{E, S} <: AlgorithmContext{E, S}
     mpsA            :: PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}      # 2-site mps（N/2 个 site，只读）
     mpsB            :: PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}      # 1-site mps（N 个 site，update! 就地修改）
     braketAA          :: LoopTransferMatrix{<:AbstractTensorMap{E, S, 2, 2}}  # 2-site transfer matrix 环
@@ -29,10 +29,9 @@ function SplitContext(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::
     braketBB = LoopTransferMatrix(mpsB, mpsB)
     braketAB = LoopTransferMatrix(mpsA, mpsB)
     braketAA = LoopTransferMatrix(mpsA, mpsA)
-    unit = id(E, codomain(braketBB[1]))
     return SplitContext(mpsA, mpsB, braketAA, braketBB, braketAB,
-                        build_cache(braketBB, 1, unit),
-                        build_cache(braketAB, 1, unit),
+                        build_cache(braketBB, 1),
+                        build_cache(braketAB, 1),
                         expectation(braketAA),
                         SplitLog())
 end

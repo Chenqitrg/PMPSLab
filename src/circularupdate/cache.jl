@@ -84,10 +84,10 @@ function right_cache(v::RingCache)
 end
 
 """
-    build_cache(v::LoopMonoid, site::Int, unit) -> RingCache
+    build_cache(v::LoopMonoid, site::Int = 1) -> RingCache
 
 Build the O(N) partial-product cache for loop `v` cut at `site`.
-`unit` is the category identity for empty half-loops (provided by caller).
+The category unit for empty half-loops is obtained via `unit(v)`.
 
 Cache layout (N = length(v)):
 
@@ -104,12 +104,11 @@ Cache layout (N = length(v)):
 Filled with two passes (prefix from the left, suffix from the right),
 totalling N-2 multiplications for N > 1.
 """
-function build_cache(v::LoopMonoid, site::Int, unit)
+function build_cache(v::LoopMonoid, site::Int = 1)
     N = length(v)
     T = eltype(v)
     cache = Vector{T}(undef, N - 1)
 
-    # left[k] = v[1] * ... * v[k]
     if N > 1
         acc = v[1]
         for k in 1:site-1
@@ -117,7 +116,6 @@ function build_cache(v::LoopMonoid, site::Int, unit)
             k < site-1 && (acc = acc * v[k + 1])
         end
 
-        # right[k] = v[k+1] * ... * v[N]
         acc = v[N]
         for k in N-1:-1:site
             cache[k] = acc
@@ -125,7 +123,7 @@ function build_cache(v::LoopMonoid, site::Int, unit)
         end
     end
 
-    return RingCache(cache, site, unit)
+    return RingCache(cache, site, unit(v))
 end
 
 """

@@ -6,6 +6,7 @@ abstract type LoopMonoid end
 
 Base.length(v::LoopMonoid) = error("length not implemented for $(typeof(v))")
 Base.getindex(v::LoopMonoid, i::Int) = error("getindex not implemented for $(typeof(v))")
+unit(v::LoopMonoid) = error("unit not implemented for $(typeof(v)) — provide a category identity")
 
 range_prod(v::LoopMonoid, r::AbstractUnitRange) = reduce(*, (v[i] for i in r))
 

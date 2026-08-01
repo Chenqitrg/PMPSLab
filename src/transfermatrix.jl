@@ -50,6 +50,8 @@ end
 
 LoopTransferMatrix(mps::PeriodicMPS) = LoopTransferMatrix(mps, mps)
 
+unit(ltm::LoopTransferMatrix) = id(scalartype(ltm[1]), codomain(ltm[1]))
+
 # Full loop product E₁ * E₂ * ... * E_N
 function Base.:*(ltm::LoopTransferMatrix)
     N = length(ltm.matrices)
