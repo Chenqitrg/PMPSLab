@@ -11,14 +11,4 @@ struct LoopSplit{S<:AbstractSweep, V<:AbstractSolve} <: AbstractLoopSplit
     solve::V
 end
 
-"""
-    split(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, alg::AbstractLoopSplit)
-
-Given a periodic MPS with 2 physical legs per site (3 codim legs), produce a
-periodic MPS with 1 physical leg per site (2 codim legs) that best approximates
-the loop state. Returns `(mps_1site, log)`.
-"""
-function split(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
-               alg::LoopSplit) where {E,S}
-    return _split(mps, alg)
-end
+# split(mps, alg) defined in context.jl — needs SplitContext
