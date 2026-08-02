@@ -5,7 +5,9 @@ import TensorKit: scalartype
 using KrylovKit
 using LinearAlgebra
 using MPSKit: left_virtualspace, right_virtualspace,
-              Algorithm, GenericMPSTensor, TruncationStrategy, PeriodicVector
+              Algorithm, GenericMPSTensor, TruncationStrategy, PeriodicVector,
+              DefaultAlgorithm
+import MPSKit
 import MPSKit: physicalspace
 
 # Types
@@ -32,6 +34,7 @@ include("canonicalize/nuclearnorm.jl")
 include("canonicalize/interface.jl")
 include("assert.jl")
 include("split/interface.jl")
+include("split/ansatz.jl")
 include("circularupdate/sweep.jl")
 include("solve.jl")
 include("algorithm_context.jl")

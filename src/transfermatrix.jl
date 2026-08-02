@@ -27,14 +27,21 @@ function site_transfer_matrix(bra::AbstractTensorMap{E,S,3,1}, ketL::AbstractTen
     return 𝔼
 end
 
+function site_transfer_matrix(braL::AbstractTensorMap{E,S,2,1}, braR::AbstractTensorMap{E,S,2,1}, ket::AbstractTensorMap{E,S,3,1}) where {E,S}
+    bL, bR = braL', braR'
+    @plansor 𝔼[-1 -2; -3 -4] := bL[1; -2 2] * bR[-4; 1 3] * ket[-1 2 3; -3]
+    return 𝔼
+end
+
 # Collection of transfer matrices wrapping a full loop.
 struct LoopTransferMatrix{T <: AbstractTensorMap} <: LoopMonoid
     matrices::PeriodicVector{T}
 end
 
 Base.length(v::LoopTransferMatrix) = length(v.matrices)
+Base.eltype(::Type{<:LoopTransferMatrix{T}}) where {T} = T
 Base.getindex(v::LoopTransferMatrix, i::Int) = v.matrices[i]
-Base.setindex!(v::LoopTransferMatrix{<:AbstractTensorMap{E, S, M, 1}}, T::AbstractTensorMap{E, S, M, 1}, i::Int) where {E, S, M} = (v.matrices[i] = T)
+Base.setindex!(v::LoopTransferMatrix, T::AbstractTensorMap, i::Int) = (v.matrices[i] = T)
 
 # Construct from a PeriodicMPS
 function LoopTransferMatrix(bra::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}, ket::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}) where {E, S, M}
@@ -43,8 +50,18 @@ function LoopTransferMatrix(bra::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}, k
 end
 
 function LoopTransferMatrix(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}) where {E, S}
+    length(mpsB) == 2 * length(mpsA) ||
+        throw(DimensionMismatch("two-site mpsA has $(length(mpsA)) sites but one-site mpsB has $(length(mpsB)) (expected $(2 * length(mpsA)))"))
     tmats = [site_transfer_matrix(mpsA[i], mpsB[2i-1], mpsB[2i])
-             for i in eachindex(mpsA)]
+             for i in 1:length(mpsA)]
+    return LoopTransferMatrix(PeriodicVector(tmats))
+end
+
+function LoopTransferMatrix(mpsB::PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}, mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}) where {E, S}
+    length(mpsB) == 2 * length(mpsA) ||
+        throw(DimensionMismatch("two-site mpsA has $(length(mpsA)) sites but one-site mpsB has $(length(mpsB)) (expected $(2 * length(mpsA)))"))
+    tmats = [site_transfer_matrix(mpsB[2i-1], mpsB[2i], mpsA[i])
+             for i in 1:length(mpsA)]
     return LoopTransferMatrix(PeriodicVector(tmats))
 end
 
@@ -64,4 +81,11 @@ end
 
 function expectation(ltm::LoopTransferMatrix)
     return tr(*(ltm))
+end
+
+function diff_norm(mps1::PeriodicMPS, mps2::PeriodicMPS)
+    transfer1 = LoopTransferMatrix(mps1)
+    transfer2 = LoopTransferMatrix(mps2)
+    transfer12 = LoopTransferMatrix(mps1, mps2)
+    return expectation(transfer1) + expectation(transfer2) - 2 * real(expectation(transfer12))
 end

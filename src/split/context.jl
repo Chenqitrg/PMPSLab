@@ -16,7 +16,7 @@ mutable struct SplitContext{E, S} <: AlgorithmContext{E, S}
     braketAB           :: LoopTransferMatrix{<:AbstractTensorMap{E, S, 2, 2}}  # 2-site → 1-site transfer matrix 环
     cacheBB         :: RingCache{<:AbstractTensorMap{E, S, 2, 2}}       # braketBB 的滑动缓存
     cacheAB         :: RingCache{<:AbstractTensorMap{E, S, 2, 2}}        # braketAB 的滑动缓存
-    expectationAA  :: Float64
+    expectationAA  :: E
     log             :: SplitLog
 end
 
@@ -28,7 +28,7 @@ this_A(ctx::SplitContext) = ctx.mpsA[pa_from_pb(site(ctx))]
 
 function SplitContext(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}) where {E, S}
     braketBB = LoopTransferMatrix(mpsB, mpsB)
-    braketAB = LoopTransferMatrix(mpsA, mpsB)
+    braketAB = LoopTransferMatrix(mpsB, mpsA)
     braketAA = LoopTransferMatrix(mpsA, mpsA)
     return SplitContext(mpsA, mpsB, braketAA, braketBB, braketAB,
                         build_cache(braketBB, 1),
@@ -38,10 +38,18 @@ function SplitContext(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::
 end
 
 function update(ctx::SplitContext, alg::AbstractSolve)
-    N = transpose(environment(ctx.cacheBB), ((2, 4), (1, 3)))   # N = E₁ * ... * E_N
+    N = transpose(environment(ctx.cacheBB), ((3, 1), (4, 2)))   # N = E₁ * ... * E_N
     AB_env = environment(ctx.cacheAB)
-    @planar W[-1; -2 -3] := AB_env[1 2; 3 -2] * this_A(ctx)[3 -1 4; 1] * other_B(ctx)'[2; -3 4]
-    return rdiv(alg, this_B(ctx), N, W)
+    A = this_A(ctx)
+    oB = other_B(ctx)'
+    if isodd(site(ctx))
+        @plansor W[-1; -2 -3] := AB_env[1 2; 3 -2] * A[3 -1 4; 1] * oB[2; -3 4]
+    else
+        @plansor W[-1; -2 -3] := AB_env[1 -3; 2 4] * A[2 3 -1; 1] * oB[-2; 4 3]
+    end
+    x0 = transpose(this_B(ctx), ((2,), (1, 3)))  # B → (P ← V_left, V_right) for right-division
+    x1 = rdiv(alg, x0, N, W)
+    return transpose(x1, ((2, 1), (3,)))          # back to (V_left ⊗ P ← V_right)
 end
 
 """

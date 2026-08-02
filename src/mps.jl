@@ -7,8 +7,10 @@ struct HalfInt
 end
 Base.convert(::Type{HalfInt}, n::Int) = HalfInt(n)
 function HalfInt(x::Rational{Int})
-    den(x) in (1, 2) || throw(ArgumentError("HalfInt: denominator must be 1 or 2, got $x"))
-    return HalfInt(div(num(x), den(x)))
+    denominator(x) == 2 || throw(ArgumentError("HalfInt: expected a half-integer n + 1/2 (denominator 2), got $x"))
+    # numerator is odd (lowest terms), so n = (num - 1) / 2 exactly;
+    # div truncates toward zero, which would give 0 for -1//2.
+    return HalfInt(div(numerator(x) - 1, 2))
 end
 Base.hash(h::HalfInt, h0::UInt) = hash(h.n, h0)
 Base.:(==)(a::HalfInt, b::HalfInt) = a.n == b.n
@@ -24,9 +26,14 @@ struct HalfPeriodicVector{A}
 end
 Base.length(v::HalfPeriodicVector) = length(v.elements)
 Base.getindex(v::HalfPeriodicVector, pos::HalfInt) = v.elements[pos.n]
+Base.getindex(v::HalfPeriodicVector, i::Int) = v.elements[i]
+Base.getindex(v::HalfPeriodicVector, x::Rational{Int}) = v[HalfInt(x)]
 Base.iterate(v::HalfPeriodicVector, i::Int = 1) =
     i > length(v) ? nothing : (v.elements[i], i + 1)
 Base.eltype(::Type{HalfPeriodicVector{A}}) where {A} = A
+
+HalfPeriodicVector(v::AbstractVector) = HalfPeriodicVector(PeriodicVector(v))
+
 
 # ------------------------------------------------------------------------------
 # PeriodicMPS — periodic boundary MPS
