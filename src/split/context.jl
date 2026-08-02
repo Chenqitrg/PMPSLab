@@ -37,7 +37,7 @@ function SplitContext(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::
                         SplitLog())
 end
 
-function update(ctx::SplitContext, alg::AbstractSolve)
+function solvenew(ctx::SplitContext, alg::AbstractSolve)
     N = transpose(environment(ctx.cacheBB), ((3, 1), (4, 2)))   # N = E₁ * ... * E_N
     AB_env = environment(ctx.cacheAB)
     A = this_A(ctx)
@@ -49,6 +49,10 @@ function update(ctx::SplitContext, alg::AbstractSolve)
     end
     x0 = transpose(this_B(ctx), ((2,), (1, 3)))  # B → (P ← V_left, V_right) for right-division
     x1 = rdiv(alg, x0, N, W)
+
+    # cost = real(ctx.expectationAA - conj(tr(W * x1')))
+    # write!(ctx.log, site(ctx), cost)
+
     return transpose(x1, ((2, 1), (3,)))          # back to (V_left ⊗ P ← V_right)
 end
 
@@ -61,7 +65,7 @@ write back the new B tensor and transfer matrices → slide both caches.
 function update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
     site(ctx) != st.site && throw(ArgumentError("sweep state site $(st.site) does not match context site $(site(ctx))"))
 
-    new = update(ctx, solve)
+    new = solvenew(ctx, solve)
     ctx.mpsB[st.site] = new
     ctx.braketBB[st.site] = site_transfer_matrix(new)
     advance!(ctx.cacheBB, ctx.braketBB, st)

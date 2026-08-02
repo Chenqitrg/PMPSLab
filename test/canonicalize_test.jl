@@ -1,9 +1,9 @@
 using Test
-using PMPSExp:
+using PMPSLab:
     PeriodicMPS,
     HalfInt,
     assertconsistency,
-    canonicalize!,
+    gaugefix!,
     dense,
     pair_contraction,
     random_mps,
@@ -228,12 +228,12 @@ end
     @test numout(R) == 1 && numin(R) == 1
 end
 
-@testset "canonicalize! — integration" begin
+@testset "gaugefix! — integration" begin
     N, d, D = 4, 2, 3
     mps = random_mps(ComplexF64, N, d, D)
     tvec = [copy(mps[i]) for i in 1:N]
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
-    log = canonicalize!(mps, alg)
+    log = gaugefix!(mps, alg)
     @test log.converged
     @test length(log.sweeps) == 1
     # After canonicalization, consistency should still hold
@@ -244,14 +244,14 @@ end
     end
 end
 
-@testset "canonicalize! — Z2Irrep" begin
+@testset "gaugefix! — Z2Irrep" begin
     N = 4
     V = Z2Space(0 => 3, 1 => 2)
     P = Z2Space(0 => 2)
     mps = random_mps(ComplexF64, N, P, V)
     tvec = [copy(mps[i]) for i in 1:N]
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
-    log = canonicalize!(mps, alg)
+    log = gaugefix!(mps, alg)
     @test log.converged
     @test assertconsistency(mps) === nothing
     for i in 1:N
@@ -259,12 +259,12 @@ end
     end
 end
 
-@testset "canonicalize! — self-consistency" begin
+@testset "gaugefix! — self-consistency" begin
     N, d, D = 4, 2, 2
     mps = random_mps(ComplexF64, N, d, D)
     dense_before = dense(mps)
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
-    canonicalize!(mps, alg)
+    gaugefix!(mps, alg)
     dense_after = dense(mps)
     @test norm(dense_before - dense_after) < 1e-10
 end

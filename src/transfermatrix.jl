@@ -83,9 +83,10 @@ function expectation(ltm::LoopTransferMatrix)
     return tr(*(ltm))
 end
 
-function diff_norm(mps1::PeriodicMPS, mps2::PeriodicMPS)
-    transfer1 = LoopTransferMatrix(mps1)
-    transfer2 = LoopTransferMatrix(mps2)
-    transfer12 = LoopTransferMatrix(mps1, mps2)
-    return expectation(transfer1) + expectation(transfer2) - 2 * real(expectation(transfer12))
+TensorKit.dot(bra::PeriodicMPS, ket::PeriodicMPS) = expectation(LoopTransferMatrix(bra, ket))
+TensorKit.norm(mps::PeriodicMPS) = real(dot(mps, mps))
+diff_norm(mps1::PeriodicMPS, mps2::PeriodicMPS) = norm(mps1) + norm(mps2) - 2 * real(dot(mps1, mps2))
+
+function Base.isapprox(mps1::PeriodicMPS, mps2::PeriodicMPS; kwargs...)
+    return isapprox(diff_norm(mps1, mps2); kwargs...)
 end

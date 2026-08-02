@@ -2,7 +2,7 @@
 # PeriodicMPS, the random/one constructors and lift.
 
 using Test
-using PMPSExp:
+using PMPSLab:
     PeriodicMPS,
     HalfInt,
     HalfPeriodicVector,
@@ -125,8 +125,9 @@ end
     @test physicalspace(mps) == ℂ^d
     @test scalartype(mps) == ComplexF64
 
-    # HalfInt getindex: bond label → left virtual space of that site
-    @test mps[HalfInt(2)] == left_virtualspace(mps[2])
+    # HalfInt getindex: bond label → right virtual space of site n = left of site n+1
+    @test mps[HalfInt(2)] == right_virtualspace(mps[2])
+    @test mps[HalfInt(2)] == left_virtualspace(mps[3])
 
     vs = virtualspaces(mps)
     @test vs isa HalfPeriodicVector

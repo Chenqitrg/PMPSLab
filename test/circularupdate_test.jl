@@ -6,7 +6,7 @@
 # ordering mistake in the cache shows up as a failing test.
 
 using Test
-using PMPSExp:
+using PMPSLab:
     PeriodicMPS,
     random_mps,
     LoopMonoid,
@@ -34,7 +34,7 @@ Base.length(v::MatrixLoop) = length(v.sites)
 Base.getindex(v::MatrixLoop, i::Int) = v.sites[i]
 
 # Category unit for a MatrixLoop — identity on the common bond space.
-PMPSExp.edge_unit(loop::MatrixLoop) = id(scalartype(loop[1]), codomain(loop[1]))
+PMPSLab.edge_unit(loop::MatrixLoop) = id(scalartype(loop[1]), codomain(loop[1]))
 
 # Random loop of D×D matrices with trivial (ℂ^D) bond spaces.
 random_loop(D::Int, N::Int) = MatrixLoop(

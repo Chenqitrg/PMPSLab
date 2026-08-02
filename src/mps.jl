@@ -42,15 +42,66 @@ HalfPeriodicVector(v::AbstractVector) = HalfPeriodicVector(PeriodicVector(v))
 struct PeriodicMPS{A <: GenericMPSTensor}
     tensors::PeriodicVector{A}
 end
-PeriodicMPS(tensors::AbstractVector{<:GenericMPSTensor}) =
-    PeriodicMPS(PeriodicVector(tensors))
+function PeriodicMPS(tensors::AbstractVector{<:GenericMPSTensor})
+    mps = PeriodicMPS(PeriodicVector(tensors))
+    assertconsistency(mps)
+    return mps
+end
+
+"""
+    assertconsistency(mps::PeriodicMPS)
+
+Check that the virtual spaces of adjacent site tensors are compatible around
+the loop. Throws `TensorKit.SpaceMismatch` on failure.
+"""
+function assertconsistency(mps::PeriodicMPS)
+    N = length(mps)
+    for i in 1:N
+        L = left_virtualspace(mps[i])
+        R = right_virtualspace(mps[i - 1])
+        L == R || throw(TensorKit.SpaceMismatch(
+            "left_virtualspace at site $i ($L) ≠ right_virtualspace at site $(i-1) ($R)"
+        ))
+    end
+    return nothing
+end
+
+# -- container interface ---------------------------------------------------------
+
+Base.size(mps::PeriodicMPS, args...) = size(mps.tensors, args...)
 Base.length(mps::PeriodicMPS) = length(mps.tensors)
+Base.eachindex(mps::PeriodicMPS) = eachindex(mps.tensors)
+Base.eachindex(l::IndexStyle, mps::PeriodicMPS) = eachindex(l, mps.tensors)
+eachsite(mps::PeriodicMPS) = PeriodicVector(eachindex(mps))
+Base.checkbounds(::Type{Bool}, mps::PeriodicMPS, i::Integer) = true
+
+# -- indexing & iteration --------------------------------------------------------
+
 Base.getindex(mps::PeriodicMPS, i::Int) = mps.tensors[i]
 Base.setindex!(mps::PeriodicMPS, v, i::Int) = (mps.tensors[i] = v)
 Base.iterate(mps::PeriodicMPS, args...) = iterate(mps.tensors, args...)
+
+# -- type traits -----------------------------------------------------------------
+
 Base.eltype(::Type{<:PeriodicMPS{A}}) where {A} = A
+Base.eltype(mps::PeriodicMPS) = eltype(typeof(mps))
+Base.isfinite(::Type{<:PeriodicMPS}) = false
+struct PeriodicChainStyle <: MPSKit.GeometryStyle end
+MPSKit.GeometryStyle(::Type{<:PeriodicMPS}) = PeriodicChainStyle()
 scalartype(mps::PeriodicMPS) = scalartype(mps[1])
-Base.getindex(mps::PeriodicMPS, pos::HalfInt) = left_virtualspace(mps[pos.n])
+
+# -- copy & transform ------------------------------------------------------------
+
+Base.copy(mps::PeriodicMPS) = PeriodicMPS(copy(mps.tensors))
+function Base.copy!(dst::PeriodicMPS, src::PeriodicMPS)
+    copy!(dst.tensors, src.tensors)
+    return dst
+end
+Base.repeat(mps::PeriodicMPS, i::Int) = PeriodicMPS(repeat(mps.tensors, i))
+Base.circshift(mps::PeriodicMPS, n) = PeriodicMPS(circshift(mps.tensors, n))
+Base.similar(mps::PeriodicMPS{A}) where {A} = PeriodicMPS(similar(mps.tensors))
+
+Base.getindex(mps::PeriodicMPS, pos::HalfInt) = right_virtualspace(mps[pos.n])
 
 virtualspace(mps::PeriodicMPS{<:GenericMPSTensor}) = left_virtualspace(mps[1])
 function virtualspaces(mps::PeriodicMPS{<:GenericMPSTensor})
@@ -186,8 +237,7 @@ Replicate the unit cell `fold` times by concatenation.
 Corresponds to lifting a loop S¹ → cover.
 """
 function lift(mps::PeriodicMPS, fold::Int)
-    tensors = repeat(collect(mps), fold)
-    return PeriodicMPS(tensors)
+    return repeat(mps, fold)
 end
 
 """

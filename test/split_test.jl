@@ -2,7 +2,7 @@
 # the per-site update rule and the full split run.
 
 using Test
-using PMPSExp:
+using PMPSLab:
     PeriodicMPS,
     HalfInt,
     random_mps,
@@ -21,9 +21,10 @@ using PMPSExp:
     LoopTransferMatrix,
     LUSolve,
     CholeskySolve
-import PMPSExp: LoopSplit, RandomAnsatz, OneAnsatz, SVDAnsatz,
-                initial_approximation, split_site, update, diff_norm,
-                site, this_B, other_B, this_A, pa_from_pb, expectation
+import PMPSLab: LoopSplit, RandomAnsatz, OneAnsatz, SVDAnsatz, OneLoopAnsatz,
+                initial_approximation, split_site, diff_norm,
+                site, this_B, other_B, this_A, pa_from_pb, expectation,
+                ProjectorCanonical, gaugefix!
 using TensorKit
 using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace,
               physicalspace, TruncationStrategy
@@ -204,4 +205,30 @@ end
     @test length(B1) == 4
     @test assertconsistency(B1) === nothing
     @test scalartype(B1[1]) == ComplexF64
+end
+
+@testset "OneLoopAnsatz — SVD pre-split + canonicalize" begin
+    D, d = 2, 2
+    B0 = random_mps(ComplexF64, 4, d, D)
+    A = pair_contraction(B0)
+    ansatz = OneLoopAnsatz(SVDAnsatz(TruncationStrategy()), ProjectorCanonical())
+    mpsB = initial_approximation(A, ansatz)
+
+    @test length(mpsB) == 4
+    @test assertconsistency(mpsB) === nothing
+    @test scalartype(mpsB[1]) == ComplexF64
+    # SVD is exact for factorizable A, and gaugefix! doesn't change the state
+    @test dense(mpsB) ≈ dense(A) rtol=1e-10
+end
+
+@testset "OneLoopAnsatz — Z2-graded spaces" begin
+    V = Z2Space(0 => 2, 1 => 1)
+    P = Z2Space(0 => 2)
+    mpsA = random_mps2(ComplexF64, 2, P, V)
+    ansatz = OneLoopAnsatz(SVDAnsatz(TruncationStrategy()), ProjectorCanonical())
+    mpsB = initial_approximation(mpsA, ansatz)
+
+    @test length(mpsB) == 4
+    @test assertconsistency(mpsB) === nothing
+    @test scalartype(mpsB[1]) == ComplexF64
 end

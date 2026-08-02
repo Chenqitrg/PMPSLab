@@ -19,7 +19,7 @@ function _absorb_projectors!(mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}}, PL_
 end
 
 """
-    canonicalize!(mps::PeriodicMPS, alg::ProjectorCanonical;
+    gaugefix!(mps::PeriodicMPS, alg::ProjectorCanonical;
                   log = ProjectorLog(), observer = nothing)
 
 Absorb the transfer-matrix fixed-point environments into `mps` by iteratively
@@ -35,7 +35,7 @@ tensors. Modifies `mps` in place and returns a [`ProjectorLog`](@ref).
 
 # Examples
 # === Basic usage ===
-log = canonicalize!(mps, alg)
+log = gaugefix!(mps, alg)
 
 # === Live polling from another task ===
 log = ProjectorLog()
@@ -43,12 +43,12 @@ log = ProjectorLog()
     println("sweeps: \$(length(log.sweeps))")
     sleep(0.1)
 end
-canonicalize!(mps, alg; log = log)
+gaugefix!(mps, alg; log = log)
 
 # === Observer callback ===
-canonicalize!(mps, alg; observer = (logL, logR) -> @info "bond done" logL.pos)
+gaugefix!(mps, alg; observer = (logL, logR) -> @info "bond done" logL.pos)
 """
-function canonicalize!(mps::PeriodicMPS, alg::ProjectorCanonical;
+function gaugefix!(mps::PeriodicMPS, alg::ProjectorCanonical;
                        log::ProjectorLog = ProjectorLog(),
                        observer = nothing)
     PR_vec, PL_vec, sweep_log = find_projectors(mps, alg; observer)

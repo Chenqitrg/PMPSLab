@@ -1,7 +1,7 @@
 # Tests for src/transfermatrix.jl — dense (eager) transfer matrices on the loop.
 
 using Test
-using PMPSExp:
+using PMPSLab:
     PeriodicMPS,
     random_mps,
     one_mps,
@@ -11,7 +11,8 @@ using PMPSExp:
     site_transfer_matrix,
     LoopTransferMatrix,
     edge_unit,
-    expectation
+    expectation,
+    diff_norm
 using TensorKit
 using MPSKit: PeriodicVector, left_virtualspace
 
@@ -170,4 +171,67 @@ end
 
     # graded one-site overlap with itself
     @test expectation(LoopTransferMatrix(bra)) ≈ overlap(bra, bra)
+end
+
+# ==============================================================================
+# dot, norm, diff_norm
+# ==============================================================================
+
+@testset "dot — agrees with expectation of LoopTransferMatrix" begin
+    N, d, D = 3, 2, 2
+    bra = random_mps(ComplexF64, N, d, D)
+    ket = random_mps(ComplexF64, N, d, D)
+
+    @test dot(bra, ket) ≈ expectation(LoopTransferMatrix(bra, ket))
+    @test dot(bra, ket) ≈ overlap(bra, ket)
+
+    # same MPS: inner product = expectation (real, positive)
+    @test dot(bra, bra) ≈ expectation(LoopTransferMatrix(bra))
+    @test imag(dot(bra, bra)) ≈ 0 atol=1e-12
+    @test real(dot(bra, bra)) > 0
+end
+
+@testset "norm — real, non-negative, analytic for one_mps" begin
+    N, d, D = 4, 2, 2
+    mps = random_mps(ComplexF64, N, d, D)
+    @test norm(mps) ≈ dot(mps, mps)
+    @test norm(mps) > 0
+    @test imag(norm(mps)) ≈ 0 atol=1e-12
+
+    # analytic: one_mps → each E = d·ones(D², D²), tr(∏E) = d^N · D^{2N}
+    mps1 = one_mps(ComplexF64, N, d, D)
+    @test norm(mps1) ≈ d^N * D^(2N)
+end
+
+@testset "norm — 2-site MPS" begin
+    N, d, D = 2, 2, 2
+    mps = random_mps2(ComplexF64, N, d, D)
+    @test norm(mps) ≈ expectation(LoopTransferMatrix(mps))
+    @test norm(mps) ≈ real(overlap(mps, mps)) rtol=1e-10
+end
+
+@testset "diff_norm — zero for identical, positive for distinct" begin
+    N, d, D = 3, 2, 2
+    mps1 = random_mps(ComplexF64, N, d, D)
+    mps2 = random_mps(ComplexF64, N, d, D)
+
+    @test diff_norm(mps1, mps1) ≈ 0 atol=1e-12
+    @test diff_norm(mps1, mps2) > 0
+    @test diff_norm(mps1, mps2) ≈ diff_norm(mps2, mps1)
+end
+
+@testset "diff_norm — with Z2-graded spaces" begin
+    N = 3
+    V = Z2Space(0 => 2, 1 => 1)
+    P = Z2Space(0 => 2)
+    mps1 = random_mps(ComplexF64, N, P, V)
+    mps2 = random_mps(ComplexF64, N, P, V)
+
+    @test diff_norm(mps1, mps1) ≈ 0 atol=1e-12
+    @test diff_norm(mps1, mps2) > 0
+    @test diff_norm(mps1, mps2) ≈ diff_norm(mps2, mps1)
+
+    # consistent with manual computation via dense
+    d12 = norm(dense(mps1) - dense(mps2))
+    @test d12^2 ≈ diff_norm(mps1, mps2) rtol=1e-10
 end

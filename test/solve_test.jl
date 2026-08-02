@@ -2,7 +2,7 @@
 # Each solver is tested against the naive backslash on a dense matrix.
 
 using Test
-using PMPSExp: LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv
+using PMPSLab: LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv
 using TensorKit
 using LinearAlgebra: Hermitian, I
 using KrylovKit: GMRES

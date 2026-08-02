@@ -43,3 +43,14 @@ function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}
     tensors = [t for i in 1:length(mps) for t in split_site(mps[i], ansatz.truncation)]
     return PeriodicMPS(tensors)
 end
+
+struct OneLoopAnsatz <: AbstractAnsatz
+    svd_pre::SVDAnsatz
+    canonical::AbstractLoopCanonical
+end
+
+function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::OneLoopAnsatz) where {E, S}
+    mps_approx = initial_approximation(mps, ansatz.svd_pre)
+    gaugefix!(mps_approx, ansatz.canonical)
+    return mps_approx
+end

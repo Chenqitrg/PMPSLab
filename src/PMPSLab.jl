@@ -1,4 +1,4 @@
-module PMPSExp
+module PMPSLab
 
 using TensorKit
 import TensorKit: scalartype
@@ -19,7 +19,7 @@ export LoopTransferMatrix
 export RingCache, build_cache, environment, left_cache, right_cache, edge_unit
 
 # Public API
-export canonicalize!, assertconsistency, dense, pair_contraction, split
+export gaugefix!, assertconsistency, dense, pair_contraction, split
 export random_mps, one_mps, random_mps2, one_mps2, lift
 export SweepState, AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, SplitContext, update!
 export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
@@ -32,7 +32,6 @@ include("transfermatrix.jl")
 include("canonicalize/projector.jl")
 include("canonicalize/nuclearnorm.jl")
 include("canonicalize/interface.jl")
-include("assert.jl")
 include("split/interface.jl")
 include("split/ansatz.jl")
 include("circularupdate/sweep.jl")
