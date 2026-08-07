@@ -10,6 +10,12 @@ edge_unit(v::LoopMonoid) = error("edge_unit not implemented for $(typeof(v)) —
 
 range_prod(v::LoopMonoid, r::AbstractUnitRange) = reduce(*, (v[i] for i in r))
 
+abstract type LoopCP <: LoopMonoid end
+abstract type LoopDenseCP <: LoopCP end
+
+abstract type LoopLModule{C <: LoopMonoid} end
+abstract type LoopRModule{C <: LoopMonoid} end
+
 # ------------------------------------------------------------------------------
 # SweepState — one step's position in a sweep
 #
