@@ -39,7 +39,7 @@ HalfPeriodicVector(v::AbstractVector) = HalfPeriodicVector(PeriodicVector(v))
 # PeriodicMPS — periodic boundary MPS
 # ------------------------------------------------------------------------------
 
-struct PeriodicMPS{A <: GenericMPSTensor}
+struct PeriodicMPS{A <: GenericMPSTensor} <: MPSKit.AbstractMPS
     tensors::PeriodicVector{A}
 end
 function PeriodicMPS(tensors::AbstractVector{<:GenericMPSTensor})
@@ -85,9 +85,10 @@ Base.iterate(mps::PeriodicMPS, args...) = iterate(mps.tensors, args...)
 
 Base.eltype(::Type{<:PeriodicMPS{A}}) where {A} = A
 Base.eltype(mps::PeriodicMPS) = eltype(typeof(mps))
-Base.isfinite(::Type{<:PeriodicMPS}) = false
+Base.isfinite(::Type{<:PeriodicMPS}) = true
 struct PeriodicChainStyle <: MPSKit.GeometryStyle end
 MPSKit.GeometryStyle(::Type{<:PeriodicMPS}) = PeriodicChainStyle()
+MPSKit.site_type(::Type{<:PeriodicMPS{A}}) where {A} = A
 scalartype(mps::PeriodicMPS) = scalartype(mps[1])
 
 # -- copy & transform ------------------------------------------------------------
