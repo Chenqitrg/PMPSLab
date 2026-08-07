@@ -2,6 +2,7 @@
 # the per-site update rule and the full split run.
 
 using Test
+using Random
 using PMPSLab:
     PeriodicMPS,
     HalfInt,
@@ -19,6 +20,7 @@ using PMPSLab:
     CircularSweep,
     SweepState,
     LoopTransferMatrix,
+    squared_distance,
     LUSolve,
     CholeskySolve
 import PMPSLab: LoopSplit, RandomAnsatz, OneAnsatz, SVDAnsatz, OneLoopAnsatz,
@@ -205,6 +207,51 @@ end
     @test length(B1) == 4
     @test assertconsistency(B1) === nothing
     @test scalartype(B1[1]) == ComplexF64
+end
+
+@testset "update! — exact loop cost descends for both sweep orders" begin
+    Random.seed!(1234)
+    mpsA = random_mps2(ComplexF64, 2, 2, 2)
+    ansatz = SVDAnsatz(TruncationStrategy(maxrank=1))
+
+    for sweep in (
+            CircularSweep(4; maximal_sweep=2),
+            ZigzagSweep(4; maximal_sweep=2),
+        )
+        ctx = SplitContext(mpsA, initial_approximation(mpsA, ansatz))
+        previous_cost = squared_distance(mpsA, ctx.mpsB)
+
+        for st in sweep
+            _, local_cost = update!(ctx, LUSolve(), st)
+            exact_cost = squared_distance(mpsA, ctx.mpsB)
+            @test local_cost ≈ exact_cost rtol=1e-9 atol=1e-9
+            @test exact_cost <= previous_cost + 1e-9 * max(previous_cost, 1.0)
+            previous_cost = exact_cost
+        end
+    end
+end
+
+@testset "split — sweep progress log and callback" begin
+    Random.seed!(4321)
+    mpsA = random_mps2(ComplexF64, 2, 2, 2)
+    nsweeps = 3
+    alg = LoopSplit(
+        SVDAnsatz(TruncationStrategy(maxrank=1)),
+        CircularSweep(4; maximal_sweep=nsweeps),
+        LUSolve(),
+    )
+    callback_costs = Float64[]
+    mpsB, log = split(
+        mpsA, alg;
+        callback=split_log -> push!(callback_costs, last(split_log.site_logs).error),
+    )
+
+    @test length(log.site_logs) == 4nsweeps
+    @test length(callback_costs) == nsweeps
+    @test callback_costs == getfield.(log.site_logs[4:4:end], :error)
+    @test all(diff(callback_costs) .<= 1e-9 .* max.(callback_costs[1:(end - 1)], 1.0))
+    @test callback_costs[end] ≈ squared_distance(mpsA, mpsB) rtol=1e-10 atol=1e-10
+    @test log.sweep_time >= 0
 end
 
 @testset "OneLoopAnsatz — SVD pre-split + projector gauge fixing" begin

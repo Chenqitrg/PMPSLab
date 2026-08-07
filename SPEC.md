@@ -101,6 +101,45 @@ replace the finite-ring tensors or preserve the finite-ring amplitude.
 `gaugefix!(mps, ProjectorCanonical(...))` in place. The later split/ALS machinery
 continues to work exclusively with `PeriodicMPS` values.
 
+### Split cost log and callback
+
+`split(mps, alg)` currently returns `(mpsB, log)`. Each `SiteLog.error` records
+the cheap local quantity produced by `solvenew`,
+
+```math
+c_{\mathrm{local}} = \operatorname{Re}
+\left(\langle A|A\rangle - \operatorname{tr}(W x^\dagger)\right).
+```
+
+This equals the global squared distance when the local normal equation and its
+mixed environment are consistent. `SplitContext` maintains `braketAB` uniformly
+as `\langle B|A\rangle`; completed B pairs are therefore written with
+`site_transfer_matrix(B₁, B₂, A)`. Exact-solver regression tests require the
+local estimate to agree with a fresh complete-loop contraction after every
+site and require non-increase for both circular and zigzag sweeps.
+
+The public interface provides a synchronous optional callback after each
+complete sweep:
+
+```julia
+split(mps, alg; callback = nothing)
+callback(log)
+cost = last(log.site_logs).error
+```
+
+No separate progress type or duplicate cost storage is needed. The error in the
+last `SiteLog` is the cost after the most recent update,
+
+```math
+c = \langle A|A\rangle + \langle B|B\rangle
+    - 2\operatorname{Re}\langle B|A\rangle.
+```
+
+The callback fires at a change of `SweepState.n` and once after the final
+sweep. It receives the same mutable `SplitLog` that is eventually returned and
+adds no contraction or MPS copy. Rendering, channels, progress bars, stopping
+policy, and cancellation remain frontend responsibilities.
+
 ## Norm semantics
 
 ```julia
@@ -120,3 +159,6 @@ squared_distance(a, b) =
 - One- and multi-physical-leg tensors, real/complex scalars, and graded spaces
   use the same generic QR/LQ and absorption implementation.
 - With truncation, errors are measured from a complete finite-loop contraction.
+- For `split` with an exact local solver, compare the local update against the
+  complete loop cost after every site and require non-increase before enabling
+  the sweep callback.

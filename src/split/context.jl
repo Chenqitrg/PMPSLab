@@ -69,8 +69,9 @@ function update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
     advance!(ctx.cacheBB, ctx.braketBB, st)
     if (st.dir == 1 && iseven(st.site)) || (st.dir == -1 && isodd(st.site))
         pa = pa_from_pb(st.site)
-        ctx.braketAB[pa] = site_transfer_matrix(ctx.mpsA[pa],
-                                                ctx.mpsB[2 * pa - 1], ctx.mpsB[2 * pa])
+        ctx.braketAB[pa] = site_transfer_matrix(
+            ctx.mpsB[2 * pa - 1], ctx.mpsB[2 * pa], ctx.mpsA[pa]
+        )
         advance!(ctx.cacheAB, ctx.braketAB, st)
     end
     return new, cost
@@ -85,21 +86,34 @@ CircularSweep(mps::PeriodicMPS; maximal_sweep::Int) = CircularSweep(length(mps);
 # ------------------------------------------------------------------------------
 
 """
-    split(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, alg::AbstractLoopSplit)
+    split(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, alg::AbstractLoopSplit;
+          callback=nothing)
 
 Given a periodic MPS with 2 physical legs per site (3 codim legs), produce a
 periodic MPS with 1 physical leg per site (2 codim legs) that best approximates
 the loop state. Returns `(mps_1site, log)` where `log` is a [`SplitLog`](@ref)
-(= `SweepLog{SiteLog{SweepState}}`) — one record `(st, cost, time)` per
-update, in visit order; per-sweep grouping follows from `st.n`.
+with one `SiteLog` per update. If supplied, `callback(log)` is called
+synchronously after each complete sweep; the current cost is
+`last(log.site_logs).error`.
 """
-function split(mps::PeriodicMPS, alg::LoopSplit)
+function split(mps::PeriodicMPS, alg::LoopSplit; callback = nothing)
     ctx = SplitContext(mps, initial_approximation(mps, alg.ansatz))
     log = SplitLog()
+    active_sweep = nothing
+    started_at = time()
     for st in alg.sweep
+        if !isnothing(active_sweep) && st.n != active_sweep
+            log.sweep_time = time() - started_at
+            isnothing(callback) || callback(log)
+        end
         t0 = time()
         _, cost = update!(ctx, alg.solve, st)
         push!(log.site_logs, SiteLog(st, cost, time() - t0))
+        active_sweep = st.n
+    end
+    if !isnothing(active_sweep)
+        log.sweep_time = time() - started_at
+        isnothing(callback) || callback(log)
     end
     return ctx.mpsB, log
 end

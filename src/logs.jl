@@ -29,4 +29,5 @@ mutable struct SweepLog{T} <: ConvergenceLog
 end
 SweepLog(site_logs::Vector{T}, sweep_time::Real, converged::Bool) where {T} =
     SweepLog{T}(site_logs, Float64(sweep_time), converged)
+
 const SplitLog = SweepLog{SiteLog{SweepState,Nothing}}
