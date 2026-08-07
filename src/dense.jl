@@ -16,13 +16,8 @@ function dense(mps::PeriodicMPS{<:AbstractTensorMap{E,S,M,1}}) where {E,S,M}
         # Move the right virtual leg and the physical legs to the domain.  The
         # physical legs are reversed here and restored below, so their public
         # order remains site-major for any number of legs per tensor.
-        left_tmp = left * transpose(T, ((1,), (M + 1, reverse(2:M)...)))
-        out_legs = numout(left_tmp)
-        old_outputs = Tuple(1:out_legs)
-        new_physical = Tuple(reverse((out_legs + 2):(out_legs + M)))
-        left = transpose(
-            left_tmp, ((old_outputs..., new_physical...), (out_legs + 1,))
-        )
+        left_tmp = left * repartition(T, 1, M)
+        left = repartition(left_tmp, numind(left_tmp) - 1, 1)
     end
     # left = L₁ ⊗ P₁ ⊗ ... ⊗ P_N ← L₁  → trace out L₁
     N_cod = length(codomain(left))

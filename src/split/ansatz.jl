@@ -33,10 +33,10 @@ struct SVDAnsatz <: AbstractAnsatz
 end
 
 function split_site(T::AbstractTensorMap{E, S, 3, 1}, trunc::TruncationStrategy) where {E, S}
-    # T: L ⊗ P₁ ⊗ P₂ ← R  →  transpose to (L ⊗ P₁) ← (R ⊗ P₂)  → SVD
-    U, Sv, Vp, _ = svd_trunc(transpose(T, ((1, 2), (4, 3))), DefaultAlgorithm(; trunc))
+    # T: L ⊗ P₁ ⊗ P₂ ← R  →  repartition as (L ⊗ P₁) ← (R ⊗ P₂)  → SVD
+    U, Sv, Vp, _ = svd_trunc(repartition(T, 2, 2), DefaultAlgorithm(; trunc))
     sqS = sqrt(Sv)
-    return U * sqS, transpose(sqS * Vp, ((1, 3), (2,)))      # two 1-site tensors: (L ⊗ P₁ ← χ), (χ ⊗ P₂ ← R)
+    return U * sqS, repartition(sqS * Vp, 2, 1)      # two 1-site tensors: (L ⊗ P₁ ← χ), (χ ⊗ P₂ ← R)
 end
 
 function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::SVDAnsatz) where {E, S}
