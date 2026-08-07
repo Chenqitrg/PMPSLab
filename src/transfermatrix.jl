@@ -34,7 +34,7 @@ function site_transfer_matrix(braL::AbstractTensorMap{E,S,2,1}, braR::AbstractTe
 end
 
 # Collection of transfer matrices wrapping a full loop.
-struct LoopTransferMatrix{T <: AbstractTensorMap} <: LoopMonoid
+struct LoopTransferMatrix{T <: AbstractTensorMap} <: LoopDenseCP
     matrices::PeriodicVector{T}
 end
 
@@ -45,6 +45,9 @@ Base.setindex!(v::LoopTransferMatrix, T::AbstractTensorMap, i::Int) = (v.matrice
 
 # Construct from a PeriodicMPS
 function LoopTransferMatrix(bra::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}, ket::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}) where {E, S, M}
+    length(bra) == length(ket) || throw(DimensionMismatch(
+        "bra has $(length(bra)) sites but ket has $(length(ket)) sites"
+    ))
     tmats = [site_transfer_matrix(bratensor, kettensor) for (bratensor, kettensor) in zip(bra, ket)]
     return LoopTransferMatrix(PeriodicVector(tmats))
 end
@@ -84,9 +87,55 @@ function expectation(ltm::LoopTransferMatrix)
 end
 
 TensorKit.dot(bra::PeriodicMPS, ket::PeriodicMPS) = expectation(LoopTransferMatrix(bra, ket))
-TensorKit.norm(mps::PeriodicMPS) = real(dot(mps, mps))
-diff_norm(mps1::PeriodicMPS, mps2::PeriodicMPS) = norm(mps1) + norm(mps2) - 2 * real(dot(mps1, mps2))
 
-function Base.isapprox(mps1::PeriodicMPS, mps2::PeriodicMPS; kwargs...)
-    return isapprox(diff_norm(mps1, mps2); kwargs...)
+function _nonnegative_squared(value::Real, scale::Real, quantity::AbstractString)
+    value >= 0 && return value
+    roundoff = 100 * eps(float(one(value))) * max(abs(scale), one(scale))
+    value >= -roundoff && return zero(value)
+    throw(DomainError(value, "$quantity is negative beyond roundoff tolerance"))
+end
+
+function squared_norm(mps::PeriodicMPS)
+    value = real(dot(mps, mps))
+    return _nonnegative_squared(value, value, "squared MPS norm")
+end
+function TensorKit.norm(mps::PeriodicMPS)
+    return sqrt(squared_norm(mps))
+end
+
+function _squared_distance_data(
+        mps1::PeriodicMPS,
+        mps2::PeriodicMPS
+    )
+    n1 = squared_norm(mps1)
+    n2 = squared_norm(mps2)
+    distance2 = n1 + n2 - 2 * real(dot(mps1, mps2))
+    scale = max(abs(n1), abs(n2))
+    return _nonnegative_squared(distance2, scale, "squared MPS distance"), n1, n2
+end
+
+squared_distance(mps1::PeriodicMPS, mps2::PeriodicMPS) =
+    first(_squared_distance_data(mps1, mps2))
+
+# Compatibility name retained for callers that already treated `diff_norm` as
+# a squared distance.
+diff_norm(mps1::PeriodicMPS, mps2::PeriodicMPS) = squared_distance(mps1, mps2)
+
+function Base.isapprox(
+        mps1::PeriodicMPS,
+        mps2::PeriodicMPS;
+        atol::Real = 0,
+        rtol::Real = Base.rtoldefault(scalartype(mps1), scalartype(mps2), atol)
+    )
+    distance2, n1, n2 = _squared_distance_data(mps1, mps2)
+    tolerance = max(atol, rtol * max(sqrt(abs(n1)), sqrt(abs(n2))))
+    return distance2 <= tolerance^2
+end
+
+function LinearAlgebra.normalize(mps::PeriodicMPS)
+    n = norm(mps)
+    iszero(n) && throw(ArgumentError("cannot normalize a zero periodic MPS"))
+    result = copy(mps)
+    result[1] = result[1] / n
+    return result
 end

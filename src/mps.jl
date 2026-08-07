@@ -106,7 +106,7 @@ Base.getindex(mps::PeriodicMPS, pos::HalfInt) = right_virtualspace(mps[pos.n])
 
 virtualspace(mps::PeriodicMPS{<:GenericMPSTensor}) = left_virtualspace(mps[1])
 function virtualspaces(mps::PeriodicMPS{<:GenericMPSTensor})
-    spaces = PeriodicVector([left_virtualspace(mps[i]) for i in 1:length(mps)])
+    spaces = PeriodicVector([right_virtualspace(mps[i]) for i in 1:length(mps)])
     return HalfPeriodicVector(spaces)
 end
 

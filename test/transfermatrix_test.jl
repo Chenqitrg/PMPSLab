@@ -12,7 +12,11 @@ using PMPSLab:
     LoopTransferMatrix,
     edge_unit,
     expectation,
-    diff_norm
+    squared_norm,
+    squared_distance,
+    diff_norm,
+    gaugefix!,
+    ProjectorCanonical
 using TensorKit
 using MPSKit: PeriodicVector, left_virtualspace
 
@@ -97,6 +101,15 @@ end
 
     # edge unit: identity on the bond space L ⊗ L*
     @test edge_unit(ltm) ≈ id(ComplexF64, codomain(ltm[1]))
+end
+
+@testset "LoopTransferMatrix — mismatched ring lengths throw" begin
+    bra = random_mps(ComplexF64, 2, 2, 2)
+    ket = random_mps(ComplexF64, 3, 2, 2)
+
+    @test_throws DimensionMismatch LoopTransferMatrix(bra, ket)
+    @test_throws DimensionMismatch dot(bra, ket)
+    @test_throws DimensionMismatch isapprox(bra, ket)
 end
 
 @testset "LoopTransferMatrix — mixed 2-site/1-site construction" begin
@@ -194,20 +207,21 @@ end
 @testset "norm — real, non-negative, analytic for one_mps" begin
     N, d, D = 4, 2, 2
     mps = random_mps(ComplexF64, N, d, D)
-    @test norm(mps) ≈ dot(mps, mps)
+    @test norm(mps)^2 ≈ dot(mps, mps)
+    @test squared_norm(mps) ≈ real(dot(mps, mps))
     @test norm(mps) > 0
     @test imag(norm(mps)) ≈ 0 atol=1e-12
 
     # analytic: one_mps → each E = d·ones(D², D²), tr(∏E) = d^N · D^{2N}
     mps1 = one_mps(ComplexF64, N, d, D)
-    @test norm(mps1) ≈ d^N * D^(2N)
+    @test norm(mps1) ≈ sqrt(d^N * D^(2N))
 end
 
 @testset "norm — 2-site MPS" begin
     N, d, D = 2, 2, 2
     mps = random_mps2(ComplexF64, N, d, D)
-    @test norm(mps) ≈ expectation(LoopTransferMatrix(mps))
-    @test norm(mps) ≈ real(overlap(mps, mps)) rtol=1e-10
+    @test norm(mps)^2 ≈ expectation(LoopTransferMatrix(mps))
+    @test norm(mps)^2 ≈ real(overlap(mps, mps)) rtol=1e-10
 end
 
 @testset "diff_norm — zero for identical, positive for distinct" begin
@@ -218,6 +232,16 @@ end
     @test diff_norm(mps1, mps1) ≈ 0 atol=1e-12
     @test diff_norm(mps1, mps2) > 0
     @test diff_norm(mps1, mps2) ≈ diff_norm(mps2, mps1)
+    @test squared_distance(mps1, mps2) ≈ diff_norm(mps1, mps2)
+end
+
+@testset "isapprox — gauge-equivalent states tolerate contraction roundoff" begin
+    mps = random_mps(ComplexF64, 4, 2, 3)
+    gauged = PeriodicMPS(copy.(mps.tensors))
+    gaugefix!(gauged, ProjectorCanonical(; tol=1e-12, maxiter=100))
+
+    @test squared_distance(mps, gauged) >= 0
+    @test isapprox(mps, gauged)
 end
 
 @testset "diff_norm — with Z2-graded spaces" begin

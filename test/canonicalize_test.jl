@@ -2,6 +2,7 @@ using Test
 using PMPSLab:
     PeriodicMPS,
     HalfInt,
+    HalfPeriodicVector,
     assertconsistency,
     gaugefix!,
     dense,
@@ -11,14 +12,8 @@ using PMPSLab:
     random_mps2,
     one_mps2,
     ProjectorCanonical,
-    ProjectorLog,
-    PowerIterLog,
-    SweepLog,
-    QR_L,
-    QR_R,
     P_decomp,
-    find_L,
-    find_R
+    find_projectors
 using TensorKit
 using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace
 import MPSKit
@@ -28,6 +23,50 @@ import MPSKit
     @test h.n == 3
     @test (h + 2).n == 5
     @test (h - 1).n == 2
+end
+
+@testset "MPSKit gauges — normalized on nonuniform virtual bonds" begin
+    P = PeriodicVector(fill(ℂ^2, 4))
+    V = HalfPeriodicVector(PeriodicVector([ℂ^2, ℂ^3, ℂ^4, ℂ^3]))
+    mps = random_mps(ComplexF64, P, V)
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
+
+    L, R = PMPSLab._mpskit_gauges(mps, alg)
+
+    @test L isa HalfPeriodicVector
+    @test R isa HalfPeriodicVector
+    for i in eachindex(mps)
+        pos = HalfInt(i)
+        bond = right_virtualspace(mps[i])
+        @test codomain(L[pos])[1] == bond
+        @test domain(L[pos])[1] == bond
+        @test codomain(R[pos])[1] == bond
+        @test domain(R[pos])[1] == bond
+        @test norm(L[pos]) ≈ 1
+        @test norm(R[pos]) ≈ 1
+    end
+end
+
+@testset "MPSKit gauge adapter — QR/LQ iteration only" begin
+    alg = ProjectorCanonical()
+    @test !hasproperty(alg, :alg_eigsolve)
+    @test !hasproperty(alg, :eig_miniter)
+    @test PMPSLab._left_algorithm(alg).eig_miniter == typemax(Int)
+    @test PMPSLab._right_algorithm(alg).eig_miniter == typemax(Int)
+end
+
+@testset "find_projectors — without input copies" begin
+    mps = random_mps(ComplexF64, 4, 2, 3)
+    tensor_objects = [mps[i] for i in 1:length(mps)]
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
+    PR, PL = find_projectors(mps, alg)
+
+    # Input tensors are passed by reference without copying or mutation.
+    @test all(mps[i] === tensor_objects[i] for i in 1:length(mps))
+    for bond in 1:length(mps)
+        pos = HalfInt(bond)
+        @test PR[pos] * PL[pos] ≈ id(domain(PR[pos])) atol=1e-10
+    end
 end
 
 @testset "random_mps / one_mps" begin
@@ -107,54 +146,6 @@ end
     @test_throws TensorKit.SpaceMismatch assertconsistency(mps_bad)
 end
 
-@testset "QR_L — 2-site" begin
-    Ld, Pd, Rd = 3, 2, 4
-    T = TensorMap(randn(ComplexF64, Ld * Pd, Rd), ℂ^Ld ⊗ ℂ^Pd, ℂ^Rd)
-    L = TensorMap(randn(ComplexF64, Ld, Ld), ℂ^Ld, ℂ^Ld)
-    new_L = QR_L(L, T)
-    @test numout(new_L) == 1
-    @test numin(new_L) == 1
-    @test dim(domain(new_L)) == Rd
-end
-
-@testset "QR_L — 3-site" begin
-    Ld, Pd1, Pd2, Rd = 3, 2, 2, 4
-    T3 = TensorMap(randn(ComplexF64, Ld * Pd1 * Pd2, Rd), ℂ^Ld ⊗ ℂ^Pd1 ⊗ ℂ^Pd2, ℂ^Rd)
-    L = TensorMap(randn(ComplexF64, Ld, Ld), ℂ^Ld, ℂ^Ld)
-    new_L = QR_L(L, T3)
-    @test numout(new_L) == 1
-    @test numin(new_L) == 1
-end
-
-@testset "QR_L — 3-site Z2Irrep" begin
-    V  = Z2Space(0 => 3, 1 => 2)
-    P1 = Z2Space(0 => 2)
-    P2 = Z2Space(0 => 1, 1 => 1)
-    T3 = rand(ComplexF64, V ⊗ P1 ⊗ P2 ← V)
-    L  = rand(ComplexF64, V ← V)
-    new_L = QR_L(L, T3)
-    @test numout(new_L) == 1 && numin(new_L) == 1
-end
-
-@testset "QR_R — 2-site" begin
-    Ld, Pd, Rd = 3, 2, 4
-    T = TensorMap(randn(ComplexF64, Ld * Pd, Rd), ℂ^Ld ⊗ ℂ^Pd, ℂ^Rd)
-    R = TensorMap(randn(ComplexF64, Rd, Rd), ℂ^Rd, ℂ^Rd)
-    new_R = QR_R(R, T)
-    @test numout(new_R) == 1
-    @test numin(new_R) == 1
-end
-
-@testset "QR_R — 3-site Z2Irrep" begin
-    V  = Z2Space(0 => 3, 1 => 2)
-    P1 = Z2Space(0 => 2)
-    P2 = Z2Space(0 => 1, 1 => 1)
-    T3 = rand(ComplexF64, V ⊗ P1 ⊗ P2 ← V)
-    R  = rand(ComplexF64, V ← V)
-    new_R = QR_R(R, T3)
-    @test numout(new_R) == 1 && numin(new_R) == 1
-end
-
 @testset "P_decomp — PR * PL ≈ I (ComplexF64)" begin
     D = 4
     L = TensorMap(randn(ComplexF64, D, D), ℂ^D, ℂ^D)
@@ -182,50 +173,20 @@ end
     @test norm(recon - id(domain(R))) < 1e-10
 end
 
-@testset "QR_L / QR_R — Z2Irrep" begin
-    V_left  = Z2Space(0 => 3, 1 => 2)
-    V_phys  = Z2Space(0 => 2)
-    V_right = Z2Space(0 => 3, 1 => 2)
-    T     = rand(ComplexF64, V_left ⊗ V_phys ← V_right)
-    L_env = rand(ComplexF64, V_left ← V_left)
-    R_env = rand(ComplexF64, V_right ← V_right)
-    new_L = QR_L(L_env, T)
-    new_R = QR_R(R_env, T)
-    @test numout(new_L) == 1 && numin(new_L) == 1
-    @test numout(new_R) == 1 && numin(new_R) == 1
-end
+@testset "rank-deficient projectors compress the unsupported virtual subspace" begin
+    mps = one_mps(ComplexF64, 4, 2, 3)
+    dense_before = dense(mps)
+    PR, PL = find_projectors(mps, ProjectorCanonical(; tol=1e-12, maxiter=100))
 
-@testset "find_L / find_R convergence" begin
-    N, d, D = 4, 2, 3
-    mps = random_mps(ComplexF64, N, d, D)
+    for bond in 1:length(mps)
+        pos = HalfInt(bond)
+        support_projector = PR[pos] * PL[pos]
+        @test support_projector * support_projector ≈ support_projector atol=1e-10
+        @test !(support_projector ≈ id(domain(PR[pos])))
+    end
 
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
-
-    pos = HalfInt(2)
-    L, logL = find_L(pos, mps, alg)
-    @test numout(L) == 1
-    @test numin(L) == 1
-    @test logL isa PowerIterLog
-
-    R, logR = find_R(pos, mps, alg)
-    @test numout(R) == 1
-    @test numin(R) == 1
-    @test logR isa PowerIterLog
-end
-
-@testset "find_L / find_R convergence — Z2Irrep" begin
-    N, d = 4, 2
-    V = Z2Space(0 => 3, 1 => 2)
-    P = Z2Space(0 => d)
-    mps = random_mps(ComplexF64, N, P, V)
-
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
-
-    pos = HalfInt(2)
-    L, _ = find_L(pos, mps, alg)
-    R, _ = find_R(pos, mps, alg)
-    @test numout(L) == 1 && numin(L) == 1
-    @test numout(R) == 1 && numin(R) == 1
+    gaugefix!(mps, ProjectorCanonical(; tol=1e-12, maxiter=100))
+    @test dense(mps) ≈ dense_before atol=1e-10
 end
 
 @testset "gaugefix! — integration" begin
@@ -233,9 +194,7 @@ end
     mps = random_mps(ComplexF64, N, d, D)
     tvec = [copy(mps[i]) for i in 1:N]
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
-    log = gaugefix!(mps, alg)
-    @test log.converged
-    @test length(log.sweeps) == 1
+    @test gaugefix!(mps, alg) === mps
     # After canonicalization, consistency should still hold
     @test assertconsistency(mps) === nothing
     # Tensors should have been modified
@@ -251,8 +210,7 @@ end
     mps = random_mps(ComplexF64, N, P, V)
     tvec = [copy(mps[i]) for i in 1:N]
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
-    log = gaugefix!(mps, alg)
-    @test log.converged
+    @test gaugefix!(mps, alg) === mps
     @test assertconsistency(mps) === nothing
     for i in 1:N
         @test !(mps[i] ≈ tvec[i])
@@ -425,4 +383,3 @@ end
         @test norm(result - manual) < 1e-12
     end
 end
-

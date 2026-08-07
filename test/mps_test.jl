@@ -132,9 +132,21 @@ end
     vs = virtualspaces(mps)
     @test vs isa HalfPeriodicVector
     @test length(vs) == N
-    @test vs[HalfInt(1)] == left_virtualspace(mps[1])
-    @test vs[HalfInt(N)] == left_virtualspace(mps[N])
-    @test [vs[HalfInt(i)] for i in 1:N] == [left_virtualspace(mps[i]) for i in 1:N]
+    @test vs[HalfInt(1)] == right_virtualspace(mps[1])
+    @test vs[HalfInt(N)] == right_virtualspace(mps[N])
+    @test [vs[HalfInt(i)] for i in 1:N] == [right_virtualspace(mps[i]) for i in 1:N]
+
+    nonuniform = random_mps(
+        ComplexF64,
+        PeriodicVector(fill(ℂ^d, N)),
+        HalfPeriodicVector(PeriodicVector([ℂ^2, ℂ^3, ℂ^4, ℂ^3])),
+    )
+    nonuniform_vs = virtualspaces(nonuniform)
+    @test all(
+        nonuniform_vs[HalfInt(i)] == right_virtualspace(nonuniform[i]) ==
+            left_virtualspace(nonuniform[i + 1])
+        for i in 1:N
+    )
 
     ps = physicalspaces(mps)
     @test ps isa PeriodicVector

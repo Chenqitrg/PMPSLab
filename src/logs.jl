@@ -4,16 +4,6 @@
 
 abstract type ConvergenceLog end
 
-# One periodic QR/LQ fixed-point solve.
-struct PowerIterLog
-    pos::HalfInt
-    errors::Vector{Float64}
-    # MPSKit's private uniform solvers do not expose their internal iteration
-    # count, so direct-adapter runs record `nothing` here.
-    steps::Union{Int,Nothing}
-    converged::Bool
-end
-
 # One immutable convergence snapshot. `state` is algorithm-specific.
 struct SiteLog{S,E}
     state::S
@@ -39,13 +29,4 @@ mutable struct SweepLog{T} <: ConvergenceLog
 end
 SweepLog(site_logs::Vector{T}, sweep_time::Real, converged::Bool) where {T} =
     SweepLog{T}(site_logs, Float64(sweep_time), converged)
-SweepLog(site_logs::Vector{PowerIterLog}, sweep_time::Real) =
-    SweepLog(site_logs, sweep_time, all(log -> log.converged, site_logs))
-
-mutable struct ProjectorLog <: ConvergenceLog
-    sweeps::Vector{SweepLog{PowerIterLog}}
-    converged::Bool
-    ProjectorLog() = new(SweepLog{PowerIterLog}[], false)
-end
-
 const SplitLog = SweepLog{SiteLog{SweepState,Nothing}}
