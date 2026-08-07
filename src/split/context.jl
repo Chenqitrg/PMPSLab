@@ -17,7 +17,6 @@ mutable struct SplitContext{E, S} <: AlgorithmContext{E, S}
     cacheBB         :: RingCache{<:AbstractTensorMap{E, S, 2, 2}}       # braketBB 的滑动缓存
     cacheAB         :: RingCache{<:AbstractTensorMap{E, S, 2, 2}}        # braketAB 的滑动缓存
     expectationAA  :: E
-    log             :: SplitLog
 end
 
 site(ctx::SplitContext) = ctx.cacheBB.site
@@ -33,8 +32,7 @@ function SplitContext(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::
     return SplitContext(mpsA, mpsB, braketAA, braketBB, braketAB,
                         build_cache(braketBB, 1),
                         build_cache(braketAB, 1),
-                        expectation(braketAA),
-                        SplitLog())
+                        expectation(braketAA))
 end
 
 function solvenew(ctx::SplitContext, alg::AbstractSolve)
@@ -50,10 +48,10 @@ function solvenew(ctx::SplitContext, alg::AbstractSolve)
     x0 = transpose(this_B(ctx), ((2,), (1, 3)))  # B → (P ← V_left, V_right) for right-division
     x1 = rdiv(alg, x0, N, W)
 
-    # cost = real(ctx.expectationAA - conj(tr(W * x1')))
-    # write!(ctx.log, site(ctx), cost)
+    # 每 site 成本 ‖ψ_A − ψ_B‖² 的局部环境近似（最优解处 tr(W * x1') = ⟨ψ_B|ψ_B⟩）
+    cost = real(ctx.expectationAA - conj(tr(W * x1')))
 
-    return transpose(x1, ((2, 1), (3,)))          # back to (V_left ⊗ P ← V_right)
+    return transpose(x1, ((2, 1), (3,))), cost    # back to (V_left ⊗ P ← V_right)
 end
 
 """
@@ -65,7 +63,7 @@ write back the new B tensor and transfer matrices → slide both caches.
 function update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
     site(ctx) != st.site && throw(ArgumentError("sweep state site $(st.site) does not match context site $(site(ctx))"))
 
-    new = solvenew(ctx, solve)
+    new, cost = solvenew(ctx, solve)
     ctx.mpsB[st.site] = new
     ctx.braketBB[st.site] = site_transfer_matrix(new)
     advance!(ctx.cacheBB, ctx.braketBB, st)
@@ -75,12 +73,8 @@ function update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
                                                 ctx.mpsB[2 * pa - 1], ctx.mpsB[2 * pa])
         advance!(ctx.cacheAB, ctx.braketAB, st)
     end
-    return new
+    return new, cost
 end
-
-# 初始 1-site 近似的构造 —— 物理内容，后续实现
-_initial_approximation(mps, alg) =
-    error("TODO: initial 1-site approximation not implemented yet")
 
 # 工厂：从 MPS 构造迭代器（sweep.jl 只依赖 N，不依赖 PeriodicMPS）
 ZigzagSweep(mps::PeriodicMPS; maximal_sweep::Int)   = ZigzagSweep(length(mps); maximal_sweep)
@@ -95,12 +89,17 @@ CircularSweep(mps::PeriodicMPS; maximal_sweep::Int) = CircularSweep(length(mps);
 
 Given a periodic MPS with 2 physical legs per site (3 codim legs), produce a
 periodic MPS with 1 physical leg per site (2 codim legs) that best approximates
-the loop state. Returns `(mps_1site, log)`.
+the loop state. Returns `(mps_1site, log)` where `log` is a [`SplitLog`](@ref)
+(= `SweepLog{SiteLog{SweepState}}`) — one record `(st, cost, time)` per
+update, in visit order; per-sweep grouping follows from `st.n`.
 """
 function split(mps::PeriodicMPS, alg::LoopSplit)
     ctx = SplitContext(mps, initial_approximation(mps, alg.ansatz))
+    log = SplitLog()
     for st in alg.sweep
-        update!(ctx, alg.solve, st)
+        t0 = time()
+        _, cost = update!(ctx, alg.solve, st)
+        push!(log.site_logs, SiteLog(st, cost, time() - t0))
     end
-    return ctx.mpsB, ctx.log
+    return ctx.mpsB, log
 end

@@ -207,7 +207,7 @@ end
     @test scalartype(B1[1]) == ComplexF64
 end
 
-@testset "OneLoopAnsatz — SVD pre-split + canonicalize" begin
+@testset "OneLoopAnsatz — SVD pre-split + projector gauge fixing" begin
     D, d = 2, 2
     B0 = random_mps(ComplexF64, 4, d, D)
     A = pair_contraction(B0)
@@ -217,7 +217,7 @@ end
     @test length(mpsB) == 4
     @test assertconsistency(mpsB) === nothing
     @test scalartype(mpsB[1]) == ComplexF64
-    # SVD is exact for factorizable A, and gaugefix! doesn't change the state
+    # SVD is exact for factorizable A, and gaugefix! doesn't change the state.
     @test dense(mpsB) ≈ dense(A) rtol=1e-10
 end
 

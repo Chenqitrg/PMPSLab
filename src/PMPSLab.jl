@@ -12,7 +12,7 @@ import MPSKit: physicalspace
 
 # Types
 export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
-export ConvergenceLog, PowerIterLog, SweepLog, ProjectorLog, SplitLog
+export ConvergenceLog, SiteLog, PowerIterLog, SweepLog, ProjectorLog, SplitLog
 export AbstractLoopCanonical, ProjectorCanonical, NuclearNormCanonical
 export AbstractLoopSplit
 export LoopTransferMatrix
@@ -25,8 +25,8 @@ export SweepState, AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, 
 export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 
 include("mps.jl")
-include("logs.jl")
 include("circularupdate/loopmonoid.jl")
+include("logs.jl")
 include("circularupdate/cache.jl")
 include("transfermatrix.jl")
 include("canonicalize/projector.jl")
