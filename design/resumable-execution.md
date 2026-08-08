@@ -210,8 +210,12 @@ end
 ```
 
 `SplitContext` continues to own the numerical working state: the current
-approximation, transfer matrices, and partial-product caches. `SplitRun` owns
-the resumable execution cursor and reporting state.
+approximation, transfer matrices, and partial-product caches. The caches store
+complete left-prefix and right-suffix workspaces (`2N - 2` tensors per cache)
+but no active site. Each slot has a fixed tensor space and can therefore be
+updated in place.
+`SplitRun.pending_iteration` is therefore the single source of the resumable
+execution cursor; `SplitRun` also owns reporting state.
 
 `log.sweep_time` accumulates the completed site timings and therefore excludes
 time spent paused between safe steps. Pause timestamps and total paused time

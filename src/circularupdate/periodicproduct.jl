@@ -11,7 +11,7 @@ range_product(v::AbstractPeriodicProduct, r::AbstractUnitRange) =
 # SweepState — one step's position in a sweep
 #
 #   site — the position to update
-#   dir  — the direction (+1/-1) in which the cache advances after the update
+#   dir  — the scan direction (+1/-1), used to refresh the directional cache
 #   n    — completed period count (for stop-check against maximal_sweep)
 # ------------------------------------------------------------------------------
 

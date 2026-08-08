@@ -33,7 +33,7 @@ using PMPSLab:
     SVDAnsatz,
     PeriodicGaugeAnsatz
 import PMPSLab: initial_approximation, split_site, diff_norm,
-                site, this_B, other_B, this_A, pa_from_pb, expectation,
+                this_B, other_B, this_A, pa_from_pb, expectation,
                 ProjectorCanonical, gaugefix!
 using TensorKit
 using KrylovKit: GMRES
@@ -123,15 +123,17 @@ end
     mpsA = pair_contraction(random_mps(ComplexF64, 4, d, D))
     ctx = SplitContext(mpsA, mpsB)
 
-    @test site(ctx) == 1
-    @test this_B(ctx) == mpsB[1]
-    @test other_B(ctx) == mpsB[2]           # odd site: the right neighbour
-    @test this_A(ctx) == mpsA[1]
+    @test this_B(ctx, 1) == mpsB[1]
+    @test other_B(ctx, 1) == mpsB[2]           # odd site: the right neighbour
+    @test other_B(ctx, 2) == mpsB[1]           # even site: the left neighbour
+    @test this_A(ctx, 1) == mpsA[1]
     @test pa_from_pb(1) == 1 && pa_from_pb(2) == 1 && pa_from_pb(3) == 2
 
-    # the caches sit at cut 1, the A-pair expectation is precomputed
-    @test ctx.cacheBB.site == 1
-    @test ctx.cacheAB.site == 1
+    # Caches contain both directions and own no duplicate site cursor.
+    @test !hasproperty(ctx.cacheBB, :site)
+    @test !hasproperty(ctx.cacheAB, :site)
+    @test length(ctx.cacheBB.left) == length(mpsB) - 1
+    @test length(ctx.cacheBB.right) == length(mpsB) - 1
     @test ctx.expectationAA ≈ expectation(ctx.braketAA)
 
     # mismatched site counts are rejected
@@ -146,35 +148,40 @@ end
 
     _, cost = update!(ctx, solver, SweepState(1, 1, 0))
     @test isfinite(cost)
-    @test ctx.cacheBB.site == 2
+    @test ctx.cacheBB.left[1] ≈ ctx.braketBB[1]
 end
 
-@testset "update! — site mismatch throws" begin
+@testset "update! — SweepState is the site source" begin
     mpsB = random_mps(ComplexF64, 4, 2, 2)
     mpsA = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
     ctx = SplitContext(mpsA, mpsB)
-    @test_throws ArgumentError update!(ctx, CholeskySolve(), SweepState(2, 1, 0))
+    _, cost = update!(ctx, CholeskySolve(), SweepState(2, 1, 0))
+    @test isfinite(cost)
+    @test ctx.cacheBB.left[2] ≈ ctx.braketBB[1] * ctx.braketBB[2]
+    @test_throws BoundsError update!(ctx, CholeskySolve(), SweepState(0, 1, 0))
 end
 
-@testset "update! — one forward step slides both caches" begin
+@testset "update! — one forward step refreshes both caches" begin
     D, d = 2, 2
     mpsB = random_mps(ComplexF64, 4, d, D)
     mpsA = pair_contraction(random_mps(ComplexF64, 4, d, D))
     ctx = SplitContext(mpsA, mpsB)
     old1 = copy(mpsB[1])
+    ab_left_slot = ctx.cacheAB.left[1]
+    old_ab_left = copy(ab_left_slot)
 
-    # step 1: update site 1 (odd) — only the BB cache slides
+    # step 1: update site 1 (odd) — only the BB prefix changes
     update!(ctx, CholeskySolve(), SweepState(1, 1, 0))
-    @test site(ctx) == 2
     @test !(ctx.mpsB[1] ≈ old1)
-    @test ctx.cacheBB.site == 2
-    @test ctx.cacheAB.site == 1          # AB cache only moves at even sites
+    @test ctx.cacheBB.left[1] ≈ ctx.braketBB[1]
+    @test ctx.cacheAB.left[1] === ab_left_slot
+    @test ctx.cacheAB.left[1] ≈ old_ab_left  # AB changes only after a complete pair
 
-    # step 2: update site 2 (even) — the AB cache slides too
+    # step 2: update site 2 (even) — both complete prefixes change
     update!(ctx, CholeskySolve(), SweepState(2, 1, 0))
-    @test site(ctx) == 3
-    @test ctx.cacheBB.site == 3
-    @test ctx.cacheAB.site == 2
+    @test ctx.cacheBB.left[2] ≈ ctx.braketBB[1] * ctx.braketBB[2]
+    @test ctx.cacheAB.left[1] === ab_left_slot
+    @test ctx.cacheAB.left[1] ≈ ctx.braketAB[1]
 
     # the new tensor keeps the site's space
     @test space(ctx.mpsB[2]) == space(mpsB[2])
@@ -218,7 +225,7 @@ end
     @test event isa SplitSiteCompleted
     @test event.log.state == SweepState(1, 1, 0)
     @test length(run.log.site_logs) == 1
-    @test site(run.context) == 2
+    @test run.context.cacheBB.left[1] ≈ run.context.braketBB[1]
     @test first(run.pending_iteration) == SweepState(2, 1, 0)
     @test !isfinished(run)
 

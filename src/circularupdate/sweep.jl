@@ -3,7 +3,7 @@
 #
 # Each scheme is an iterator yielding `SweepState` values:
 #   site — the position to update next
-#   dir  — the direction (+1/-1) in which the cache cut slides after the update
+#   dir  — the scan direction (+1/-1) after the update
 #   n    — completed lap count (internal stop-check)
 #
 # Iteration state is an immutable `SweepState`, separate from the container,
@@ -52,7 +52,7 @@ function Base.iterate(z::ZigzagSweep, st::SweepState = SweepState(1, 1, 0))
         return (SweepState(1, 1, n), SweepState(1, 1, n + 1))
     end
     if site == z.N && dir == 1
-        # 峰值：掉头，slide 方向翻为 -1
+        # 峰值：掉头，扫描方向翻为 -1
         return (SweepState(site, -1, n), SweepState(z.N - 1, -1, n))
     elseif site == 2 && dir == -1
         # 一趟结束（不重访 site 1）

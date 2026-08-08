@@ -68,59 +68,56 @@ function naive_complement(product, site)
 end
 
 @testset "build_cache — cache contents vs naive products" begin
-    for N in [2, 3, 5, 8], site in 1:N
+    for N in [2, 3, 5, 8]
         product = random_periodic_product(3, N)
-        v = build_cache(product, site)
+        v = build_cache(product)
 
         @test v isa PeriodicCache
         @test length(v) == N
         @test lastindex(v) == N
-        @test scalartype(v.cache[1]) == ComplexF64
+        @test length(v.left) == N - 1
+        @test length(v.right) == N - 1
+        @test scalartype(v.left[1]) == ComplexF64
+        @test v.left[1] !== product[1]
+        @test v.right[end] !== product[N]
 
-        # Prefix ranges v[1:k] with k < site.
-        for k in 1:(site - 1)
+        for k in 1:(N - 1)
             @test v[1:k] ≈ naive_range_product(product, 1:k)
         end
 
-        # Suffix ranges v[k:N] with k > site.
-        for k in (site + 1):N
+        for k in 2:N
             @test v[k:N] ≈ naive_range_product(product, k:N)
         end
     end
 end
 
-@testset "build_cache — validates the cut" begin
-    product = random_periodic_product(3, 3)
-    @test_throws BoundsError build_cache(product, 0)
-    @test_throws BoundsError build_cache(product, 4)
+@testset "build_cache — rejects an empty product" begin
     @test_throws ArgumentError build_cache(MatrixPeriodicProduct(TensorMap[]))
 end
 
 @testset "range queries — invalid ranges throw" begin
     product = random_periodic_product(3, 5)
-    v = build_cache(product, 3)
+    v = build_cache(product)
 
-    # Any range that crosses the cut site is not representable.
-    @test_throws ArgumentError v[1:3]   # contains the cut
-    @test_throws ArgumentError v[2:3]   # contains the cut
-    @test_throws ArgumentError v[2:4]   # crosses the cut
-    @test_throws ArgumentError v[3:3]   # the cut site itself
-    @test_throws ArgumentError v[3:4]   # starts at the cut
-    @test_throws ArgumentError v[4:4]   # suffix but does not end at N
+    @test_throws ArgumentError v[1:5]   # full period
+    @test_throws ArgumentError v[2:3]   # interior range
+    @test_throws ArgumentError v[2:4]   # interior range
+    @test_throws ArgumentError v[3:3]   # interior singleton
+    @test_throws ArgumentError v[3:4]   # suffix does not reach N
+    @test_throws ArgumentError v[4:4]   # suffix does not reach N
     @test_throws ArgumentError v[2:1]   # empty range
 
-    # Valid: pure prefix (ends before the cut) and pure suffix (starts after).
-    @test v[1:2] ≈ naive_range_product(product, 1:2)
+    @test v[1:3] ≈ naive_range_product(product, 1:3)
+    @test v[3:5] ≈ naive_range_product(product, 3:5)
     @test v[4:5] ≈ naive_range_product(product, 4:5)
 end
 
 @testset "left/right cache and environment — every cut position" begin
     N, D = 5, 3
     product = random_periodic_product(D, N)
+    v = build_cache(product)
 
     for site in 1:N
-        v = build_cache(product, site)
-
         expected_left = site == 1 ?
                         v.edge_identity :
                         naive_range_product(product, 1:(site - 1))
@@ -128,56 +125,62 @@ end
                          v.edge_identity :
                          naive_range_product(product, (site + 1):N)
 
-        @test left_cache(v) ≈ expected_left
-        @test right_cache(v) ≈ expected_right
+        @test left_cache(v, site) ≈ expected_left
+        @test right_cache(v, site) ≈ expected_right
 
-        # The environment is the product of everything except the cut site,
+        # The environment is the product of everything except the supplied site,
         # in right-then-left order (noncommutative: order matters).
-        @test environment(v) ≈ naive_complement(product, site)
-        @test environment(v) ≈ right_cache(v) * left_cache(v)
+        @test environment(v, site) ≈ naive_complement(product, site)
+        @test environment(v, site) ≈ right_cache(v, site) * left_cache(v, site)
     end
 
-    # The default site argument is 1.
-    v_default = build_cache(product, 1)
-    @test environment(v_default) ≈ naive_complement(product, 1)
+    @test_throws BoundsError environment(v, 0)
+    @test_throws BoundsError environment(v, N + 1)
 end
 
 @testset "units and spaces" begin
     D = 3
     product = random_periodic_product(D, 4)
-    v2 = build_cache(product, 2)
+    v2 = build_cache(product)
     @test v2.edge_identity ≈ id(ComplexF64, ℂ^D)
     @test dim(codomain(v2.edge_identity)) == D
 
     # Empty halves return the unit.
-    @test left_cache(build_cache(product, 1)) ≈ edge_identity(product)
-    @test right_cache(build_cache(product, 4)) ≈ edge_identity(product)
+    @test left_cache(v2, 1) ≈ edge_identity(product)
+    @test right_cache(v2, 4) ≈ edge_identity(product)
+
+    single = random_periodic_product(D, 1)
+    single_cache = build_cache(single)
+    @test isempty(single_cache.left)
+    @test isempty(single_cache.right)
+    @test environment(single_cache, 1) ≈ edge_identity(single)
+    @test advance!(single_cache, single, SweepState(1, 1, 0)) === single_cache
 end
 
 @testset "Z2Irrep — unit space and environment" begin
     V = Z2Space(0 => 2, 1 => 2)
     product = random_periodic_product(V, 4)
-    v = build_cache(product, 2)
+    v = build_cache(product)
     @test v.edge_identity ≈ id(ComplexF64, V)
 
     for site in 1:4
-        @test environment(build_cache(product, site)) ≈ naive_complement(product, site)
+        @test environment(v, site) ≈ naive_complement(product, site)
     end
 end
 
 @testset "Float64 element type" begin
     product = MatrixPeriodicProduct([TensorMap(randn(Float64, 2, 2), ℝ^2, ℝ^2) for _ in 1:4])
-    v = build_cache(product, 2)
+    v = build_cache(product)
     @test v[1:1] ≈ product[1]
     @test v[3:4] ≈ naive_range_product(product, 3:4)
-    @test environment(v) ≈ naive_complement(product, 2)
+    @test environment(v, 2) ≈ naive_complement(product, 2)
 end
 
 @testset "PeriodicTransferMatrix integration" begin
     N, d, D = 4, 2, 2
     mps = random_mps(ComplexF64, N, d, D)
     ptm = PeriodicTransferMatrix(mps)
-    v = build_cache(ptm, 2)
+    v = build_cache(ptm)
 
     @test length(v) == N
     @test v.edge_identity ≈ id(ComplexF64, ℂ^D ⊗ (ℂ^D)')
@@ -187,9 +190,9 @@ end
     @test v[3:4] ≈ range_product(ptm, 3:4)
     @test v[4:4] ≈ range_product(ptm, 4:4)
 
-    @test left_cache(v) ≈ range_product(ptm, 1:1)
-    @test right_cache(v) ≈ range_product(ptm, 3:4)
-    @test environment(v) ≈ naive_complement(ptm, 2)
+    @test left_cache(v, 2) ≈ range_product(ptm, 1:1)
+    @test right_cache(v, 2) ≈ range_product(ptm, 3:4)
+    @test environment(v, 2) ≈ naive_complement(ptm, 2)
 
     # The full-period helper agrees with a direct product.
     @test *(ptm) ≈ naive_range_product(ptm, 1:N)
@@ -227,37 +230,48 @@ end
     end
 end
 
-@testset "advance! — 滑动缓存" begin
-    # 前滑：cut 2 更新 site 2 → cut 3
+@testset "advance! — 按扫描方向刷新缓存" begin
+    # 前滑：更新 site 2 的 prefix，下一 site 3 的 environment 随即有效。
     product = random_periodic_product(3, 5)
     new2 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     product2 = MatrixPeriodicProduct([i == 2 ? new2 : product[i] for i in 1:5])
-    v = build_cache(product, 2)
+    v = build_cache(product)
+    left_slot = v.left[2]
     advance!(v, product2, SweepState(2, 1, 0))
-    @test v.site == 3
-    @test environment(v) ≈ naive_complement(product2, 3)
+    @test v.left[2] === left_slot
+    @test environment(v, 3) ≈ naive_complement(product2, 3)
 
-    # 后滑：cut 4 更新 site 4 → cut 3
+    # 后滑：更新 site 4 的 suffix，下一 site 3 的 environment 随即有效。
     new4 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     product4 = MatrixPeriodicProduct([i == 4 ? new4 : product[i] for i in 1:5])
-    v = build_cache(product, 4)
+    v = build_cache(product)
+    right_slot = v.right[3]
     advance!(v, product4, SweepState(4, -1, 0))
-    @test v.site == 3
-    @test environment(v) ≈ naive_complement(product4, 3)
+    @test v.right[3] === right_slot
+    @test environment(v, 3) ≈ naive_complement(product4, 3)
 
-    # 回卷 N→1：更新 site 5 后整个缓存重建
+    # 回卷 N→1：更新 site 5 后重建 right cache，并复用所有 slot。
     new5 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     product5 = MatrixPeriodicProduct([i == 5 ? new5 : product[i] for i in 1:5])
-    v = build_cache(product, 5)
+    v = build_cache(product)
+    right_slots = copy(v.right)
     advance!(v, product5, SweepState(5, 1, 0))
-    @test v.site == 1
-    @test environment(v) ≈ naive_complement(product5, 1)
+    @test all(v.right[i] === right_slots[i] for i in eachindex(v.right))
+    @test environment(v, 1) ≈ naive_complement(product5, 1)
 
-    # 前滑 cut 1 → cut 2（无前缀可乘，直接写入）
+    # 前滑 site 1 → site 2（无前缀可乘，原地复制）。
     new1 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
     product1 = MatrixPeriodicProduct([i == 1 ? new1 : product[i] for i in 1:5])
-    v = build_cache(product, 1)
+    v = build_cache(product)
+    left_slot = v.left[1]
     advance!(v, product1, SweepState(1, 1, 0))
-    @test v.site == 2
-    @test environment(v) ≈ naive_complement(product1, 2)
+    @test v.left[1] === left_slot
+    @test environment(v, 2) ≈ naive_complement(product1, 2)
+
+    # 回卷 1→N：反向更新 site 1 后重建 left cache。
+    v = build_cache(product)
+    left_slots = copy(v.left)
+    advance!(v, product1, SweepState(1, -1, 0))
+    @test all(v.left[i] === left_slots[i] for i in eachindex(v.left))
+    @test environment(v, 5) ≈ naive_complement(product1, 5)
 end

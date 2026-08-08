@@ -143,11 +143,11 @@ $$
 - 全局 cost；
 - 每个 site 的 local cost；
 - 完整 sweep 时间；
-- `environment(cacheBB)` 时间；
-- `environment(cacheAB)` 时间；
+- `environment(cacheBB, pb)` 时间；
+- `environment(cacheAB, pa)` 时间；
 - $W$ contraction 时间；
 - `rdiv` 时间；
-- cache advance 时间；
+- directional cache update 时间；
 - peak memory；
 - raw tensor update norm；
 - gauge-aligned tensor update norm；
