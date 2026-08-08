@@ -42,6 +42,7 @@ struct PeriodicMPS{A <: GenericMPSTensor} <: MPSKit.AbstractMPS
     tensors::PeriodicVector{A}
 end
 function PeriodicMPS(tensors::AbstractVector{<:GenericMPSTensor})
+    isempty(tensors) && throw(ArgumentError("a periodic MPS must contain at least one tensor"))
     mps = PeriodicMPS(PeriodicVector(tensors))
     assertconsistency(mps)
     return mps

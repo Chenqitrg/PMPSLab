@@ -132,6 +132,13 @@ end
     @test all(copied[i] == mps[i] for i in eachindex(mps))
 end
 
+@testset "PeriodicMPS — rejects an empty period" begin
+    @test_throws ArgumentError random_mps(ComplexF64, 0, 2, 3)
+    @test_throws ArgumentError one_mps(ComplexF64, 0, 2, 3)
+    @test_throws ArgumentError random_mps2(ComplexF64, 0, 2, 3)
+    @test_throws ArgumentError one_mps2(ComplexF64, 0, 2, 3)
+end
+
 @testset "PeriodicMPS — space queries" begin
     N, d, D = 4, 2, 3
     mps = random_mps(ComplexF64, N, d, D)

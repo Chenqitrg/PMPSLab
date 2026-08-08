@@ -23,19 +23,34 @@ using PMPSLab:
     PeriodicTransferMatrix,
     squared_distance,
     LUSolve,
-    CholeskySolve
-import PMPSLab: PeriodicSplit, RandomAnsatz, OneAnsatz, SVDAnsatz,
-                PeriodicGaugeAnsatz,
-                initial_approximation, split_site, diff_norm,
+    CholeskySolve,
+    KrylovSolve,
+    PeriodicSplit,
+    RandomAnsatz,
+    OneAnsatz,
+    SVDAnsatz,
+    PeriodicGaugeAnsatz
+import PMPSLab: initial_approximation, split_site, diff_norm,
                 site, this_B, other_B, this_A, pa_from_pb, expectation,
                 ProjectorCanonical, gaugefix!
 using TensorKit
+using KrylovKit: GMRES
 using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace,
               physicalspace, TruncationStrategy
 
 # ==============================================================================
 # Ansätze
 # ==============================================================================
+
+@testset "public split API" begin
+    @test PMPSLab.split === Base.split
+    @test all(name -> name in names(PMPSLab), (
+        :PeriodicSplit, :RandomAnsatz, :OneAnsatz, :SVDAnsatz,
+        :PeriodicGaugeAnsatz,
+    ))
+    @test SVDAnsatz().truncation isa TruncationStrategy
+    @test PeriodicGaugeAnsatz().svd_pre isa SVDAnsatz
+end
 
 @testset "RandomAnsatz / OneAnsatz — construction and initial approximation" begin
     N = 2                      # 2-site MPS with N sites → 2N one-site tensors
@@ -119,6 +134,17 @@ end
 
     # mismatched site counts are rejected
     @test_throws DimensionMismatch SplitContext(mpsA, random_mps(ComplexF64, 3, d, D))
+end
+
+@testset "update! — Krylov solver follows the split protocol" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsB = initial_approximation(mpsA, SVDAnsatz())
+    ctx = SplitContext(mpsA, mpsB)
+    solver = KrylovSolve(GMRES(; maxiter=100, tol=1e-12))
+
+    _, cost = update!(ctx, solver, SweepState(1, 1, 0))
+    @test isfinite(cost)
+    @test ctx.cacheBB.site == 2
 end
 
 @testset "update! — site mismatch throws" begin

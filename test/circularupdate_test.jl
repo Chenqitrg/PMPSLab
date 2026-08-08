@@ -219,6 +219,14 @@ end
     @test length(collect(CircularSweep(1; maximal_sweep = 3))) == 3
 end
 
+@testset "sweep constructors validate their configuration" begin
+    for Sweep in (ZigzagSweep, CircularSweep)
+        @test_throws ArgumentError Sweep(0; maximal_sweep=1)
+        @test_throws ArgumentError Sweep(2; maximal_sweep=-1)
+        @test isempty(collect(Sweep(2; maximal_sweep=0)))
+    end
+end
+
 @testset "advance! — 滑动缓存" begin
     # 前滑：cut 2 更新 site 2 → cut 3
     product = random_periodic_product(3, 5)

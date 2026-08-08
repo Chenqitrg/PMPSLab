@@ -25,6 +25,13 @@ Yields sites `1, 2, …, N, N-1, …, 2` per round trip, repeating up to
 struct ZigzagSweep <: AbstractSweep
     N::Int
     maximal_sweep::Int
+    function ZigzagSweep(N::Int, maximal_sweep::Int)
+        N > 0 || throw(ArgumentError("sweep length must be positive, got $N"))
+        maximal_sweep >= 0 || throw(ArgumentError(
+            "maximal_sweep must be non-negative, got $maximal_sweep"
+        ))
+        return new(N, maximal_sweep)
+    end
 end
 
 ZigzagSweep(N::Int; maximal_sweep::Int) = ZigzagSweep(N, maximal_sweep)
@@ -70,6 +77,13 @@ Yields sites `1, 2, …, N` repeatedly, `maximal_sweep` laps in total.
 struct CircularSweep <: AbstractSweep
     N::Int
     maximal_sweep::Int
+    function CircularSweep(N::Int, maximal_sweep::Int)
+        N > 0 || throw(ArgumentError("sweep length must be positive, got $N"))
+        maximal_sweep >= 0 || throw(ArgumentError(
+            "maximal_sweep must be non-negative, got $maximal_sweep"
+        ))
+        return new(N, maximal_sweep)
+    end
 end
 
 CircularSweep(N::Int; maximal_sweep::Int) = CircularSweep(N, maximal_sweep)

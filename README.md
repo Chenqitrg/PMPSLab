@@ -29,6 +29,11 @@ complete finite-period cost and is non-increasing up to numerical roundoff.
 `split` accepts an optional synchronous callback:
 
 ```julia
+alg = PeriodicSplit(
+    SVDAnsatz(),
+    CircularSweep(2 * length(A); maximal_sweep=4),
+    CholeskySolve(),
+)
 B, log = split(A, alg; callback = log -> display(last(log.site_logs).error))
 ```
 

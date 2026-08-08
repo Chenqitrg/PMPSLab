@@ -221,6 +221,11 @@ end
     @test norm(mps1) ≈ sqrt(d^N * D^(2N))
 end
 
+@testset "negative squared quantities reject non-roundoff values" begin
+    @test PMPSLab._nonnegative_squared(-eps(Float64), 1.0, "test quantity") == 0.0
+    @test_throws DomainError PMPSLab._nonnegative_squared(-1.0, 1.0, "test quantity")
+end
+
 @testset "norm — 2-site MPS" begin
     N, d, D = 2, 2, 2
     mps = random_mps2(ComplexF64, N, d, D)

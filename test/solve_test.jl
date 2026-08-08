@@ -2,7 +2,7 @@
 # Each solver is tested against the naive backslash on a dense matrix.
 
 using Test
-using PMPSLab: LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv
+using PMPSLab: LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 using TensorKit
 using LinearAlgebra: Hermitian, I
 using KrylovKit: GMRES
@@ -46,8 +46,23 @@ end
     x0 = zero(b)
 
     x_lu = A \ b
-    x_kry = ldiv(KrylovSolve(GMRES(; maxiter=100, tol=1e-12)), A, b, x0)
+    x_kry = ldiv(KrylovSolve(GMRES(; maxiter=100, tol=1e-12)), x0, A, b)
     @test x_kry ≈ x_lu rtol=1e-10
+end
+
+@testset "right-division solver protocol" begin
+    M = randn(ComplexF64, ℂ^4, ℂ^4)
+    A = M * M' + id(ℂ^4)
+    b = randn(ComplexF64, ℂ^2, ℂ^4)
+    x0 = zero(b)
+    expected = b / A
+
+    for solver in (LUSolve(), LDLTSolve(), CholeskySolve())
+        @test rdiv(solver, x0, A, b) ≈ expected rtol=1e-10
+    end
+
+    krylov = KrylovSolve(GMRES(; maxiter=100, tol=1e-12))
+    @test rdiv(krylov, x0, A, b) ≈ expected rtol=1e-10
 end
 
 @testset "Graded space (Z2Irrep)" begin

@@ -1,5 +1,6 @@
 module PMPSLab
 
+import Base: split
 using TensorKit
 import TensorKit: scalartype
 using KrylovKit
@@ -14,7 +15,8 @@ import MPSKit: physicalspace
 export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
 export ConvergenceLog, SiteLog, SweepLog, SplitLog
 export AbstractPeriodicCanonical, ProjectorCanonical
-export AbstractPeriodicSplit
+export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
+export PeriodicSplit, RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export PeriodicTransferMatrix
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
 export left_cache, right_cache, range_product, edge_identity

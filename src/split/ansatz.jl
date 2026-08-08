@@ -40,6 +40,8 @@ struct SVDAnsatz{T<:TruncationStrategy} <: AbstractAnsatz
     truncation::T
 end
 
+SVDAnsatz() = SVDAnsatz(TruncationStrategy())
+
 function split_site(T::AbstractTensorMap{E, S, 3, 1}, trunc::TruncationStrategy) where {E, S}
     # T: L ⊗ P₁ ⊗ P₂ ← R  →  repartition as (L ⊗ P₁) ← (R ⊗ P₂)  → SVD
     U, Sv, Vp, _ = svd_trunc(repartition(T, 2, 2), DefaultAlgorithm(; trunc))
@@ -56,6 +58,8 @@ struct PeriodicGaugeAnsatz{S<:SVDAnsatz,C<:AbstractPeriodicCanonical} <: Abstrac
     svd_pre::S
     canonical::C
 end
+
+PeriodicGaugeAnsatz() = PeriodicGaugeAnsatz(SVDAnsatz(), ProjectorCanonical())
 
 function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::PeriodicGaugeAnsatz) where {E, S}
     mps_approx = initial_approximation(mps, ansatz.svd_pre)

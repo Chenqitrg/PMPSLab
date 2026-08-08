@@ -66,8 +66,8 @@ ldiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTen
 # Krylov solver — delegates to KrylovKit.linsolve
 # ---------------------------------------------------------------------------
 
-function ldiv(sol::KrylovSolve, A::AbstractTensorMap, b::AbstractTensorMap,
-               x0::AbstractTensorMap)
+function ldiv(sol::KrylovSolve, x0::AbstractTensorMap, A::AbstractTensorMap,
+              b::AbstractTensorMap)
     x, info = linsolve(x -> A * x, b, x0, sol.alg)
     iszero(info.converged) && @warn "Krylov linsolve did not converge."
     return x
@@ -110,8 +110,8 @@ end
 rdiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U) =
     x + rdiv(CholeskySolve(), A, b - x * A; uplo=uplo)
 
-function rdiv(sol::KrylovSolve, A::AbstractTensorMap, b::AbstractTensorMap,
-               x0::AbstractTensorMap)
+function rdiv(sol::KrylovSolve, x0::AbstractTensorMap, A::AbstractTensorMap,
+              b::AbstractTensorMap)
     x, info = linsolve(x -> x * A, b, x0, sol.alg)
     iszero(info.converged) && @warn "Krylov linsolve did not converge."
     return x
