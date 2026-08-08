@@ -21,16 +21,15 @@ Base.:-(h::HalfInt, n::Int) = HalfInt(h.n - n)
 # HalfPeriodicVector — N bond elements, indexed by HalfInt
 # ------------------------------------------------------------------------------
 
-struct HalfPeriodicVector{A}
+struct HalfPeriodicVector{A} <: AbstractVector{A}
     elements::PeriodicVector{A}
 end
-Base.length(v::HalfPeriodicVector) = length(v.elements)
+Base.size(v::HalfPeriodicVector) = size(parent(v))
+Base.parent(v::HalfPeriodicVector) = v.elements
+Base.IndexStyle(::Type{<:HalfPeriodicVector}) = IndexLinear()
 Base.getindex(v::HalfPeriodicVector, pos::HalfInt) = v.elements[pos.n]
 Base.getindex(v::HalfPeriodicVector, i::Int) = v.elements[i]
 Base.getindex(v::HalfPeriodicVector, x::Rational{Int}) = v[HalfInt(x)]
-Base.iterate(v::HalfPeriodicVector, i::Int = 1) =
-    i > length(v) ? nothing : (v.elements[i], i + 1)
-Base.eltype(::Type{HalfPeriodicVector{A}}) where {A} = A
 
 HalfPeriodicVector(v::AbstractVector) = HalfPeriodicVector(PeriodicVector(v))
 
@@ -52,11 +51,10 @@ end
     assertconsistency(mps::PeriodicMPS)
 
 Check that the virtual spaces of adjacent site tensors are compatible around
-the loop. Throws `TensorKit.SpaceMismatch` on failure.
+the period. Throws `TensorKit.SpaceMismatch` on failure.
 """
 function assertconsistency(mps::PeriodicMPS)
-    N = length(mps)
-    for i in 1:N
+    for i in eachindex(mps)
         L = left_virtualspace(mps[i])
         R = right_virtualspace(mps[i - 1])
         L == R || throw(TensorKit.SpaceMismatch(
@@ -70,6 +68,8 @@ end
 
 Base.size(mps::PeriodicMPS, args...) = size(mps.tensors, args...)
 Base.length(mps::PeriodicMPS) = length(mps.tensors)
+Base.firstindex(mps::PeriodicMPS) = firstindex(mps.tensors)
+Base.lastindex(mps::PeriodicMPS) = lastindex(mps.tensors)
 Base.eachindex(mps::PeriodicMPS) = eachindex(mps.tensors)
 Base.eachindex(l::IndexStyle, mps::PeriodicMPS) = eachindex(l, mps.tensors)
 eachsite(mps::PeriodicMPS) = PeriodicVector(eachindex(mps))
@@ -89,13 +89,14 @@ Base.isfinite(::Type{<:PeriodicMPS}) = true
 struct PeriodicChainStyle <: MPSKit.GeometryStyle end
 MPSKit.GeometryStyle(::Type{<:PeriodicMPS}) = PeriodicChainStyle()
 MPSKit.site_type(::Type{<:PeriodicMPS{A}}) where {A} = A
-scalartype(mps::PeriodicMPS) = scalartype(mps[1])
+scalartype(mps::PeriodicMPS) = scalartype(first(mps))
 
 # -- copy & transform ------------------------------------------------------------
 
-Base.copy(mps::PeriodicMPS) = PeriodicMPS(copy(mps.tensors))
-function Base.copy!(dst::PeriodicMPS, src::PeriodicMPS)
-    copy!(dst.tensors, src.tensors)
+Base.parent(mps::PeriodicMPS) = mps.tensors
+Base.copy(mps::PeriodicMPS) = PeriodicMPS(copy(parent(mps)))
+function Base.copyto!(dst::PeriodicMPS, src::PeriodicMPS)
+    copyto!(parent(dst), parent(src))
     return dst
 end
 Base.repeat(mps::PeriodicMPS, i::Int) = PeriodicMPS(repeat(mps.tensors, i))
@@ -104,14 +105,21 @@ Base.similar(mps::PeriodicMPS{A}) where {A} = PeriodicMPS(similar(mps.tensors))
 
 Base.getindex(mps::PeriodicMPS, pos::HalfInt) = right_virtualspace(mps[pos.n])
 
-virtualspace(mps::PeriodicMPS{<:GenericMPSTensor}) = left_virtualspace(mps[1])
-function virtualspaces(mps::PeriodicMPS{<:GenericMPSTensor})
-    spaces = PeriodicVector([right_virtualspace(mps[i]) for i in 1:length(mps)])
-    return HalfPeriodicVector(spaces)
-end
+virtualspace(mps::PeriodicMPS{<:GenericMPSTensor}) = left_virtualspace(first(mps))
+virtualspaces(mps::PeriodicMPS{<:GenericMPSTensor}) =
+    HalfPeriodicVector(map(right_virtualspace, mps))
 
-physicalspace(mps::PeriodicMPS{<:GenericMPSTensor}) = physicalspace(mps[1])
-physicalspaces(mps::PeriodicMPS{<:GenericMPSTensor}) = PeriodicVector([physicalspace(t) for t in mps])
+physicalspace(mps::PeriodicMPS{<:GenericMPSTensor}) = physicalspace(first(mps))
+physicalspaces(mps::PeriodicMPS{<:GenericMPSTensor}) =
+    PeriodicVector(map(physicalspace, mps))
+
+function _check_matching_periods(P, V)
+    length(P) == length(V) || throw(DimensionMismatch(
+        "physical and virtual spaces must have the same length: " *
+        "got $(length(P)) and $(length(V))"
+    ))
+    return eachindex(P)
+end
 
 # ------------------------------------------------------------------------------
 # Constructors — random and uniform (all-ones) periodic MPS
@@ -122,7 +130,7 @@ physicalspaces(mps::PeriodicMPS{<:GenericMPSTensor}) = PeriodicVector([physicals
     random_mps(elt, N, d, D) -> PeriodicMPS
 
 Random periodic MPS with `N` sites: physical space `ℂ^d`, virtual space
-`ℂ^D`. Every site carries the same spaces, so the loop closes.
+`ℂ^D`. Every site carries the same spaces, so the period closes.
 
     random_mps(elt, N, P, V) -> PeriodicMPS
 
@@ -139,9 +147,8 @@ function random_mps(elt::Type{<:Number}, N::Int, P::ElementarySpace, V::Elementa
 end
 
 function random_mps(elt::Type{<:Number}, P::PeriodicVector{<:ElementarySpace}, V::HalfPeriodicVector{<:ElementarySpace})
-    N = length(P)
-    @assert length(V) == N "physical and virtual spaces must have the same length"
-    tensors = [rand(elt, V[i - 1//2] ⊗ P[i] ← V[i + 1//2]) for i in 1:N]
+    tensors = [rand(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
+               for i in _check_matching_periods(P, V)]
     return PeriodicMPS(tensors)
 end
 
@@ -166,9 +173,8 @@ function one_mps(elt::Type{<:Number}, N::Int, P::ElementarySpace, V::ElementaryS
 end
 
 function one_mps(elt::Type{<:Number}, P::PeriodicVector{<:ElementarySpace}, V::HalfPeriodicVector{<:ElementarySpace})
-    N = length(P)
-    @assert length(V) == N "physical and virtual spaces must have the same length"
-    tensors = [ones(elt, V[i - 1//2] ⊗ P[i] ← V[i + 1//2]) for i in 1:N]
+    tensors = [ones(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
+               for i in _check_matching_periods(P, V)]
     return PeriodicMPS(tensors)
 end
 
@@ -176,7 +182,7 @@ end
     random_mps2(elt, N, d, D) -> PeriodicMPS
 
 Random two-site periodic MPS with `N` sites: each site carries two physical
-legs `ℂ^d` (loop order: site a, site b) and virtual space `ℂ^D`. The tensors
+legs `ℂ^d` (periodic order: site a, site b) and virtual space `ℂ^D`. The tensors
 live in `ℂ^D ⊗ ℂ^d ⊗ ℂ^d ← ℂ^D`, as produced by `pair_contraction`.
 
     random_mps2(elt, N, P, V) -> PeriodicMPS
@@ -194,9 +200,8 @@ function random_mps2(elt::Type{<:Number}, N::Int, P::ElementarySpace, V::Element
 end
 
 function random_mps2(elt::Type{<:Number}, P::PeriodicVector{<:ProductSpace}, V::HalfPeriodicVector{<:ElementarySpace})
-    N = length(P)
-    @assert length(V) == N "physical and virtual spaces must have the same length"
-    tensors = [rand(elt, V[i - 1//2] ⊗ P[i] ← V[i + 1//2]) for i in 1:N]
+    tensors = [rand(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
+               for i in _check_matching_periods(P, V)]
     return PeriodicMPS(tensors)
 end
 
@@ -221,9 +226,77 @@ function one_mps2(elt::Type{<:Number}, N::Int, P::ElementarySpace, V::Elementary
 end
 
 function one_mps2(elt::Type{<:Number}, P::PeriodicVector{<:ProductSpace}, V::HalfPeriodicVector{<:ElementarySpace})
-    N = length(P)
-    @assert length(V) == N "physical and virtual spaces must have the same length"
-    tensors = [ones(elt, V[i - 1//2] ⊗ P[i] ← V[i + 1//2]) for i in 1:N]
+    tensors = [ones(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
+               for i in _check_matching_periods(P, V)]
+    return PeriodicMPS(tensors)
+end
+
+# ------------------------------------------------------------------------------
+# Corner-double-line test states
+# ------------------------------------------------------------------------------
+
+"""
+    random_cdl(Vdl, Vdr, Vlu, Vld, Vru, Vrd)
+    random_cdl(elt, Vdl, Vdr, Vlu, Vld, Vru, Vrd)
+
+Construct a local corner-double-line tensor from three independent random maps
+
+```
+Vdl ← Vld,    Vrd ← Vdr,    Vlu ← Vru.
+```
+
+The open legs are bent into the layout
+
+```
+Vlu ⊗ Vld' ⊗ Vdl ⊗ Vdr' ← Vru ⊗ Vrd'.
+```
+"""
+random_cdl(
+    Vdl::ElementarySpace, Vdr::ElementarySpace,
+    Vlu::ElementarySpace, Vld::ElementarySpace,
+    Vru::ElementarySpace, Vrd::ElementarySpace,
+) = random_cdl(ComplexF64, Vdl, Vdr, Vlu, Vld, Vru, Vrd)
+
+function random_cdl(
+        elt::Type{<:Number},
+        Vdl::ElementarySpace, Vdr::ElementarySpace,
+        Vlu::ElementarySpace, Vld::ElementarySpace,
+        Vru::ElementarySpace, Vrd::ElementarySpace
+    )
+    down = rand(elt, Vdl ← Vld)
+    lower_right = rand(elt, Vrd ← Vdr)
+    upper = rand(elt, Vlu ← Vru)
+    @plansor tensor[-1 -2 -3 -4; -5 -6] :=
+        upper[-1; -5] * down[-3; -2] * lower_right[-6; -4]
+    return tensor
+end
+
+"""
+    random_cdl_mps(elt, N, χ) -> PeriodicMPS
+    random_cdl_mps(elt, N, V) -> PeriodicMPS
+
+Construct an `N`-site periodic CDL MPS. Each local tensor is built with
+`random_cdl`; the two virtual double lines are fused into a bond space of
+dimension `dim(V)^2`. TensorKit unitary fusion maps are inserted on the two
+sides of every bond as mutually inverse pairs, so they do not change the
+contracted periodic state.
+"""
+random_cdl_mps(elt::Type{<:Number}, N::Int, χ::Int) =
+    random_cdl_mps(elt, N, ℂ^χ)
+
+function random_cdl_mps(
+        elt::Type{<:Number}, N::Int, V::ElementarySpace
+    )
+    N > 0 || throw(ArgumentError("N must be positive"))
+
+    virtual = fuse(V ⊗ V')
+    fusion = unitary(elt, V ⊗ V', virtual)
+    tensors = map(1:N) do _
+        tensor = random_cdl(elt, V, V, V, V, V, V)
+        @plansor mps_tensor[-1 -2 -3; -4] :=
+            fusion'[-1; 1 2] * tensor[1 2 -2 -3; 3 4] * fusion[3 4; -4]
+        return mps_tensor
+    end
     return PeriodicMPS(tensors)
 end
 
@@ -235,17 +308,13 @@ end
     lift(mps::PeriodicMPS, fold::Int) -> PeriodicMPS
 
 Replicate the unit cell `fold` times by concatenation.
-Corresponds to lifting a loop S¹ → cover.
+Corresponds to lifting a periodic cell to a finite cover.
 """
-function lift(mps::PeriodicMPS, fold::Int)
-    return repeat(mps, fold)
-end
+lift(mps::PeriodicMPS, fold::Int) = repeat(mps, fold)
 
 """
     lift(mps::PeriodicMPS, ::Val{Inf}) -> InfiniteMPS
 
 Lift to an infinite MPS (MPSKit.InfiniteMPS) by repeating the unit cell.
 """
-function lift(mps::PeriodicMPS, ::Val{Inf})
-    return MPSKit.InfiniteMPS(collect(mps))
-end
+lift(mps::PeriodicMPS, ::Val{Inf}) = MPSKit.InfiniteMPS(collect(mps))

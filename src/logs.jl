@@ -23,10 +23,8 @@ mutable struct SweepLog{T} <: ConvergenceLog
     site_logs::Vector{T}
     sweep_time::Float64
     converged::Bool
-    SweepLog{T}() where T = new(T[], 0.0, false)
-    SweepLog{T}(site_logs::Vector{T}, sweep_time::Float64, converged::Bool) where {T} =
-        new(site_logs, sweep_time, converged)
 end
+SweepLog{T}() where {T} = SweepLog{T}(T[], 0.0, false)
 SweepLog(site_logs::Vector{T}, sweep_time::Real, converged::Bool) where {T} =
     SweepLog{T}(site_logs, Float64(sweep_time), converged)
 

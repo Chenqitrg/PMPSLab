@@ -1,7 +1,7 @@
 > **Status: non-authoritative generated draft.** This file is retained only as
 > exploratory material for the independent `WordReduction` idea. It is not the
 > PeriodicMPS package specification and none of its code should be copied into
-> the finite-ring projector implementation without separate review. See
+> the finite-periodic projector implementation without separate review. See
 > `SPEC.md` for the authoritative design.
 
 Below is a self-contained implementation. It uses only Base plus `MPSKit.PeriodicVector`. Current MPSKit documentation defines `PeriodicVector{T}` as the one-dimensional alias of `PeriodicArray{T,1}` and confirms that it supports periodic integer indexing. ([quantumkithub.github.io](https://quantumkithub.github.io/MPSKit.jl/stable/lib/lib/?utm_source=openai))

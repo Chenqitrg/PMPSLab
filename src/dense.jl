@@ -1,17 +1,17 @@
 """
     dense(mps::PeriodicMPS)
 
-Contract all site tensors around the loop into a single dense tensor with
+Contract one full period into a single dense tensor with
 all physical legs open. The virtual indices are fully traced out.
 
 **Warning**: the output space grows exponentially with the number of physical
 legs, so this is intended only for small test systems.
 
 For a 2-site MPS with tensors `T[i]` of shape `(L_i ⊗ p_i ← R_i)`, the N-site
-loop trace is `∑_{v_1…v_N} T[1]^{p_1}_{v_1,v_2} · T[2]^{p_2}_{v_2,v_3} · … · T[N]^{p_N}_{v_N,v_1}`.
+periodic trace is `∑_{v_1…v_N} T[1]^{p_1}_{v_1,v_2} · T[2]^{p_2}_{v_2,v_3} · … · T[N]^{p_N}_{v_N,v_1}`.
 """
 function dense(mps::PeriodicMPS{<:AbstractTensorMap{E,S,M,1}}) where {E,S,M}
-    left = id(E, left_virtualspace(mps[1]))
+    left = id(E, left_virtualspace(first(mps)))
     for T in mps
         # Move the right virtual leg and the physical legs to the domain.  The
         # physical legs are reversed here and restored below, so their public
@@ -39,10 +39,10 @@ Each pair (T_{2k-1}, T_{2k}) becomes one two-site tensor
     T_k' : L_{2k-1} ⊗ P_{2k-1} ⊗ P_{2k} ← R_{2k}
 
 summing over the shared virtual leg (R_{2k-1} = L_{2k}). The result is a
-two-site MPS with N/2 sites, each carrying two physical legs in loop order.
+two-site MPS with N/2 sites, each carrying two physical legs in periodic order.
 Requires N even.
 
-The full loop product is preserved: `dense(pair_contraction(mps))` equals
+The full-period product is preserved: `dense(pair_contraction(mps))` equals
 `dense(mps)` with the same physical leg order.
 """
 function pair_contraction(mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}}) where {E,S}

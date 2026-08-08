@@ -13,20 +13,21 @@ import MPSKit: physicalspace
 # Types
 export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
 export ConvergenceLog, SiteLog, SweepLog, SplitLog
-export AbstractLoopCanonical, ProjectorCanonical
-export AbstractLoopSplit
-export LoopTransferMatrix
-export RingCache, build_cache, environment, left_cache, right_cache, edge_unit
+export AbstractPeriodicCanonical, ProjectorCanonical
+export AbstractPeriodicSplit
+export PeriodicTransferMatrix
+export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
+export left_cache, right_cache, range_product, edge_identity
 
 # Public API
 export gaugefix!, assertconsistency, dense, pair_contraction, split
 export squared_norm, squared_distance, diff_norm
-export random_mps, one_mps, random_mps2, one_mps2, lift
+export random_mps, one_mps, random_mps2, one_mps2, random_cdl, random_cdl_mps, lift
 export SweepState, AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, SplitContext, update!
 export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 
 include("mps.jl")
-include("circularupdate/loopmonoid.jl")
+include("circularupdate/periodicproduct.jl")
 include("logs.jl")
 include("circularupdate/cache.jl")
 include("transfermatrix.jl")

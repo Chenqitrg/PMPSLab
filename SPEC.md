@@ -8,7 +8,7 @@ struct PeriodicMPS{A <: GenericMPSTensor} <: MPSKit.AbstractMPS
 end
 ```
 
-`PeriodicMPS` is the only finite-ring state type. It is finite
+`PeriodicMPS` is the only finite-periodic state type. It is finite
 (`isfinite == true`), uses `PeriodicChainStyle`, and stores the tensors whose
 closed contraction defines the physical state. There is no
 `CanonicalPeriodicMPS`, `AL/AR/C` storage layer, cut closure, or finite-chain
@@ -18,7 +18,7 @@ closed contraction defines the physical state. There is no
 
 ```julia
 @kwdef struct ProjectorCanonical{T<:TruncationStrategy,O} <:
-        AbstractLoopCanonical
+        AbstractPeriodicCanonical
     tol::Float64 = 1e-12
     maxiter::Int = 100
     trscheme::T = TruncationStrategy()
@@ -58,6 +58,12 @@ projector construction, every returned `L[b]` and `R[b]` is normalized after the
 solve and stored in a `HalfPeriodicVector`, matching the old per-reference-cut
 entanglement-filter convention.
 
+`gaugefix!` first calls MPSKit's in-place `makefullrank!`. This is a local
+QR/LQ structural cleanup: it changes incompatible virtual-space dimensions
+without forming a dense state. The non-mutating `find_projectors` helper does
+not perform this step and rejects a structurally rank-deficient input before
+allocating MPSKit's fixed workspace.
+
 ## Projectors and in-place update
 
 At bond `b = i + 1/2`, define the mixed gauge
@@ -75,9 +81,11 @@ PR_b PL_b \simeq I,
 
 For a rank-deficient or truncated gauge, `PR_b PL_b` is instead the projector
 onto the supported or retained virtual subspace. This nontrivial projection is
-intentional: it removes unused or discarded virtual directions. In the
-rank-deficient untruncated case it still preserves the represented finite-ring
-state exactly; explicit truncation may change that state.
+intentional: it removes unused or discarded virtual directions. It need not be
+an exact gauge transformation on the finite periodic state. In particular,
+removing a closed redundant double line can change a global scalar even when
+the projective physical state is unchanged; explicit truncation can also
+change the projective state.
 
 The state remains a `PeriodicMPS`, updated locally as
 
@@ -86,18 +94,18 @@ A_i \leftarrow PL_{i-1/2} A_i PR_{i+1/2}.
 ```
 
 With a truncating `TruncationStrategy`, the same operation is the approximate
-entanglement filter: the bond dimension and physical finite-ring state may
+entanglement filter: the bond dimension and physical periodic state may
 change. Truncation is controlled explicitly by the algorithm rather than by a
 canonical storage constructor.
 
 `AL`, `AR`, and the normalized InfiniteMPS `C` are temporary fixed-point
 objects only. In particular, MPSKit normalizes its boundary gauge during
 InfiniteMPS regularization, so its returned unit-cell tensors cannot directly
-replace the finite-ring tensors or preserve the finite-ring amplitude.
+replace the finite-periodic tensors or preserve their amplitude.
 
 ## 2-to-1 approximation
 
-`OneLoopAnsatz` first performs its local SVD split and then calls
+`PeriodicGaugeAnsatz` first performs its local SVD split and then calls
 `gaugefix!(mps, ProjectorCanonical(...))` in place. The later split/ALS machinery
 continues to work exclusively with `PeriodicMPS` values.
 
@@ -115,7 +123,7 @@ This equals the global squared distance when the local normal equation and its
 mixed environment are consistent. `SplitContext` maintains `braketAB` uniformly
 as `\langle B|A\rangle`; completed B pairs are therefore written with
 `site_transfer_matrix(B₁, B₂, A)`. Exact-solver regression tests require the
-local estimate to agree with a fresh complete-loop contraction after every
+local estimate to agree with a fresh complete-period contraction after every
 site and require non-increase for both circular and zigzag sweeps.
 
 The public interface provides a synchronous optional callback after each
@@ -153,12 +161,14 @@ squared_distance(a, b) =
 
 - All bond gauges are obtained by one direct MPSKit left solve and one direct
   MPSKit right solve, without copying the input tensors.
+- `find_projectors` rejects structurally rank-deficient inputs; `gaugefix!`
+  applies exact local full-rank cleanup before allocating the solver workspace.
 - With no truncation, full-rank adjacent projectors cancel. Rank-deficient
-  projectors act nontrivially only outside the represented support, and `dense`
-  remains unchanged.
+  projectors are tested both on exactly preserved states and on CDL states
+  where every corner bond is compressed and a closed global scalar may change.
 - One- and multi-physical-leg tensors, real/complex scalars, and graded spaces
   use the same generic QR/LQ and absorption implementation.
-- With truncation, errors are measured from a complete finite-loop contraction.
+- With truncation, errors are measured from a complete finite-period contraction.
 - For `split` with an exact local solver, compare the local update against the
-  complete loop cost after every site and require non-increase before enabling
+  complete periodic cost after every site and require non-increase before enabling
   the sweep callback.

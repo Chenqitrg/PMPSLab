@@ -1,12 +1,15 @@
 # PeriodicMPS
 
-Finite periodic matrix-product states and projector-based loop gauge fixing.
+Finite periodic matrix-product states and projector-based periodic gauge fixing.
 
-A finite MPS on a ring is not stored as an `InfiniteMPS` canonical unit cell.
+A finite periodic MPS is not stored as an `InfiniteMPS` canonical unit cell.
 The package keeps the original `PeriodicMPS` tensors and uses the same kind of
 periodic QR/LQ fixed-point iteration as MPSKit's InfiniteMPS regularization to
 compute left and right bond gauges. Projectors derived from those gauges are
-then absorbed into the finite ring in place.
+then absorbed into the finite periodic state in place. `gaugefix!` first applies
+MPSKit's exact local full-rank cleanup when the bond-space layout requires it;
+the read-only `find_projectors` helper instead expects that cleanup to have
+already been done.
 
 ```julia
 mps = random_mps(ComplexF64, 6, 2, 4)
@@ -19,9 +22,9 @@ algorithm and invariants.
 
 ## Split status and cost reporting
 
-The 2-to-1 `split` code keeps the mixed transfer loop consistently oriented as
+The 2-to-1 `split` code keeps the mixed periodic transfer product oriented as
 `⟨B|A⟩`. With an exact local solver, every update therefore agrees with the
-complete finite-loop cost and is non-increasing up to numerical roundoff.
+complete finite-period cost and is non-increasing up to numerical roundoff.
 
 `split` accepts an optional synchronous callback:
 

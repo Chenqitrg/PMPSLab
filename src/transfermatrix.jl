@@ -9,18 +9,16 @@ function site_transfer_matrix(bra::AbstractTensorMap{E,S,3,1}, ket::AbstractTens
     return 𝔼
 end
 
-function site_transfer_matrix(ket::AbstractTensorMap{E,S,3,1}) where {E,S}
-    return site_transfer_matrix(ket, ket)
-end
+site_transfer_matrix(ket::AbstractTensorMap{E,S,3,1}) where {E,S} =
+    site_transfer_matrix(ket, ket)
 
 function site_transfer_matrix(bra::AbstractTensorMap{E,S,2,1}, ket::AbstractTensorMap{E,S,2,1}) where {E,S}
     @plansor 𝔼[-1 -2; -3 -4] := bra'[-4; -2 1] * ket[-1 1; -3]
     return 𝔼
 end
 
-function site_transfer_matrix(ket::AbstractTensorMap{E,S,2,1}) where {E,S}
-    return site_transfer_matrix(ket, ket)
-end
+site_transfer_matrix(ket::AbstractTensorMap{E,S,2,1}) where {E,S} =
+    site_transfer_matrix(ket, ket)
 
 function site_transfer_matrix(bra::AbstractTensorMap{E,S,3,1}, ketL::AbstractTensorMap{E,S,2,1}, ketR::AbstractTensorMap{E,S,2,1}) where {E,S}
     @plansor 𝔼[-1 -2; -3 -4] := ketL[-1 l; m] * ketR[m r; -3] * bra'[-4; -2 l r]
@@ -33,60 +31,56 @@ function site_transfer_matrix(braL::AbstractTensorMap{E,S,2,1}, braR::AbstractTe
     return 𝔼
 end
 
-# Collection of transfer matrices wrapping a full loop.
-struct LoopTransferMatrix{T <: AbstractTensorMap} <: LoopDenseCP
+# Collection of transfer matrices over one period.
+struct PeriodicTransferMatrix{T <: AbstractTensorMap} <: AbstractPeriodicProduct
     matrices::PeriodicVector{T}
 end
 
-Base.length(v::LoopTransferMatrix) = length(v.matrices)
-Base.eltype(::Type{<:LoopTransferMatrix{T}}) where {T} = T
-Base.getindex(v::LoopTransferMatrix, i::Int) = v.matrices[i]
-Base.setindex!(v::LoopTransferMatrix, T::AbstractTensorMap, i::Int) = (v.matrices[i] = T)
+Base.length(v::PeriodicTransferMatrix) = length(v.matrices)
+Base.eltype(::Type{<:PeriodicTransferMatrix{T}}) where {T} = T
+Base.parent(v::PeriodicTransferMatrix) = v.matrices
+Base.eachindex(v::PeriodicTransferMatrix) = eachindex(parent(v))
+Base.iterate(v::PeriodicTransferMatrix, state...) = iterate(parent(v), state...)
+Base.getindex(v::PeriodicTransferMatrix, i::Int) = v.matrices[i]
+Base.setindex!(v::PeriodicTransferMatrix, T::AbstractTensorMap, i::Int) = (v.matrices[i] = T)
 
 # Construct from a PeriodicMPS
-function LoopTransferMatrix(bra::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}, ket::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}) where {E, S, M}
+function PeriodicTransferMatrix(bra::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}, ket::PeriodicMPS{<:AbstractTensorMap{E, S, M, 1}}) where {E, S, M}
     length(bra) == length(ket) || throw(DimensionMismatch(
         "bra has $(length(bra)) sites but ket has $(length(ket)) sites"
     ))
     tmats = [site_transfer_matrix(bratensor, kettensor) for (bratensor, kettensor) in zip(bra, ket)]
-    return LoopTransferMatrix(PeriodicVector(tmats))
+    return PeriodicTransferMatrix(PeriodicVector(tmats))
 end
 
-function LoopTransferMatrix(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}) where {E, S}
+function PeriodicTransferMatrix(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}) where {E, S}
     length(mpsB) == 2 * length(mpsA) ||
         throw(DimensionMismatch("two-site mpsA has $(length(mpsA)) sites but one-site mpsB has $(length(mpsB)) (expected $(2 * length(mpsA)))"))
-    tmats = [site_transfer_matrix(mpsA[i], mpsB[2i-1], mpsB[2i])
-             for i in 1:length(mpsA)]
-    return LoopTransferMatrix(PeriodicVector(tmats))
+    tmats = [site_transfer_matrix(mpsA[i], mpsB[2i - 1], mpsB[2i])
+             for i in eachindex(mpsA)]
+    return PeriodicTransferMatrix(PeriodicVector(tmats))
 end
 
-function LoopTransferMatrix(mpsB::PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}, mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}) where {E, S}
+function PeriodicTransferMatrix(mpsB::PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}, mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}) where {E, S}
     length(mpsB) == 2 * length(mpsA) ||
         throw(DimensionMismatch("two-site mpsA has $(length(mpsA)) sites but one-site mpsB has $(length(mpsB)) (expected $(2 * length(mpsA)))"))
-    tmats = [site_transfer_matrix(mpsB[2i-1], mpsB[2i], mpsA[i])
-             for i in 1:length(mpsA)]
-    return LoopTransferMatrix(PeriodicVector(tmats))
+    tmats = [site_transfer_matrix(mpsB[2i - 1], mpsB[2i], mpsA[i])
+             for i in eachindex(mpsA)]
+    return PeriodicTransferMatrix(PeriodicVector(tmats))
 end
 
-LoopTransferMatrix(mps::PeriodicMPS) = LoopTransferMatrix(mps, mps)
+PeriodicTransferMatrix(mps::PeriodicMPS) = PeriodicTransferMatrix(mps, mps)
 
-edge_unit(ltm::LoopTransferMatrix) = id(scalartype(ltm[1]), codomain(ltm[1]))
+edge_identity(ptm::PeriodicTransferMatrix) =
+    id(scalartype(ptm[1]), codomain(ptm[1]))
 
-# Full loop product E₁ * E₂ * ... * E_N
-function Base.:*(ltm::LoopTransferMatrix)
-    N = length(ltm.matrices)
-    result = ltm.matrices[1]
-    for i in 2:N
-        result = result * ltm.matrices[i]
-    end
-    return result
-end
+# Full-period product E₁ * E₂ * ... * E_N
+Base.:*(ptm::PeriodicTransferMatrix) = range_product(ptm, eachindex(ptm))
 
-function expectation(ltm::LoopTransferMatrix)
-    return tr(*(ltm))
-end
+expectation(ptm::PeriodicTransferMatrix) = tr(*(ptm))
 
-TensorKit.dot(bra::PeriodicMPS, ket::PeriodicMPS) = expectation(LoopTransferMatrix(bra, ket))
+TensorKit.dot(bra::PeriodicMPS, ket::PeriodicMPS) =
+    expectation(PeriodicTransferMatrix(bra, ket))
 
 function _nonnegative_squared(value::Real, scale::Real, quantity::AbstractString)
     value >= 0 && return value
@@ -128,8 +122,17 @@ function Base.isapprox(
         rtol::Real = Base.rtoldefault(scalartype(mps1), scalartype(mps2), atol)
     )
     distance2, n1, n2 = _squared_distance_data(mps1, mps2)
-    tolerance = max(atol, rtol * max(sqrt(abs(n1)), sqrt(abs(n2))))
-    return distance2 <= tolerance^2
+    scale2 = max(abs(n1), abs(n2))
+    tolerance = max(atol, rtol * sqrt(scale2))
+
+    # `distance2` subtracts three independently contracted quantities of size
+    # `scale2`. At the default `rtol`, squaring the requested tolerance reaches
+    # machine precision, so contraction roundoff can otherwise decide the
+    # result solely by its sign. Use the same roundoff budget in both
+    # directions; unlike `_nonnegative_squared`, keep the reported distance
+    # itself unchanged when it is small and positive.
+    roundoff2 = 100 * eps(float(one(distance2))) * scale2
+    return distance2 <= max(tolerance^2, roundoff2)
 end
 
 function LinearAlgebra.normalize(mps::PeriodicMPS)

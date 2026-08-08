@@ -9,7 +9,7 @@ function _absorb_projectors!(
         PL_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}},
         PR_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}}
     ) where {E,S,N}
-    for i in 1:length(mps)
+    for i in eachindex(mps)
         left_bond = HalfInt(i - 1)
         right_bond = HalfInt(i)
         mps[i] = _projector_mul_front(PL_vec[left_bond], mps[i]) *
@@ -23,11 +23,14 @@ end
 
 Use MPSKit's periodic left/right canonicalization to obtain normalized bond
 gauges, construct the bond projectors, and absorb them into `mps`. Modifies and
-returns `mps`. The internal MPSKit solvers run without native log output.
+returns `mps`. Before entering MPSKit's fixed-workspace canonicalization,
+structurally incompatible virtual spaces are reduced exactly with local QR/LQ
+transformations. The internal MPSKit solvers run without native log output.
 """
 function gaugefix!(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}}, alg::ProjectorCanonical
     ) where {E,S,N}
+    MPSKit.makefullrank!(mps.tensors; alg_orth = alg.alg_orth)
     PR_vec, PL_vec = find_projectors(mps, alg)
     return _absorb_projectors!(mps, PL_vec, PR_vec)
 end

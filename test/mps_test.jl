@@ -1,4 +1,4 @@
-# Tests for src/mps.jl — core loop-MPS types: HalfInt, HalfPeriodicVector,
+# Tests for src/mps.jl — core periodic-MPS types: HalfInt, HalfPeriodicVector,
 # PeriodicMPS, the random/one constructors and lift.
 
 using Test
@@ -14,6 +14,8 @@ using PMPSLab:
     one_mps,
     random_mps2,
     one_mps2,
+    random_cdl,
+    random_cdl_mps,
     lift,
     assertconsistency,
     scalartype
@@ -71,7 +73,12 @@ end
     els = PeriodicVector([ℂ^2, ℂ^3, ℂ^4])
     v = HalfPeriodicVector(els)
 
+    @test v isa AbstractVector
     @test length(v) == 3
+    @test size(v) == (3,)
+    @test axes(v) == (Base.OneTo(3),)
+    @test eachindex(v) == Base.OneTo(3)
+    @test parent(v) === els
     @test eltype(typeof(v)) == ComplexSpace
 
     # indexing by HalfInt bond label
@@ -103,6 +110,10 @@ end
     mps = random_mps(ComplexF64, 4, 2, 3)
 
     @test length(mps) == 4
+    @test firstindex(mps) == 1
+    @test lastindex(mps) == 4
+    @test eachindex(mps) == Base.OneTo(4)
+    @test parent(mps) === mps.tensors
     @test eltype(typeof(mps)) == typeof(mps[1])
     @test mps[1] == mps[1]
     @test mps[0] == mps[4]                      # PeriodicVector wraps around
@@ -115,6 +126,10 @@ end
 
     # iteration
     @test collect(mps) == collect(mps.tensors)
+
+    copied = similar(mps)
+    @test copyto!(copied, mps) === copied
+    @test all(copied[i] == mps[i] for i in eachindex(mps))
 end
 
 @testset "PeriodicMPS — space queries" begin
@@ -182,6 +197,10 @@ end
     @test length(mg) == 3
     @test assertconsistency(mg) === nothing
     @test left_virtualspace(mg[1]) == Z2Space(0 => 2, 1 => 1)
+
+    @test_throws DimensionMismatch random_mps(
+        ComplexF64, PeriodicVector(fill(ℂ^2, 3)), HalfPeriodicVector(fill(ℂ^2, 2))
+    )
 end
 
 @testset "random_mps2 / one_mps2 — PeriodicVector + HalfPeriodicVector spaces" begin
@@ -200,6 +219,28 @@ end
     @test length(mps1) == 2
     @test assertconsistency(mps1) === nothing
     @test all(all(mps1[i][a, b, c, d] == 1 for a in 1:3, b in 1:2, c in 1:2, d in 1:3) for i in 1:2)
+end
+
+@testset "random_cdl — prescribed six-leg layout" begin
+    Vdl, Vdr = ℂ^2, ℂ^3
+    Vlu, Vld = ℂ^4, ℂ^5
+    Vru, Vrd = ℂ^4, ℂ^3
+    tensor = random_cdl(Vdl, Vdr, Vlu, Vld, Vru, Vrd)
+
+    @test space(tensor) ==
+          (Vlu ⊗ Vld' ⊗ Vdl ⊗ Vdr' ← Vru ⊗ Vrd')
+    @test scalartype(tensor) == ComplexF64
+end
+
+@testset "random_cdl_mps — inverse fusion unitaries" begin
+    N, χ = 4, 2
+    mps = random_cdl_mps(ComplexF64, N, χ)
+
+    @test length(mps) == N
+    @test assertconsistency(mps) === nothing
+    @test all(dim(left_virtualspace(tensor)) == χ^2 for tensor in mps)
+    @test all(dim(right_virtualspace(tensor)) == χ^2 for tensor in mps)
+    @test all(numout(tensor) == 3 && numin(tensor) == 1 for tensor in mps)
 end
 
 # ==============================================================================

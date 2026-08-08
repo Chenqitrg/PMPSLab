@@ -1,7 +1,7 @@
 # WordReduction — Exploratory Prompt
 
 > This is an exploratory cache-design prompt, not the PeriodicMPS canonical
-> state specification. The authoritative finite-ring representation and
+> state specification. The authoritative finite-periodic representation and
 > projector gauge-fixing design live in `SPEC.md`.
 
 I need a Julia submodule `WordReduction` with zero external dependencies. It solves the periodic product problem with updates: a sequence of elements with

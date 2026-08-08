@@ -1,35 +1,43 @@
-struct RandomAnsatz{I<:Sector} <: AbstractAnsatz
-    virtual_space::HalfPeriodicVector{<:GradedSpace{I}}
+struct RandomAnsatz{V<:GradedSpace} <: AbstractAnsatz
+    virtual_space::HalfPeriodicVector{V}
 end
 
-RandomAnsatz(Vs::Vector{<:GradedSpace{I}}) where {I<:Sector} = RandomAnsatz{I}(HalfPeriodicVector(Vs))
-RandomAnsatz(V::GradedSpace{I}, N::Int) where {I<:Sector} = RandomAnsatz(fill(V, N))
+RandomAnsatz(Vs::AbstractVector{V}) where {V<:GradedSpace} =
+    RandomAnsatz(HalfPeriodicVector(Vs))
+RandomAnsatz(V::GradedSpace, N::Int) = RandomAnsatz(fill(V, N))
 
-function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::RandomAnsatz{I}) where {E, I, S<:GradedSpace{I}}
-    N = 2 * length(mps)
-    @assert length(ansatz.virtual_space) == N "ansatz virtual space length must match mps length"
-    # physicalspaces(mps) returns ProductSpace elements — flatten each collect → vcat
-    P_spaces = PeriodicVector(reduce(vcat, collect.(physicalspaces(mps))))
-    return random_mps(E, P_spaces, ansatz.virtual_space)
+function _ansatz_physicalspaces(mps::PeriodicMPS, virtual_space::HalfPeriodicVector)
+    expected_length = 2 * length(mps)
+    length(virtual_space) == expected_length || throw(DimensionMismatch(
+        "ansatz has $(length(virtual_space)) virtual spaces; expected $expected_length"
+    ))
+    return PeriodicVector(collect(Iterators.flatten(physicalspaces(mps))))
 end
 
-struct OneAnsatz{I<:Sector} <: AbstractAnsatz
-    virtual_space::HalfPeriodicVector{<:GradedSpace{I}}
+function initial_approximation(
+        mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, ansatz::RandomAnsatz
+    ) where {E,S}
+    P = _ansatz_physicalspaces(mps, ansatz.virtual_space)
+    return random_mps(E, P, ansatz.virtual_space)
 end
 
-OneAnsatz(Vs::Vector{<:GradedSpace{I}}) where {I<:Sector} = OneAnsatz{I}(HalfPeriodicVector(Vs))
-OneAnsatz(V::GradedSpace{I}, N::Int) where {I<:Sector} = OneAnsatz(fill(V, N))
-
-function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::OneAnsatz{I}) where {E, I, S<:GradedSpace{I}}
-    N = 2 * length(mps)
-    @assert length(ansatz.virtual_space) == N "ansatz virtual space length must match mps length"
-    # physicalspaces(mps) returns ProductSpace elements — flatten each collect → vcat
-    P_spaces = PeriodicVector(reduce(vcat, collect.(physicalspaces(mps))))
-    return one_mps(E, P_spaces, ansatz.virtual_space)
+struct OneAnsatz{V<:GradedSpace} <: AbstractAnsatz
+    virtual_space::HalfPeriodicVector{V}
 end
 
-struct SVDAnsatz <: AbstractAnsatz
-    truncation::TruncationStrategy
+OneAnsatz(Vs::AbstractVector{V}) where {V<:GradedSpace} =
+    OneAnsatz(HalfPeriodicVector(Vs))
+OneAnsatz(V::GradedSpace, N::Int) = OneAnsatz(fill(V, N))
+
+function initial_approximation(
+        mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, ansatz::OneAnsatz
+    ) where {E,S}
+    P = _ansatz_physicalspaces(mps, ansatz.virtual_space)
+    return one_mps(E, P, ansatz.virtual_space)
+end
+
+struct SVDAnsatz{T<:TruncationStrategy} <: AbstractAnsatz
+    truncation::T
 end
 
 function split_site(T::AbstractTensorMap{E, S, 3, 1}, trunc::TruncationStrategy) where {E, S}
@@ -40,16 +48,16 @@ function split_site(T::AbstractTensorMap{E, S, 3, 1}, trunc::TruncationStrategy)
 end
 
 function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::SVDAnsatz) where {E, S}
-    tensors = [t for i in 1:length(mps) for t in split_site(mps[i], ansatz.truncation)]
+    tensors = [tensor for site in mps for tensor in split_site(site, ansatz.truncation)]
     return PeriodicMPS(tensors)
 end
 
-struct OneLoopAnsatz <: AbstractAnsatz
-    svd_pre::SVDAnsatz
-    canonical::AbstractLoopCanonical
+struct PeriodicGaugeAnsatz{S<:SVDAnsatz,C<:AbstractPeriodicCanonical} <: AbstractAnsatz
+    svd_pre::S
+    canonical::C
 end
 
-function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::OneLoopAnsatz) where {E, S}
+function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::PeriodicGaugeAnsatz) where {E, S}
     mps_approx = initial_approximation(mps, ansatz.svd_pre)
     gaugefix!(mps_approx, ansatz.canonical)
     return mps_approx

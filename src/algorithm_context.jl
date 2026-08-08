@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------------------
-# AlgorithmContext — generic protocol for loop MPS algorithms
+# AlgorithmContext — generic protocol for periodic MPS algorithms
 #
 # Every algorithm context holds a target object, a working object and a
 # result log. Implementations (e.g. SplitContext) add algorithm-specific

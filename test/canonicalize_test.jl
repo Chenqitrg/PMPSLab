@@ -190,6 +190,34 @@ end
     @test dense(mps) ≈ dense_before atol=1e-10
 end
 
+function structurally_rank_deficient_mps()
+    return PeriodicMPS([
+        rand(ComplexF64, ℂ^3 ⊗ ℂ^2 ← ℂ^1),
+        rand(ComplexF64, ℂ^1 ⊗ ℂ^2 ← ℂ^3),
+        rand(ComplexF64, ℂ^3 ⊗ ℂ^2 ← ℂ^1),
+        rand(ComplexF64, ℂ^1 ⊗ ℂ^2 ← ℂ^3),
+    ])
+end
+
+@testset "structural rank cleanup precedes projector gauge fixing" begin
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
+
+    # `find_projectors` is non-mutating and therefore cannot repair invalid
+    # local bond dimensions. It should reject them before entering MPSKit's
+    # fixed-workspace orthogonalization.
+    direct = structurally_rank_deficient_mps()
+    @test_throws ArgumentError find_projectors(direct, alg)
+
+    # The mutating workflow may repair those dimensions exactly before finding
+    # projectors. This is the preprocessing performed by InfiniteMPS as well.
+    mps = structurally_rank_deficient_mps()
+    dense_before = dense(mps)
+    @test gaugefix!(mps, alg) === mps
+    @test all(MPSKit.isfullrank, mps)
+    @test [dim(right_virtualspace(tensor)) for tensor in mps] == [1, 2, 1, 2]
+    @test norm(dense(mps) - dense_before) / norm(dense_before) < 1e-12
+end
+
 @testset "gaugefix! — integration" begin
     N, d, D = 4, 2, 3
     mps = random_mps(ComplexF64, N, d, D)
@@ -382,7 +410,7 @@ end
         D, d = 2, 2
         for N in [2, 4, 6]
             mps = random_mps(ComplexF64, N, d, D)
-            # Same physical leg order as dense(mps) — the loop product is preserved.
+            # Same physical leg order as dense(mps); the periodic product is preserved.
             @test dense(pair_contraction(mps)) ≈ dense(mps)
         end
     end

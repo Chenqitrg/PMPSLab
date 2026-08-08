@@ -2,11 +2,11 @@
 # Projector-based periodic gauge fixing
 # ------------------------------------------------------------------------------
 
-abstract type AbstractLoopCanonical <: Algorithm end
+abstract type AbstractPeriodicCanonical <: Algorithm end
 
 @kwdef struct ProjectorCanonical{
         T<:TruncationStrategy, O
-    } <: AbstractLoopCanonical
+    } <: AbstractPeriodicCanonical
     tol::Float64 = 1e-12
     maxiter::Int = 100
     trscheme::T = TruncationStrategy()
@@ -35,14 +35,14 @@ _right_algorithm(alg::ProjectorCanonical) = MPSKit.RightCanonical(;
 function _gauge_seed(
     mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}}
     ) where {E,S,N}
-    return id(E, left_virtualspace(mps[1]))
+    return id(E, left_virtualspace(first(mps)))
 end
 
 function _mpskit_gauges(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}},
         alg::ProjectorCanonical
     ) where {E,S,N}
-    A = mps.tensors
+    A = parent(mps)
     Aorth = similar.(A)
     seed = _gauge_seed(mps)
 
@@ -61,6 +61,19 @@ function _mpskit_gauges(
     return HalfPeriodicVector(L), HalfPeriodicVector(R)
 end
 
+function _require_structurally_fullrank(mps::PeriodicMPS)
+    invalid_site = findfirst(eachindex(mps)) do i
+        !MPSKit.isfullrank(mps[i])
+    end
+    isnothing(invalid_site) && return nothing
+
+    throw(ArgumentError(
+        "find_projectors requires structurally full-rank local tensor spaces; " *
+        "site $invalid_site violates this condition. Use gaugefix! to perform " *
+        "the exact in-place structural cleanup before projector construction."
+    ))
+end
+
 """
     P_decomp(R, L, trunc) -> (PR, PL)
 
@@ -71,9 +84,9 @@ supported or retained virtual subspace; that nontrivial projection is the
 intended virtual-bond compression.
 """
 function P_decomp(
-        R::AbstractTensorMap{E,A,1,1}, L::AbstractTensorMap{E,A,1,1},
+        R::AbstractTensorMap{E,Sp,1,1}, L::AbstractTensorMap{E,Sp,1,1},
         trunc::TruncationStrategy
-    ) where {E,A}
+    ) where {E,Sp}
     U, S, Vh, _ = svd_trunc(L * R; trunc)
     inverse_sqrt = pseudopow(S, -0.5)
     PR = R * Vh' * inverse_sqrt
@@ -87,12 +100,15 @@ end
 Run MPSKit's left and right periodic gauge solvers directly on the read-only
 `mps.tensors` container. A single internal orthogonal-tensor buffer is reused
 for the left and right solves. The normalized gauges and resulting projectors
-use `HalfPeriodicVector` bond indexing.
+use `HalfPeriodicVector` bond indexing. Because this function does not mutate
+its input, `mps` must already have structurally full-rank local tensor spaces;
+use `gaugefix!` when exact structural cleanup may be required.
 """
 function find_projectors(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}},
         alg::ProjectorCanonical
     ) where {E,S,N}
+    _require_structurally_fullrank(mps)
     L, R = _mpskit_gauges(mps, alg)
 
     projectors = map(eachindex(mps)) do bond

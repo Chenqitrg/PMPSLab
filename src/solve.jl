@@ -10,7 +10,7 @@
 # Pseudo-power: suppresses small singular values to avoid 1/0 blowup
 function pseudopow(t::DiagonalTensorMap, a::Real; tol = eps(scalartype(t))^(3 / 4))
     t′ = copy(t)
-    for (c, b) in blocks(t′)
+    for (_, b) in blocks(t′)
         @inbounds for i in 1:size(b, 1)
             b.diag[i] = abs(b.diag[i]) < tol ? b.diag[i] : b.diag[i]^a
         end
@@ -38,7 +38,7 @@ function _block_ldiv(f, A::AbstractTensorMap, b::AbstractTensorMap)
     T = float(promote_type(scalartype(A), scalartype(b)))
     x = similar(b, T, domain(A) ← domain(b))
     for (c, block_b) in blocks(x)
-        copy!(block_b, f(block(A, c), block(b, c)))
+        copyto!(block_b, f(block(A, c), block(b, c)))
     end
     return x
 end
@@ -69,7 +69,7 @@ ldiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTen
 function ldiv(sol::KrylovSolve, A::AbstractTensorMap, b::AbstractTensorMap,
                x0::AbstractTensorMap)
     x, info = linsolve(x -> A * x, b, x0, sol.alg)
-    info.converged == 0 && @warn "Krylov linsolve did not converge."
+    iszero(info.converged) && @warn "Krylov linsolve did not converge."
     return x
 end
 
@@ -83,7 +83,7 @@ function _block_rdiv(f, A::AbstractTensorMap, b::AbstractTensorMap)
     T = float(promote_type(scalartype(A), scalartype(b)))
     x = similar(b, T, codomain(b) ← codomain(A))
     for (c, block_x) in blocks(x)
-        copy!(block_x, f(block(b, c), block(A, c)))
+        copyto!(block_x, f(block(b, c), block(A, c)))
     end
     return x
 end
@@ -113,6 +113,6 @@ rdiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTen
 function rdiv(sol::KrylovSolve, A::AbstractTensorMap, b::AbstractTensorMap,
                x0::AbstractTensorMap)
     x, info = linsolve(x -> x * A, b, x0, sol.alg)
-    info.converged == 0 && @warn "Krylov linsolve did not converge."
+    iszero(info.converged) && @warn "Krylov linsolve did not converge."
     return x
 end
