@@ -207,6 +207,7 @@ end
 
     @test run isa SplitRun
     @test run.context isa SplitContext
+    @test !hasproperty(run, :target)
     @test !isfinished(run)
     @test first(run.pending_iteration) == SweepState(1, 1, 0)
     @test last(run.pending_iteration) == SweepState(2, 1, 0)
@@ -230,6 +231,12 @@ end
     @test length(log.site_logs) == 4
     @test log.sweep_time == sum(site_log -> site_log.time, log.site_logs)
     @test_throws ArgumentError step!(run)
+
+    blocking_mps, blocking_log = split(mpsA, algorithm)
+    @test dense(blocking_mps) ≈ dense(mpsB)
+    @test getfield.(blocking_log.site_logs, :error) ≈
+          getfield.(log.site_logs, :error)
+    @test_throws MethodError split(mpsA, algorithm; callback=nothing)
 end
 
 @testset "SplitRun — an empty sweep is complete at initialization" begin
@@ -311,7 +318,7 @@ end
     end
 end
 
-@testset "split — sweep progress log and callback" begin
+@testset "split — sweep progress log" begin
     Random.seed!(4321)
     mpsA = random_mps2(ComplexF64, 2, 2, 2)
     nsweeps = 3
@@ -320,17 +327,13 @@ end
         CircularSweep(4; maximal_sweep=nsweeps),
         LUSolve(),
     )
-    callback_costs = Float64[]
-    mpsB, log = split(
-        mpsA, alg;
-        callback=split_log -> push!(callback_costs, last(split_log.site_logs).error),
-    )
+    mpsB, log = split(mpsA, alg)
+    sweep_costs = getfield.(log.site_logs[4:4:end], :error)
 
     @test length(log.site_logs) == 4nsweeps
-    @test length(callback_costs) == nsweeps
-    @test callback_costs == getfield.(log.site_logs[4:4:end], :error)
-    @test all(diff(callback_costs) .<= 1e-9 .* max.(callback_costs[1:(end - 1)], 1.0))
-    @test callback_costs[end] ≈ squared_distance(mpsA, mpsB) rtol=1e-10 atol=1e-10
+    @test length(sweep_costs) == nsweeps
+    @test all(diff(sweep_costs) .<= 1e-9 .* max.(sweep_costs[1:(end - 1)], 1.0))
+    @test sweep_costs[end] ≈ squared_distance(mpsA, mpsB) rtol=1e-10 atol=1e-10
     @test log.sweep_time >= 0
 end
 
@@ -340,11 +343,9 @@ function run_end_to_end_split(mpsA, ansatz; nsweeps::Int=4)
         CircularSweep(2 * length(mpsA); maximal_sweep=nsweeps),
         LUSolve(),
     )
-    costs = Float64[]
-    mpsB, log = split(
-        mpsA, alg;
-        callback=split_log -> push!(costs, last(split_log.site_logs).error),
-    )
+    mpsB, log = split(mpsA, alg)
+    sites_per_sweep = 2 * length(mpsA)
+    costs = getfield.(log.site_logs[sites_per_sweep:sites_per_sweep:end], :error)
     return mpsB, log, costs
 end
 

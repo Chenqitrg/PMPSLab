@@ -5,8 +5,7 @@ Mutable execution state for a [`PeriodicSplit`](@ref). `context` owns the
 numerical working state, while the run owns the algorithm, sweep cursor,
 and progress log.
 """
-mutable struct SplitRun{M,A<:PeriodicSplit,C<:SplitContext,P} <: AbstractAlgorithmRun
-    target::M
+mutable struct SplitRun{A<:PeriodicSplit,C<:SplitContext,P} <: AbstractAlgorithmRun
     algorithm::A
     context::C
     pending_iteration::Union{Nothing,P}
@@ -27,9 +26,8 @@ function initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
     context = SplitContext(mps, approximation)
     pending_iteration = iterate(algorithm.sweep)
     return SplitRun{
-        typeof(mps),typeof(algorithm),typeof(context),typeof(pending_iteration)
+        typeof(algorithm),typeof(context),typeof(pending_iteration)
     }(
-        mps,
         algorithm,
         context,
         pending_iteration,
@@ -58,4 +56,21 @@ end
 function run_result(run::SplitRun)
     isfinished(run) || throw(ArgumentError("split run is not complete"))
     return run.context.mpsB, run.log
+end
+
+"""
+    split(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, alg::PeriodicSplit)
+
+Given a periodic MPS with 2 physical legs per site (3 codim legs), produce a
+periodic MPS with 1 physical leg per site (2 codim legs) that best approximates
+the periodic state. Returns `(mps_1site, log)` where `log` is a [`SplitLog`](@ref)
+with one `SiteLog` per update. This blocking convenience API uses the same
+[`SplitRun`](@ref) stepper as controllable local and platform execution.
+"""
+function split(mps::PeriodicMPS, algorithm::PeriodicSplit)
+    run = initialize_run(mps, algorithm)
+    while !isfinished(run)
+        step!(run)
+    end
+    return run_result(run)
 end

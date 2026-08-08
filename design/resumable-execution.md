@@ -59,8 +59,8 @@ HTTP API, job registry, authentication, or storage service.
    handles must never be part of a checkpoint.
 4. Derived contraction caches may be rebuilt on restore when this only changes
    results within machine precision.
-5. Existing synchronous APIs, especially `split(mps, alg; callback=...)`, must
-   remain available as compatibility wrappers.
+5. The blocking `split(mps, alg)` API remains available as a convenience
+   wrapper around the same run protocol; progress is reported through events.
 
 ## Non-goals
 
@@ -201,8 +201,7 @@ lifetime of the run. They do not require a common problem wrapper.
 ### Run
 
 ```julia
-mutable struct SplitRun{M,A,C,P} <: AbstractAlgorithmRun
-    target::M
+mutable struct SplitRun{A,C,P} <: AbstractAlgorithmRun
     algorithm::A
     context::C
     pending_iteration::Union{Nothing,P}
@@ -251,9 +250,9 @@ an extra completion-only call to `step!`.
 Persisting only the just-completed `SweepState` would cause duplicate work
 after restore, especially at a zigzag turn.
 
-The final implementation must preserve the existing sweep callback semantics:
-one callback after each complete sweep and one after the final sweep, without
-duplicate calls across a restore boundary.
+The blocking `split(mps, algorithm)` function initializes a `SplitRun`, drives
+it to completion, and returns `run_result(run)`. Controllable execution uses an
+observer on the execution adapter rather than a numerical-core callback.
 
 ### Snapshot
 
@@ -506,11 +505,10 @@ safe boundary must also snapshot its RNG state.
 
 ## Testing strategy
 
-### Compatibility tests
+### Blocking API tests
 
-- The public `split(mps, alg; callback=...)` result remains numerically
-  unchanged after it becomes a wrapper around `SplitRun`.
-- Callback timing and count remain unchanged.
+- The public `split(mps, alg)` result matches manually driving `SplitRun`.
+- Passing the removed `callback` keyword is rejected.
 - Existing circular and zigzag update-cost tests continue to pass.
 
 ### Stepper tests

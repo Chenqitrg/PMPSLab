@@ -13,4 +13,4 @@ struct PeriodicSplit{A<:AbstractAnsatz, S<:AbstractSweep, V<:AbstractSolve} <: A
     solve::V
 end
 
-# split(mps, alg) defined in context.jl — needs SplitContext
+# split(mps, alg) defined in run.jl — drives SplitRun to completion

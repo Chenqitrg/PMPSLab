@@ -26,7 +26,7 @@ The 2-to-1 `split` code keeps the mixed periodic transfer product oriented as
 `⟨B|A⟩`. With an exact local solver, every update therefore agrees with the
 complete finite-period cost and is non-increasing up to numerical roundoff.
 
-`split` accepts an optional synchronous callback:
+`split` is the blocking convenience API:
 
 ```julia
 alg = PeriodicSplit(
@@ -34,10 +34,22 @@ alg = PeriodicSplit(
     CircularSweep(2 * length(A); maximal_sweep=4),
     CholeskySolve(),
 )
-B, log = split(A, alg; callback = log -> display(last(log.site_logs).error))
+B, log = split(A, alg)
 ```
 
-After every complete sweep it calls `callback(log)`. The current cost is simply
+For controllable execution and per-site progress events, drive the same
+algorithm through a run session:
+
+```julia
+session = start_run(
+    initialize_run(A, alg);
+    observer = event -> display(event.log.error),
+)
+wait(session)
+B, log = run_result(session)
+```
+
+The current cost is
 
 ```julia
 last(log.site_logs).error
@@ -50,6 +62,5 @@ and represents
                      - 2\operatorname{Re}\langle B|A\rangle.
 ```
 
-The callback adds no contraction or copying: it receives the same `SplitLog`
-that is returned by `split`. `SiteLog.state.n` identifies the sweep and
-`log.sweep_time` contains the elapsed run time.
+`SiteLog.state.n` identifies the sweep. `log.sweep_time` is the accumulated
+time spent inside completed site updates and excludes time spent paused.
