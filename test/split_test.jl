@@ -337,6 +337,62 @@ end
     @test length(saved.log.site_logs) == 2
 end
 
+@testset "SplitSnapshot — restores every circular and zigzag boundary" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    finish_run! = function(run)
+        while !isfinished(run)
+            step!(run)
+        end
+        return run_result(run)
+    end
+
+    for sweep in (
+            CircularSweep(4; maximal_sweep=2),
+            ZigzagSweep(4; maximal_sweep=2),
+        )
+        algorithm = PeriodicSplit(SVDAnsatz(), sweep, CholeskySolve())
+        for completed_steps in 0:length(sweep)
+            uninterrupted = initialize_run(mpsA, algorithm)
+            for _ in 1:completed_steps
+                step!(uninterrupted)
+            end
+
+            restored = restore_run(snapshot(uninterrupted), mpsA, algorithm)
+            expected_mps, expected_log = finish_run!(uninterrupted)
+            restored_mps, restored_log = finish_run!(restored)
+
+            @test dense(restored_mps) ≈ dense(expected_mps) rtol=1e-12
+            @test getfield.(restored_log.site_logs, :error) ≈
+                  getfield.(expected_log.site_logs, :error)
+            @test length(restored_log.site_logs) == length(sweep)
+        end
+    end
+end
+
+@testset "SplitSnapshot — rejects an inconsistent cursor or sweep" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=2),
+        CholeskySolve(),
+    )
+    run = initialize_run(mpsA, algorithm)
+    for _ in 1:3
+        step!(run)
+    end
+    saved = snapshot(run)
+
+    bad_cursor = SplitSnapshot(saved.mpsB, iterate(algorithm.sweep), saved.log)
+    @test_throws ArgumentError restore_run(bad_cursor, mpsA, algorithm)
+
+    wrong_sweep = PeriodicSplit(
+        algorithm.ansatz,
+        ZigzagSweep(4; maximal_sweep=2),
+        algorithm.solve,
+    )
+    @test_throws ArgumentError restore_run(saved, mpsA, wrong_sweep)
+end
+
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin
     B0 = random_mps(ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
