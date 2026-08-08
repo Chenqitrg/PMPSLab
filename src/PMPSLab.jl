@@ -18,7 +18,7 @@ export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
 export AlgorithmEvent, LocalRunSession, LocalRunStatus
 export AbstractPeriodicCanonical, ProjectorCanonical
 export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
-export PeriodicSplit, SplitRun, SplitSiteCompleted
+export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export PeriodicTransferMatrix
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment

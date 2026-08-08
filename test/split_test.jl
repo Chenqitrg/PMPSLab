@@ -253,6 +253,42 @@ end
     @test isempty(last(run_result(run)).site_logs)
 end
 
+@testset "SplitSnapshot — captures an isolated safe-boundary state" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=1),
+        CholeskySolve(),
+    )
+    run = initialize_run(mpsA, algorithm)
+    step!(run)
+
+    saved = snapshot(run)
+    @test saved isa SplitSnapshot
+    @test saved.mpsB !== run.context.mpsB
+    @test parent(saved.mpsB) !== parent(run.context.mpsB)
+    @test all(saved.mpsB[i] !== run.context.mpsB[i] for i in eachindex(saved.mpsB))
+    @test saved.pending_iteration == run.pending_iteration
+    @test saved.log !== run.log
+    @test saved.log.site_logs !== run.log.site_logs
+    @test saved.log.site_logs == run.log.site_logs
+    @test saved.log.sweep_time == run.log.sweep_time
+
+    saved_next_tensor = copy(saved.mpsB[2])
+    step!(run)
+    @test saved.pending_iteration != run.pending_iteration
+    @test length(saved.log.site_logs) == 1
+    @test length(run.log.site_logs) == 2
+    @test saved.mpsB[2] == saved_next_tensor
+
+    while !isfinished(run)
+        step!(run)
+    end
+    completed = snapshot(run)
+    @test isnothing(completed.pending_iteration)
+    @test length(completed.log.site_logs) == 4
+end
+
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin
     B0 = random_mps(ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)

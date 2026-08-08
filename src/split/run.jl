@@ -13,6 +13,19 @@ mutable struct SplitRun{A<:PeriodicSplit,C<:SplitContext,P} <: AbstractAlgorithm
 end
 
 """
+    SplitSnapshot
+
+Durable numerical state captured from a [`SplitRun`](@ref) at a safe site
+boundary. Derived transfer matrices and contraction caches are intentionally
+excluded and will be rebuilt by `restore_run`.
+"""
+struct SplitSnapshot{M,P,L<:SplitLog} <: AbstractAlgorithmSnapshot
+    mpsB::M
+    pending_iteration::P
+    log::L
+end
+
+"""
     SplitSiteCompleted
 
 Progress event emitted after one split site has been updated successfully.
@@ -36,6 +49,19 @@ function initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
 end
 
 isfinished(run::SplitRun) = isnothing(run.pending_iteration)
+
+function snapshot(run::SplitRun)
+    # A snapshot must remain unchanged if the run continues. Copy every tensor,
+    # rather than only copying the PeriodicMPS container, and detach the mutable
+    # log vector from the live run.
+    mpsB = PeriodicMPS([copy(tensor) for tensor in run.context.mpsB])
+    log = SplitLog(
+        copy(run.log.site_logs),
+        run.log.sweep_time,
+        run.log.converged,
+    )
+    return SplitSnapshot(mpsB, run.pending_iteration, log)
+end
 
 function step!(run::SplitRun)
     isfinished(run) && throw(ArgumentError("split run is already complete"))

@@ -257,19 +257,25 @@ observer on the execution adapter rather than a numerical-core callback.
 ### Snapshot
 
 ```julia
-struct SplitSnapshot{M,L} <: AbstractAlgorithmSnapshot
-    schema_version::Int
+struct SplitSnapshot{M,P,L} <: AbstractAlgorithmSnapshot
     mpsB::M
-    iterator_state::SweepState
+    pending_iteration::P
     log::L
-    active_sweep::Union{Nothing,Int}
-    completed::Bool
 end
 ```
 
 The snapshot stores the current approximation but not the derived
 `PeriodicTransferMatrix` and `PeriodicCache` values. Restore reconstructs a
 `SplitContext` from the immutable target MPS and the stored approximation.
+`pending_iteration` is the same Julia iterator result stored by `SplitRun`; a
+value of `nothing` represents a completed run. Completion and the next safe
+step therefore require no duplicated snapshot fields. Schema versioning belongs
+to the checkpoint codec header introduced in Phase 3 rather than to this
+in-memory algorithm snapshot.
+
+Snapshot construction copies the approximation tensors and mutable log storage,
+so continuing the live run cannot modify a snapshot that has already been
+captured.
 
 This may change the order in which some floating-point contractions are
 recomputed, so equality is specified within machine precision rather than
