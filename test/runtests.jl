@@ -1,4 +1,5 @@
 using Test, PMPSLab
+include("execution_test.jl")
 include("mps_test.jl")
 include("transfermatrix_test.jl")
 include("canonicalize_test.jl")

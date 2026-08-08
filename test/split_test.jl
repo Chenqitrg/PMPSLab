@@ -26,6 +26,8 @@ using PMPSLab:
     CholeskySolve,
     KrylovSolve,
     PeriodicSplit,
+    SplitRun,
+    SplitSiteCompleted,
     RandomAnsatz,
     OneAnsatz,
     SVDAnsatz,
@@ -193,6 +195,56 @@ end
 # ==============================================================================
 # split — full run
 # ==============================================================================
+
+@testset "SplitRun — one safe step updates exactly one site" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=1),
+        CholeskySolve(),
+    )
+    run = initialize_run(mpsA, algorithm)
+
+    @test run isa SplitRun
+    @test run.context isa SplitContext
+    @test !isfinished(run)
+    @test first(run.pending_iteration) == SweepState(1, 1, 0)
+    @test last(run.pending_iteration) == SweepState(2, 1, 0)
+    @test isempty(run.log.site_logs)
+    @test_throws ArgumentError run_result(run)
+
+    event = step!(run)
+    @test event isa SplitSiteCompleted
+    @test event.log.state == SweepState(1, 1, 0)
+    @test length(run.log.site_logs) == 1
+    @test site(run.context) == 2
+    @test first(run.pending_iteration) == SweepState(2, 1, 0)
+    @test !isfinished(run)
+
+    while !isfinished(run)
+        step!(run)
+    end
+    mpsB, log = run_result(run)
+    @test mpsB === run.context.mpsB
+    @test log === run.log
+    @test length(log.site_logs) == 4
+    @test log.sweep_time == sum(site_log -> site_log.time, log.site_logs)
+    @test_throws ArgumentError step!(run)
+end
+
+@testset "SplitRun — an empty sweep is complete at initialization" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=0),
+        CholeskySolve(),
+    )
+    run = initialize_run(mpsA, algorithm)
+
+    @test isfinished(run)
+    @test isnothing(run.pending_iteration)
+    @test isempty(last(run_result(run)).site_logs)
+end
 
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin
     B0 = random_mps(ComplexF64, 4, 2, 2)
