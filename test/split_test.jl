@@ -27,6 +27,7 @@ using PMPSLab:
     KrylovSolve,
     PeriodicSplit,
     SplitRun,
+    SplitSnapshot,
     SplitSiteCompleted,
     RandomAnsatz,
     OneAnsatz,
@@ -294,6 +295,46 @@ end
     completed = snapshot(run)
     @test isnothing(completed.pending_iteration)
     @test length(completed.log.site_logs) == 4
+end
+
+@testset "SplitSnapshot — restores one mid-sweep boundary" begin
+    mpsA = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=1),
+        CholeskySolve(),
+    )
+    uninterrupted = initialize_run(mpsA, algorithm)
+    step!(uninterrupted)
+    step!(uninterrupted)
+
+    saved = snapshot(uninterrupted)
+    saved_tensor = copy(saved.mpsB[3])
+    restored = restore_run(saved, mpsA, algorithm)
+
+    @test restored !== uninterrupted
+    @test restored.context.mpsB !== saved.mpsB
+    @test all(restored.context.mpsB[i] !== saved.mpsB[i]
+              for i in eachindex(saved.mpsB))
+    @test restored.log !== saved.log
+    @test restored.log.site_logs !== saved.log.site_logs
+    @test restored.log.site_logs == saved.log.site_logs
+    @test restored.pending_iteration == saved.pending_iteration
+
+    while !isfinished(uninterrupted)
+        step!(uninterrupted)
+    end
+    while !isfinished(restored)
+        step!(restored)
+    end
+
+    expected_mps, expected_log = run_result(uninterrupted)
+    restored_mps, restored_log = run_result(restored)
+    @test dense(restored_mps) ≈ dense(expected_mps) rtol=1e-12
+    @test getfield.(restored_log.site_logs, :error) ≈
+          getfield.(expected_log.site_logs, :error)
+    @test saved.mpsB[3] == saved_tensor
+    @test length(saved.log.site_logs) == 2
 end
 
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin

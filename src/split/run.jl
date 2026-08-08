@@ -50,17 +50,65 @@ end
 
 isfinished(run::SplitRun) = isnothing(run.pending_iteration)
 
+function _copy_split_log(log::SplitLog)
+    return SplitLog(copy(log.site_logs), log.sweep_time, log.converged)
+end
+
 function snapshot(run::SplitRun)
     # A snapshot must remain unchanged if the run continues. Copy every tensor,
     # rather than only copying the PeriodicMPS container, and detach the mutable
     # log vector from the live run.
     mpsB = PeriodicMPS([copy(tensor) for tensor in run.context.mpsB])
-    log = SplitLog(
-        copy(run.log.site_logs),
-        run.log.sweep_time,
-        run.log.converged,
+    return SplitSnapshot(mpsB, run.pending_iteration, _copy_split_log(run.log))
+end
+
+function _validate_split_cursor(saved::SplitSnapshot, sweep::AbstractSweep)
+    expected_iteration = iterate(sweep)
+    for (step, site_log) in enumerate(saved.log.site_logs)
+        isnothing(expected_iteration) && throw(ArgumentError(
+            "snapshot contains a log for step $step after the supplied sweep is complete"
+        ))
+        expected_state, next_iterator_state = expected_iteration
+        site_log.state == expected_state || throw(ArgumentError(
+            "snapshot step $step has state $(site_log.state), expected $expected_state for the supplied sweep"
+        ))
+        expected_iteration = iterate(sweep, next_iterator_state)
+    end
+    isequal(saved.pending_iteration, expected_iteration) || throw(ArgumentError(
+        "snapshot cursor does not match its completed logs and the supplied sweep"
+    ))
+    return nothing
+end
+
+"""
+    restore_run(saved::SplitSnapshot, mpsA::PeriodicMPS, algorithm::PeriodicSplit)
+
+Reconstruct a split run at the safe boundary captured by `saved`. Transfer
+matrices and contraction caches are derived again from the immutable target
+`mpsA` and a private copy of the saved approximation.
+"""
+function restore_run(
+        saved::SplitSnapshot,
+        mpsA::PeriodicMPS,
+        algorithm::PeriodicSplit,
     )
-    return SplitSnapshot(mpsB, run.pending_iteration, log)
+    length(saved.mpsB) == 2 * length(mpsA) || throw(DimensionMismatch(
+        "snapshot approximation has $(length(saved.mpsB)) sites but target has " *
+        "$(length(mpsA)) two-site tensors (expected $(2 * length(mpsA)))"
+    ))
+    _validate_split_cursor(saved, algorithm.sweep)
+
+    mpsB = PeriodicMPS([copy(tensor) for tensor in saved.mpsB])
+    context = SplitContext(mpsA, mpsB)
+    pending_iteration = saved.pending_iteration
+    return SplitRun{
+        typeof(algorithm),typeof(context),typeof(pending_iteration)
+    }(
+        algorithm,
+        context,
+        pending_iteration,
+        _copy_split_log(saved.log),
+    )
 end
 
 function step!(run::SplitRun)
