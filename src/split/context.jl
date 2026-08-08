@@ -9,7 +9,7 @@
 
 # A site (2 physical legs) maps to two B sites (1 physical leg each):
 #   pa = (pb + 1) ÷ 2, and A[pa] couples to B[2pa-1], B[2pa].
-mutable struct SplitContext{
+struct SplitContext{
         E, S,
         MA<:PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, MB,
         TAA, TBB, TAB, CBB, CAB

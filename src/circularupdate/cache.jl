@@ -18,7 +18,7 @@ its tensor storage in place.
 - `right::Vector{T}`: all non-full right suffixes
 - `edge_identity::T`: the identity used when one side is empty
 """
-mutable struct PeriodicCache{T}
+struct PeriodicCache{T}
     left::Vector{T}
     right::Vector{T}
     edge_identity::T

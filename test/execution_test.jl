@@ -7,7 +7,7 @@ mutable struct DummyContext <: AlgorithmContext{Int,Nothing}
     value::Int
 end
 
-mutable struct DummyRun <: AbstractAlgorithmRun
+struct DummyRun <: AbstractAlgorithmRun
     target::Int
     algorithm::DummyAlgorithm
     context::DummyContext
