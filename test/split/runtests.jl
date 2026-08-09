@@ -25,7 +25,9 @@ using PMPSLab:
     CircularSweep,
     SweepState,
     DenseTransferMatrix,
+    TruncatedTransferMatrix,
     PeriodicTransferMatrix,
+    environment,
     squared_distance,
     LUSolve,
     CholeskySolve,
@@ -48,6 +50,7 @@ using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace,
 
 include("ansatz_test.jl")
 include("context_test.jl")
+include("environment_test.jl")
 include("run_test.jl")
 include("snapshot_test.jl")
 include("algorithm_test.jl")

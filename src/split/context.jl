@@ -46,19 +46,13 @@ function solvenew(ctx::SplitContext, alg::AbstractSolve, st::SweepState)
     pb = st.site
     1 <= pb <= length(ctx.mpsB) || throw(BoundsError(ctx.mpsB, pb))
     pa = pa_from_pb(pb)
-    N = transpose(
-        dense(environment(ctx.cacheBB, pb)), ((3, 1), (4, 2))
-    )   # N = E₁ * ... * E_N
-    AB_env = dense(environment(ctx.cacheAB, pa))
+    BB_env = environment(ctx.cacheBB, pb)
+    AB_env = environment(ctx.cacheAB, pa)
     A = this_A(ctx, pb)
     oB = other_B(ctx, pb)'
-    if isodd(pb)
-        @plansor W[-1; -2 -3] := AB_env[1 2; 3 -2] * A[3 -1 4; 1] * oB[2; -3 4]
-    else
-        @plansor W[-1; -2 -3] := AB_env[1 -3; 2 4] * A[2 3 -1; 1] * oB[-2; 4 3]
-    end
+    W = _split_rhs(AB_env, A, oB, pb)
     x0 = transpose(this_B(ctx, pb), ((2,), (1, 3)))  # B → (P ← V_left, V_right) for right-division
-    x1 = rdiv(alg, x0, N, W)
+    x1 = _solve_split_norm(alg, x0, BB_env, W)
 
     # 每 site 成本 ‖ψ_A − ψ_B‖² 的局部环境近似（最优解处 tr(W * x1') = ⟨ψ_B|ψ_B⟩）
     cost = real(ctx.expectationAA - conj(tr(W * x1')))

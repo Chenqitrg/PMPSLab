@@ -63,6 +63,7 @@ end
 
     krylov = KrylovSolve(GMRES(; maxiter=100, tol=1e-12))
     @test rdiv(krylov, x0, A, b) ≈ expected rtol=1e-10
+    @test rdiv(krylov, x0, x -> x * A, b) ≈ expected rtol=1e-10
 end
 
 @testset "Graded space (Z2Irrep)" begin

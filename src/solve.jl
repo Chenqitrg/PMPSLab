@@ -110,9 +110,22 @@ end
 rdiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTensorMap; uplo::Symbol = :U) =
     x + rdiv(CholeskySolve(), A, b - x * A; uplo=uplo)
 
-function rdiv(sol::KrylovSolve, x0::AbstractTensorMap, A::AbstractTensorMap,
-              b::AbstractTensorMap)
-    x, info = linsolve(x -> x * A, b, x0, sol.alg)
+function rdiv(
+        sol::KrylovSolve,
+        x0::AbstractTensorMap,
+        action::Function,
+        b::AbstractTensorMap,
+    )
+    x, info = linsolve(action, b, x0, sol.alg)
     iszero(info.converged) && @warn "Krylov linsolve did not converge."
     return x
+end
+
+function rdiv(
+        sol::KrylovSolve,
+        x0::AbstractTensorMap,
+        A::AbstractTensorMap,
+        b::AbstractTensorMap,
+    )
+    return rdiv(sol, x0, x -> x * A, b)
 end
