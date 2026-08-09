@@ -9,7 +9,7 @@ An approximate transfer matrix stored as the truncated singular-value
 factorization `u * s * vᴴ`. The two outer factors are rank-three tensor maps;
 the transfer's original left and right double bonds are never fused into a
 dense rank-four tensor unless explicitly requested with
-`DenseTransferMatrix(transfer)`.
+[`dense`](@ref).
 
 `trunc` is retained so that multiplying two truncated transfers can choose a
 combined truncation policy in a later step.
@@ -34,16 +34,46 @@ function TruncatedTransferMatrix(
     return TruncatedTransferMatrix(u, s, vᴴ, trunc)
 end
 
+TruncatedTransferMatrix(
+    ket::AbstractTensorMap{<:Any,<:Any,2,1}, trunc::TruncationStrategy
+) = TruncatedTransferMatrix(DenseTransferMatrix(ket), trunc)
+TruncatedTransferMatrix(
+    ket::AbstractTensorMap{<:Any,<:Any,3,1}, trunc::TruncationStrategy
+) = TruncatedTransferMatrix(DenseTransferMatrix(ket), trunc)
+TruncatedTransferMatrix(
+    bra::AbstractTensorMap{<:Any,<:Any,M,1},
+    ket::AbstractTensorMap{<:Any,<:Any,M,1},
+    trunc::TruncationStrategy,
+) where {M} = TruncatedTransferMatrix(DenseTransferMatrix(bra, ket), trunc)
+TruncatedTransferMatrix(
+    bra::AbstractTensorMap{<:Any,<:Any,3,1},
+    ket_left::AbstractTensorMap{<:Any,<:Any,2,1},
+    ket_right::AbstractTensorMap{<:Any,<:Any,2,1},
+    trunc::TruncationStrategy,
+) = TruncatedTransferMatrix(
+    DenseTransferMatrix(bra, ket_left, ket_right), trunc
+)
+TruncatedTransferMatrix(
+    bra_left::AbstractTensorMap{<:Any,<:Any,2,1},
+    bra_right::AbstractTensorMap{<:Any,<:Any,2,1},
+    ket::AbstractTensorMap{<:Any,<:Any,3,1},
+    trunc::TruncationStrategy,
+) = TruncatedTransferMatrix(
+    DenseTransferMatrix(bra_left, bra_right, ket), trunc
+)
+
 scalartype(transfer::TruncatedTransferMatrix) = scalartype(transfer.u)
 TensorKit.codomain(transfer::TruncatedTransferMatrix) = codomain(transfer.u)
 TensorKit.domain(transfer::TruncatedTransferMatrix) = domain(transfer.vᴴ)
+dense(transfer::TruncatedTransferMatrix) =
+    transfer.u * transfer.s * transfer.vᴴ
 
 Base.copy(transfer::TruncatedTransferMatrix) = TruncatedTransferMatrix(
     copy(transfer.u), copy(transfer.s), copy(transfer.vᴴ), transfer.trunc
 )
 
 DenseTransferMatrix(transfer::TruncatedTransferMatrix) =
-    DenseTransferMatrix(transfer.u * transfer.s * transfer.vᴴ)
+    DenseTransferMatrix(dense(transfer))
 
 function Base.:*(
         left::TruncatedTransferMatrix,

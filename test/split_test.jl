@@ -20,6 +20,7 @@ using PMPSLab:
     ZigzagSweep,
     CircularSweep,
     SweepState,
+    DenseTransferMatrix,
     PeriodicTransferMatrix,
     squared_distance,
     LUSolve,
@@ -35,7 +36,7 @@ using PMPSLab:
     PeriodicGaugeAnsatz
 import PMPSLab: initial_approximation, split_site, diff_norm,
                 this_B, other_B, this_A, pa_from_pb, expectation,
-                site_transfer_matrix, ProjectorCanonical, gaugefix!
+                ProjectorCanonical, gaugefix!
 using TensorKit
 using KrylovKit: GMRES
 using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace,
@@ -152,7 +153,7 @@ end
 
     _, cost = update!(ctx, solver, SweepState(1, 1, 0))
     @test isfinite(cost)
-    @test ctx.cacheBB.left[1] ≈ site_transfer_matrix(ctx.mpsB[1])
+    @test ctx.cacheBB.left[1] ≈ DenseTransferMatrix(ctx.mpsB[1])
 end
 
 @testset "update! — SweepState is the site source" begin
@@ -162,8 +163,8 @@ end
     _, cost = update!(ctx, CholeskySolve(), SweepState(2, 1, 0))
     @test isfinite(cost)
     @test ctx.cacheBB.left[2] ≈
-          site_transfer_matrix(ctx.mpsB[1]) *
-          site_transfer_matrix(ctx.mpsB[2])
+          DenseTransferMatrix(ctx.mpsB[1]) *
+          DenseTransferMatrix(ctx.mpsB[2])
     @test_throws BoundsError update!(ctx, CholeskySolve(), SweepState(0, 1, 0))
 end
 
@@ -179,17 +180,17 @@ end
     # step 1: update site 1 (odd) — only the BB prefix changes
     update!(ctx, CholeskySolve(), SweepState(1, 1, 0))
     @test !(ctx.mpsB[1] ≈ old1)
-    @test ctx.cacheBB.left[1] ≈ site_transfer_matrix(ctx.mpsB[1])
+    @test ctx.cacheBB.left[1] ≈ DenseTransferMatrix(ctx.mpsB[1])
     @test ctx.cacheAB.left[1] === ab_left_slot
     @test ctx.cacheAB.left[1] ≈ old_ab_left  # AB changes only after a complete pair
 
     # step 2: update site 2 (even) — both complete prefixes change
     update!(ctx, CholeskySolve(), SweepState(2, 1, 0))
     @test ctx.cacheBB.left[2] ≈
-          site_transfer_matrix(ctx.mpsB[1]) *
-          site_transfer_matrix(ctx.mpsB[2])
+          DenseTransferMatrix(ctx.mpsB[1]) *
+          DenseTransferMatrix(ctx.mpsB[2])
     @test ctx.cacheAB.left[1] === ab_left_slot
-    @test ctx.cacheAB.left[1] ≈ site_transfer_matrix(
+    @test ctx.cacheAB.left[1] ≈ DenseTransferMatrix(
         ctx.mpsB[1], ctx.mpsB[2], ctx.mpsA[1]
     )
 
@@ -236,7 +237,7 @@ end
     @test event.log.state == SweepState(1, 1, 0)
     @test length(run.log.site_logs) == 1
     @test run.context.cacheBB.left[1] ≈
-          site_transfer_matrix(run.context.mpsB[1])
+          DenseTransferMatrix(run.context.mpsB[1])
     @test first(run.pending_iteration) == SweepState(2, 1, 0)
     @test !isfinished(run)
 

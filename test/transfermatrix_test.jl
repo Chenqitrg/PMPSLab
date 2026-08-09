@@ -10,7 +10,6 @@ using PMPSLab:
     random_mps2,
     pair_contraction,
     dense,
-    site_transfer_matrix,
     combine_truncation,
     DenseTransferMatrix,
     TruncatedTransferMatrix,
@@ -34,10 +33,10 @@ function overlap(bra::PeriodicMPS, ket::PeriodicMPS)
     return scalar(dense(bra)' * dense(ket))
 end
 
-@testset "site_transfer_matrix — 1-site ket" begin
+@testset "DenseTransferMatrix — 1-site ket constructor" begin
     D, d = 3, 2
     T = randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)
-    E = site_transfer_matrix(T)
+    E = DenseTransferMatrix(T)
 
     # E: (L ⊗ L* ← R ⊗ R*), i.e. 2 in / 2 out legs, all bond spaces
     @test length(codomain(E)) == 2
@@ -63,7 +62,8 @@ end
 
 @testset "TruncatedTransferMatrix — factored representation" begin
     D, d = 3, 2
-    transfer = DenseTransferMatrix(randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D))
+    tensor = randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)
+    transfer = DenseTransferMatrix(tensor)
 
     exact = TruncatedTransferMatrix(transfer, TruncationStrategy())
     @test exact isa AbstractTransferMatrix
@@ -76,13 +76,16 @@ end
     @test numin(exact.vᴴ) == 2
     @test codomain(exact) == codomain(transfer)
     @test domain(exact) == domain(transfer)
-    @test dense(DenseTransferMatrix(exact)) ≈ dense(transfer)
+    @test dense(exact) ≈ dense(transfer)
+    @test dense(DenseTransferMatrix(exact)) ≈ dense(exact)
+    @test dense(TruncatedTransferMatrix(tensor, TruncationStrategy())) ≈
+          dense(transfer)
 
     trunc = truncrank(2)
     rank_two = TruncatedTransferMatrix(transfer, trunc)
     @test rank_two.trunc === trunc
     @test dim(space(rank_two.s, 1)) == 2
-    @test norm(dense(transfer) - dense(DenseTransferMatrix(rank_two))) <
+    @test norm(dense(transfer) - dense(rank_two)) <
           norm(dense(transfer))
 end
 
@@ -116,7 +119,7 @@ end
     right_exact = TruncatedTransferMatrix(dense_right, TruncationStrategy())
     exact_product = left_exact * right_exact
     @test exact_product isa TruncatedTransferMatrix
-    @test dense(DenseTransferMatrix(exact_product)) ≈
+    @test dense(exact_product) ≈
           dense(dense_left * dense_right)
 
     left = TruncatedTransferMatrix(dense_left, truncrank(5))
@@ -126,12 +129,11 @@ end
     @test product.trunc.howmany == 3
     @test dim(space(product.s, 1)) == 3
 
-    materialized_inputs = dense(DenseTransferMatrix(left)) *
-                          dense(DenseTransferMatrix(right))
+    materialized_inputs = dense(left) * dense(right)
     expected_u, expected_s, expected_vᴴ, _ =
         svd_trunc(materialized_inputs; trunc = truncrank(3))
     expected = expected_u * expected_s * expected_vᴴ
-    @test dense(DenseTransferMatrix(product)) ≈ expected
+    @test dense(product) ≈ expected
 end
 
 @testset "TruncatedTransferMatrix — mul! cache reuse" begin
@@ -151,8 +153,7 @@ end
     @test updated.u === u_slot
     @test updated.s === s_slot
     @test updated.vᴴ === vᴴ_slot
-    @test dense(DenseTransferMatrix(updated)) ≈
-          dense(DenseTransferMatrix(left * right))
+    @test dense(updated) ≈ dense(left * right)
 
     narrower = TruncatedTransferMatrix(
         DenseTransferMatrix(left), truncrank(2)
@@ -160,14 +161,13 @@ end
     replacement = mul!(narrower, left, right)
     @test replacement !== narrower
     @test dim(space(replacement.s, 1)) == 3
-    @test dense(DenseTransferMatrix(replacement)) ≈
-          dense(DenseTransferMatrix(left * right))
+    @test dense(replacement) ≈ dense(left * right)
 end
 
-@testset "site_transfer_matrix — 2-site ket" begin
+@testset "DenseTransferMatrix — 2-site ket constructor" begin
     D, d = 3, 2
     T = randn(ComplexF64, ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D)
-    E = site_transfer_matrix(T)
+    E = DenseTransferMatrix(T)
 
     @test length(codomain(E)) == 2
     @test length(domain(E)) == 2
@@ -177,12 +177,12 @@ end
     @test E ≈ manual
 end
 
-@testset "site_transfer_matrix — mixed (2-site bra, two 1-site kets)" begin
+@testset "transfer constructors — mixed 2-site/1-site tensors" begin
     D, d = 3, 2
     A = randn(ComplexF64, ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D)     # bra: one 2-site tensor
     B1 = randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)          # ket: left half
     B2 = randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)          # ket: right half
-    E = site_transfer_matrix(A, B1, B2)
+    E = DenseTransferMatrix(A, B1, B2)
 
     @test length(codomain(E)) == 2
     @test length(domain(E)) == 2
@@ -191,6 +191,8 @@ end
     # manual: E[l l'; r r'] = Σ_{p,q,m} B1[l p; m] B2[m q; r] conj(A[l' q p'; r'])
     @plansor manual[-1 -2; -3 -4] := B1[-1 1; 2] * B2[2 3; -3] * A'[-4; -2 1 3]
     @test E ≈ manual
+    @test dense(TruncatedTransferMatrix(A, B1, B2, TruncationStrategy())) ≈
+          dense(E)
 end
 
 # ==============================================================================
@@ -208,12 +210,10 @@ end
     @test collect(ptm) == collect(ptm.matrices)
     for i in 1:N
         @test ptm[i] isa DenseTransferMatrix
-        @test ptm[i] ≈ site_transfer_matrix(mps[i])
+        @test ptm[i] ≈ DenseTransferMatrix(mps[i])
     end
     # getindex by HalfInt-style positions via Int; setindex! replaces a site
-    new = DenseTransferMatrix(
-        site_transfer_matrix(random_mps(ComplexF64, 1, d, D)[1])
-    )
+    new = DenseTransferMatrix(random_mps(ComplexF64, 1, d, D)[1])
     ptm[2] = new
     @test ptm[2] ≈ new
 end
@@ -225,7 +225,7 @@ end
     ptm = PeriodicTransferMatrix(bra, ket)
 
     @test length(ptm) == N
-    @test ptm[2] ≈ site_transfer_matrix(bra[2], ket[2])
+    @test ptm[2] ≈ DenseTransferMatrix(bra[2], ket[2])
 
     # edge unit: identity on the bond space L ⊗ L*
     @test edge_identity(ptm) ≈ id(ComplexF64, codomain(ptm[1]))
@@ -247,8 +247,8 @@ end
     ptm = PeriodicTransferMatrix(mpsA, mpsB)
 
     @test length(ptm) == 2
-    @test ptm[1] ≈ site_transfer_matrix(mpsA[1], mpsB[1], mpsB[2])
-    @test ptm[2] ≈ site_transfer_matrix(mpsA[2], mpsB[3], mpsB[4])
+    @test ptm[1] ≈ DenseTransferMatrix(mpsA[1], mpsB[1], mpsB[2])
+    @test ptm[2] ≈ DenseTransferMatrix(mpsA[2], mpsB[3], mpsB[4])
 
     # mismatched site counts must be rejected, not silently wrapped
     mpsB_short = random_mps(ComplexF64, 3, d, D)

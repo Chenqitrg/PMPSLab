@@ -68,50 +68,45 @@ function Base.isapprox(
     return isapprox(left, dense(right); kwargs...)
 end
 
-# Single-site transfer matrix: traces out physical legs of one site tensor.
+# Construct a dense transfer by tracing the physical legs of site tensors.
 # T: L ⊗ P₁ ⊗ P₂ ← R  →  E: (L ⊗ dual(L)) ← (R ⊗ dual(R))
-function site_transfer_matrix(bra::AbstractTensorMap{E,S,3,1}, ket::AbstractTensorMap{E,S,3,1}) where {E,S}
+function DenseTransferMatrix(
+        bra::AbstractTensorMap{E,S,3,1},
+        ket::AbstractTensorMap{E,S,3,1},
+    ) where {E,S}
     @plansor 𝔼[-1 -2; -3 -4] := bra'[-4; -2 1 2] * ket[-1 1 2; -3]
-    return 𝔼
+    return DenseTransferMatrix(𝔼)
 end
 
-site_transfer_matrix(ket::AbstractTensorMap{E,S,3,1}) where {E,S} =
-    site_transfer_matrix(ket, ket)
+DenseTransferMatrix(ket::AbstractTensorMap{E,S,3,1}) where {E,S} =
+    DenseTransferMatrix(ket, ket)
 
-function site_transfer_matrix(bra::AbstractTensorMap{E,S,2,1}, ket::AbstractTensorMap{E,S,2,1}) where {E,S}
+function DenseTransferMatrix(
+        bra::AbstractTensorMap{E,S,2,1},
+        ket::AbstractTensorMap{E,S,2,1},
+    ) where {E,S}
     @plansor 𝔼[-1 -2; -3 -4] := bra'[-4; -2 1] * ket[-1 1; -3]
-    return 𝔼
+    return DenseTransferMatrix(𝔼)
 end
 
-site_transfer_matrix(ket::AbstractTensorMap{E,S,2,1}) where {E,S} =
-    site_transfer_matrix(ket, ket)
+DenseTransferMatrix(ket::AbstractTensorMap{E,S,2,1}) where {E,S} =
+    DenseTransferMatrix(ket, ket)
 
-function site_transfer_matrix(bra::AbstractTensorMap{E,S,3,1}, ketL::AbstractTensorMap{E,S,2,1}, ketR::AbstractTensorMap{E,S,2,1}) where {E,S}
-    @plansor 𝔼[-1 -2; -3 -4] := ketL[-1 l; m] * ketR[m r; -3] * bra'[-4; -2 l r]
-    return 𝔼
+function DenseTransferMatrix(
+        bra::AbstractTensorMap{E,S,3,1},
+        ket_left::AbstractTensorMap{E,S,2,1},
+        ket_right::AbstractTensorMap{E,S,2,1},
+    ) where {E,S}
+    @plansor 𝔼[-1 -2; -3 -4] := ket_left[-1 l; m] * ket_right[m r; -3] * bra'[-4; -2 l r]
+    return DenseTransferMatrix(𝔼)
 end
 
-function site_transfer_matrix(braL::AbstractTensorMap{E,S,2,1}, braR::AbstractTensorMap{E,S,2,1}, ket::AbstractTensorMap{E,S,3,1}) where {E,S}
-    bL, bR = braL', braR'
+function DenseTransferMatrix(
+        bra_left::AbstractTensorMap{E,S,2,1},
+        bra_right::AbstractTensorMap{E,S,2,1},
+        ket::AbstractTensorMap{E,S,3,1},
+    ) where {E,S}
+    bL, bR = bra_left', bra_right'
     @plansor 𝔼[-1 -2; -3 -4] := bL[1; -2 2] * bR[-4; 1 3] * ket[-1 2 3; -3]
-    return 𝔼
+    return DenseTransferMatrix(𝔼)
 end
-
-DenseTransferMatrix(ket::AbstractTensorMap{<:Any,<:Any,2,1}) =
-    DenseTransferMatrix(site_transfer_matrix(ket))
-DenseTransferMatrix(ket::AbstractTensorMap{<:Any,<:Any,3,1}) =
-    DenseTransferMatrix(site_transfer_matrix(ket))
-DenseTransferMatrix(
-        bra::AbstractTensorMap{<:Any,<:Any,M,1},
-        ket::AbstractTensorMap{<:Any,<:Any,M,1},
-    ) where {M} = DenseTransferMatrix(site_transfer_matrix(bra, ket))
-DenseTransferMatrix(
-        bra::AbstractTensorMap{<:Any,<:Any,3,1},
-        ket_left::AbstractTensorMap{<:Any,<:Any,2,1},
-        ket_right::AbstractTensorMap{<:Any,<:Any,2,1},
-    ) = DenseTransferMatrix(site_transfer_matrix(bra, ket_left, ket_right))
-DenseTransferMatrix(
-        bra_left::AbstractTensorMap{<:Any,<:Any,2,1},
-        bra_right::AbstractTensorMap{<:Any,<:Any,2,1},
-        ket::AbstractTensorMap{<:Any,<:Any,3,1},
-    ) = DenseTransferMatrix(site_transfer_matrix(bra_left, bra_right, ket))
