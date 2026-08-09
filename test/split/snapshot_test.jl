@@ -1,0 +1,131 @@
+@testset "SplitSnapshot — captures an isolated safe-boundary state" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=1),
+        CholeskySolve(),
+    )
+    run = initialize_run(mpsA, algorithm)
+    step!(run)
+
+    saved = snapshot(run)
+    @test saved isa SplitSnapshot
+    @test saved.mpsB !== run.context.mpsB
+    @test parent(saved.mpsB) !== parent(run.context.mpsB)
+    @test all(saved.mpsB[i] !== run.context.mpsB[i] for i in eachindex(saved.mpsB))
+    @test saved.pending_iteration == run.pending_iteration
+    @test saved.log !== run.log
+    @test saved.log.site_logs !== run.log.site_logs
+    @test saved.log.site_logs == run.log.site_logs
+    @test saved.log.sweep_time == run.log.sweep_time
+
+    saved_next_tensor = copy(saved.mpsB[2])
+    step!(run)
+    @test saved.pending_iteration != run.pending_iteration
+    @test length(saved.log.site_logs) == 1
+    @test length(run.log.site_logs) == 2
+    @test saved.mpsB[2] == saved_next_tensor
+
+    while !isfinished(run)
+        step!(run)
+    end
+    completed = snapshot(run)
+    @test isnothing(completed.pending_iteration)
+    @test length(completed.log.site_logs) == 4
+end
+
+@testset "SplitSnapshot — restores one mid-sweep boundary" begin
+    mpsA = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=1),
+        CholeskySolve(),
+    )
+    uninterrupted = initialize_run(mpsA, algorithm)
+    step!(uninterrupted)
+    step!(uninterrupted)
+
+    saved = snapshot(uninterrupted)
+    saved_tensor = copy(saved.mpsB[3])
+    restored = restore_run(saved, mpsA, algorithm)
+
+    @test restored !== uninterrupted
+    @test restored.context.mpsB !== saved.mpsB
+    @test all(restored.context.mpsB[i] !== saved.mpsB[i]
+              for i in eachindex(saved.mpsB))
+    @test restored.log !== saved.log
+    @test restored.log.site_logs !== saved.log.site_logs
+    @test restored.log.site_logs == saved.log.site_logs
+    @test restored.pending_iteration == saved.pending_iteration
+
+    while !isfinished(uninterrupted)
+        step!(uninterrupted)
+    end
+    while !isfinished(restored)
+        step!(restored)
+    end
+
+    expected_mps, expected_log = run_result(uninterrupted)
+    restored_mps, restored_log = run_result(restored)
+    @test dense(restored_mps) ≈ dense(expected_mps) rtol=1e-12
+    @test getfield.(restored_log.site_logs, :error) ≈
+          getfield.(expected_log.site_logs, :error)
+    @test saved.mpsB[3] == saved_tensor
+    @test length(saved.log.site_logs) == 2
+end
+
+@testset "SplitSnapshot — restores every circular and zigzag boundary" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    finish_run! = function(run)
+        while !isfinished(run)
+            step!(run)
+        end
+        return run_result(run)
+    end
+
+    for sweep in (
+            CircularSweep(4; maximal_sweep=2),
+            ZigzagSweep(4; maximal_sweep=2),
+        )
+        algorithm = PeriodicSplit(SVDAnsatz(), sweep, CholeskySolve())
+        for completed_steps in 0:length(sweep)
+            uninterrupted = initialize_run(mpsA, algorithm)
+            for _ in 1:completed_steps
+                step!(uninterrupted)
+            end
+
+            restored = restore_run(snapshot(uninterrupted), mpsA, algorithm)
+            expected_mps, expected_log = finish_run!(uninterrupted)
+            restored_mps, restored_log = finish_run!(restored)
+
+            @test dense(restored_mps) ≈ dense(expected_mps) rtol=1e-12
+            @test getfield.(restored_log.site_logs, :error) ≈
+                  getfield.(expected_log.site_logs, :error)
+            @test length(restored_log.site_logs) == length(sweep)
+        end
+    end
+end
+
+@testset "SplitSnapshot — rejects an inconsistent cursor or sweep" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=2),
+        CholeskySolve(),
+    )
+    run = initialize_run(mpsA, algorithm)
+    for _ in 1:3
+        step!(run)
+    end
+    saved = snapshot(run)
+
+    bad_cursor = SplitSnapshot(saved.mpsB, iterate(algorithm.sweep), saved.log)
+    @test_throws ArgumentError restore_run(bad_cursor, mpsA, algorithm)
+
+    wrong_sweep = PeriodicSplit(
+        algorithm.ansatz,
+        ZigzagSweep(4; maximal_sweep=2),
+        algorithm.solve,
+    )
+    @test_throws ArgumentError restore_run(saved, mpsA, wrong_sweep)
+end
