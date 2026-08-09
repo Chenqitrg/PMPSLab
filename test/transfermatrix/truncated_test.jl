@@ -99,3 +99,29 @@ end
     @test dim(space(replacement.s, 1)) == 3
     @test dense(replacement) ≈ dense(left * right)
 end
+
+@testset "TruncatedTransferMatrix — copy! cache reuse" begin
+    D, d = 3, 2
+    trunc = truncrank(3)
+    source = TruncatedTransferMatrix(
+        DenseTransferMatrix(randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)), trunc
+    )
+    destination = copy(source)
+    u_slot, s_slot, vᴴ_slot = destination.u, destination.s, destination.vᴴ
+
+    updated = copy!(destination, source)
+    @test updated === destination
+    @test updated.u === u_slot
+    @test updated.s === s_slot
+    @test updated.vᴴ === vᴴ_slot
+    @test dense(updated) ≈ dense(source)
+
+    narrower = TruncatedTransferMatrix(
+        DenseTransferMatrix(randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)),
+        truncrank(2),
+    )
+    replacement = copy!(narrower, source)
+    @test replacement !== narrower
+    @test replacement.trunc === trunc
+    @test dense(replacement) ≈ dense(source)
+end

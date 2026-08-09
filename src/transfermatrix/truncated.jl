@@ -72,6 +72,26 @@ Base.copy(transfer::TruncatedTransferMatrix) = TruncatedTransferMatrix(
     copy(transfer.u), copy(transfer.s), copy(transfer.vᴴ), transfer.trunc
 )
 
+function _can_reuse(
+        destination::TruncatedTransferMatrix,
+        s::AbstractTensorMap{<:Any,<:Any,1,1},
+    )
+    return space(destination.s, 1) == space(s, 1)
+end
+
+function Base.copy!(
+        destination::TruncatedTransferMatrix,
+        source::TruncatedTransferMatrix,
+    )
+    if destination.trunc == source.trunc && _can_reuse(destination, source.s)
+        copy!(destination.u, source.u)
+        copy!(destination.s, source.s)
+        copy!(destination.vᴴ, source.vᴴ)
+        return destination
+    end
+    return copy(source)
+end
+
 DenseTransferMatrix(transfer::TruncatedTransferMatrix) =
     DenseTransferMatrix(dense(transfer))
 
@@ -89,13 +109,6 @@ function Base.:*(
     u = left.u * u_middle
     vᴴ = vᴴ_middle * right.vᴴ
     return TruncatedTransferMatrix(u, s, vᴴ, trunc)
-end
-
-function _can_reuse(
-        destination::TruncatedTransferMatrix,
-        s::AbstractTensorMap{<:Any,<:Any,1,1},
-    )
-    return space(destination.s, 1) == space(s, 1)
 end
 
 """

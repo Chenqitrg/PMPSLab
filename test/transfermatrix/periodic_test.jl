@@ -50,6 +50,81 @@ end
     @test_throws DimensionMismatch PeriodicTransferMatrix(mpsA, mpsB_short)
 end
 
+@testset "PeriodicTransferMatrix — truncated construction and cache" begin
+    D, d, N = 2, 2, 4
+    trunc = truncrank(2)
+    bra = random_mps(ComplexF64, N, d, D)
+    ket = random_mps(ComplexF64, N, d, D)
+    ptm = PeriodicTransferMatrix(bra, ket, trunc)
+
+    @test ptm isa PeriodicTransferMatrix{<:TruncatedTransferMatrix}
+    @test all(transfer -> transfer.trunc === trunc, ptm)
+    @test all(
+        dense(ptm[i]) ≈
+        dense(TruncatedTransferMatrix(bra[i], ket[i], trunc))
+        for i in eachindex(ptm)
+    )
+
+    identity_transfer = edge_identity(ptm)
+    @test identity_transfer isa eltype(ptm)
+    @test identity_transfer.trunc === trunc
+    @test dense(identity_transfer) ≈
+          id(ComplexF64, codomain(ptm[1]))
+
+    cache = build_cache(ptm)
+    @test cache.edge_identity isa eltype(ptm)
+    @test all(transfer -> transfer isa eltype(ptm), cache.left)
+    @test all(transfer -> transfer isa eltype(ptm), cache.right)
+    @test dense(cache.left[2]) ≈ dense(ptm[1] * ptm[2])
+    @test dense(cache.right[2]) ≈ dense(ptm[3] * ptm[4])
+
+    left_slot = cache.left[1]
+    rank_one = TruncatedTransferMatrix(
+        one_mps(ComplexF64, N, d, D)[1], truncrank(1)
+    )
+    replacement = TruncatedTransferMatrix(
+        rank_one.u, rank_one.s, rank_one.vᴴ, trunc
+    )
+    advance!(cache, replacement, SweepState(1, 1, 0))
+    @test cache.left[1] !== left_slot
+    @test dense(cache.left[1]) ≈ dense(replacement)
+
+    self_ptm = PeriodicTransferMatrix(ket, trunc)
+    @test all(transfer -> transfer isa TruncatedTransferMatrix, self_ptm)
+end
+
+@testset "PeriodicTransferMatrix — truncated mixed construction" begin
+    D, d = 2, 2
+    trunc = truncrank(2)
+    mpsB = random_mps(ComplexF64, 4, d, D)
+    mpsA = pair_contraction(random_mps(ComplexF64, 4, d, D))
+
+    ab = PeriodicTransferMatrix(mpsA, mpsB, trunc)
+    ba = PeriodicTransferMatrix(mpsB, mpsA, trunc)
+
+    @test all(transfer -> transfer isa TruncatedTransferMatrix, ab)
+    @test all(transfer -> transfer isa TruncatedTransferMatrix, ba)
+    @test dense(ab[1]) ≈
+          dense(TruncatedTransferMatrix(mpsA[1], mpsB[1], mpsB[2], trunc))
+    @test dense(ba[1]) ≈
+          dense(TruncatedTransferMatrix(mpsB[1], mpsB[2], mpsA[1], trunc))
+
+    mpsB_short = random_mps(ComplexF64, 3, d, D)
+    @test_throws DimensionMismatch PeriodicTransferMatrix(mpsA, mpsB_short, trunc)
+end
+
+@testset "PeriodicTransferMatrix — truncated Z2 cache" begin
+    V = Z2Space(0 => 2, 1 => 1)
+    P = Z2Space(0 => 2)
+    mps = random_mps(ComplexF64, 3, P, V)
+    ptm = PeriodicTransferMatrix(mps, truncrank(3))
+    cache = build_cache(ptm)
+
+    @test all(transfer -> transfer isa TruncatedTransferMatrix, ptm)
+    @test dense(edge_identity(ptm)) ≈ id(ComplexF64, codomain(ptm[1]))
+    @test dense(cache.left[2]) ≈ dense(ptm[1] * ptm[2])
+end
+
 @testset "full-period product and expectation — 1-site" begin
     N, d, D = 3, 2, 2
     mps = random_mps(ComplexF64, N, d, D)
