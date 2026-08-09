@@ -6,6 +6,7 @@ import TensorKit: scalartype
 import JLD2
 using KrylovKit
 using LinearAlgebra
+import MatrixAlgebraKit
 using MPSKit: left_virtualspace, right_virtualspace,
               AbstractTransferMatrix, Algorithm, GenericMPSTensor,
               TruncationStrategy, PeriodicVector, DefaultAlgorithm
@@ -21,7 +22,7 @@ export AbstractPeriodicCanonical, ProjectorCanonical
 export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
 export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
-export DenseTransferMatrix, PeriodicTransferMatrix
+export DenseTransferMatrix, TruncatedTransferMatrix, PeriodicTransferMatrix
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
 export left_cache, right_cache, range_product, edge_identity
 
@@ -41,7 +42,11 @@ include("mps.jl")
 include("circularupdate/periodicproduct.jl")
 include("logs.jl")
 include("circularupdate/cache.jl")
-include("transfermatrix.jl")
+include("transfermatrix/dense.jl")
+include("transfermatrix/truncation.jl")
+include("transfermatrix/truncated.jl")
+include("transfermatrix/periodic.jl")
+include("transfermatrix/distance.jl")
 include("canonicalize/projector.jl")
 include("canonicalize/interface.jl")
 include("split/interface.jl")

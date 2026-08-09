@@ -11,7 +11,7 @@ Left prefixes and right suffixes live in separate arrays with fixed meanings:
 The cache deliberately stores no active site. A caller supplies the site to
 [`environment`](@ref), so the sweep iterator remains the single source of
 position. Keeping each slot's meaning fixed also lets [`advance!`](@ref) update
-its tensor storage in place.
+its tensor storage in place whenever the representation remains compatible.
 
 # Fields
 - `left::Vector{T}`: all non-full left prefixes
@@ -80,8 +80,9 @@ end
 Build every non-full left prefix and right suffix of `v`. Construction uses
 `2N - 4` multiplications for `N > 1` and stores `2N - 2` tensors. Endpoint
 tensors are copied so later in-place cache updates never alias `v` itself.
-Product elements must support `copy`, `copy!`, and three-argument `mul!` while
-preserving the tensor space associated with each site.
+Product elements must support `copy`, `copy!`, and three-argument `mul!`.
+`mul!` returns the updated cache value: a representation may reuse the supplied
+destination or return a replacement when its internal space changes.
 """
 function build_cache(v::AbstractPeriodicProduct)
     N = length(v)
@@ -128,7 +129,7 @@ function _rebuild_left!(v::PeriodicCache, product::AbstractPeriodicProduct)
     N == 1 && return v
     copy!(v.left[1], product[1])
     for k in 2:N-1
-        mul!(v.left[k], v.left[k - 1], product[k])
+        v.left[k] = mul!(v.left[k], v.left[k - 1], product[k])
     end
     return v
 end
@@ -138,7 +139,7 @@ function _rebuild_right!(v::PeriodicCache, product::AbstractPeriodicProduct)
     N == 1 && return v
     copy!(v.right[N - 1], product[N])
     for k in N-2:-1:1
-        mul!(v.right[k], product[k + 1], v.right[k + 1])
+        v.right[k] = mul!(v.right[k], product[k + 1], v.right[k + 1])
     end
     return v
 end
@@ -182,13 +183,13 @@ function advance!(v::PeriodicCache, transfer, st::SweepState)
         if s == 1
             copy!(v.left[1], transfer)
         else
-            mul!(v.left[s], v.left[s - 1], transfer)
+            v.left[s] = mul!(v.left[s], v.left[s - 1], transfer)
         end
     else
         if s == N
             copy!(v.right[N - 1], transfer)
         else
-            mul!(v.right[s - 1], transfer, v.right[s])
+            v.right[s - 1] = mul!(v.right[s - 1], transfer, v.right[s])
         end
     end
     return v

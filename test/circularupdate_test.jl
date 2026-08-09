@@ -5,6 +5,7 @@
 # ordering mistake in the cache shows up as a failing test.
 
 using Test
+import PMPSLab
 using PMPSLab:
     PeriodicMPS,
     random_mps,
