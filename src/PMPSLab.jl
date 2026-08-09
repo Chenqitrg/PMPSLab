@@ -38,7 +38,12 @@ export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 
 include("execution/interface.jl")
 include("execution/local_session.jl")
-include("mps.jl")
+include("mps/indices.jl")
+include("mps/container.jl")
+include("mps/constructors.jl")
+include("mps/cdl.jl")
+include("mps/contraction.jl")
+include("mps/lift.jl")
 include("circularupdate/periodicproduct.jl")
 include("logs.jl")
 include("circularupdate/cache.jl")
@@ -58,6 +63,5 @@ include("split/environment.jl")
 include("split/context.jl")
 include("split/run.jl")
 include("execution/checkpoint.jl")
-include("dense.jl")
 
 end

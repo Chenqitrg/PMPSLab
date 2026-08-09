@@ -59,8 +59,7 @@ end
     # Mismatched: change one site's right virtual space
     tvec_bad = copy(tvec)
     tvec_bad[2] = TensorMap(randn(ComplexF64, D*2, D+1), ℂ^D ⊗ ℂ^2, ℂ^(D+1))
-    mps_bad = PeriodicMPS(PeriodicVector(tvec_bad))
-    @test_throws TensorKit.SpaceMismatch assertconsistency(mps_bad)
+    @test_throws TensorKit.SpaceMismatch PeriodicMPS(PeriodicVector(tvec_bad))
 end
 
 @testset "assertconsistency — Z2Irrep" begin
@@ -71,6 +70,5 @@ end
     @test assertconsistency(mps) === nothing
     tvec_bad = copy(tvec)
     tvec_bad[2] = rand(ComplexF64, V ⊗ P ← Z2Space(0 => 3, 1 => 3))
-    mps_bad = PeriodicMPS(PeriodicVector(tvec_bad))
-    @test_throws TensorKit.SpaceMismatch assertconsistency(mps_bad)
+    @test_throws TensorKit.SpaceMismatch PeriodicMPS(PeriodicVector(tvec_bad))
 end

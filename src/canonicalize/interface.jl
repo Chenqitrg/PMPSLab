@@ -9,12 +9,13 @@ function _absorb_projectors!(
         PL_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}},
         PR_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}}
     ) where {E,S,N}
-    for i in eachindex(mps)
+    tensors = map(eachindex(mps)) do i
         left_bond = HalfInt(i - 1)
         right_bond = HalfInt(i)
-        mps[i] = _projector_mul_front(PL_vec[left_bond], mps[i]) *
-                 PR_vec[right_bond]
+        return _projector_mul_front(PL_vec[left_bond], mps[i]) *
+               PR_vec[right_bond]
     end
+    copyto!(mps, PeriodicMPS(tensors))
     return mps
 end
 
@@ -31,6 +32,7 @@ function gaugefix!(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}}, alg::ProjectorCanonical
     ) where {E,S,N}
     MPSKit.makefullrank!(mps.tensors; alg_orth = alg.alg_orth)
+    assertconsistency(mps)
     PR_vec, PL_vec = find_projectors(mps, alg)
     return _absorb_projectors!(mps, PL_vec, PR_vec)
 end

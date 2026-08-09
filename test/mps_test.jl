@@ -1,4 +1,4 @@
-# Tests for src/mps.jl — core periodic-MPS types: HalfInt, HalfPeriodicVector,
+# Tests for src/mps/ — core periodic-MPS types: HalfInt, HalfPeriodicVector,
 # PeriodicMPS, the random/one constructors and lift.
 
 using Test
@@ -130,6 +130,55 @@ end
     copied = similar(mps)
     @test copyto!(copied, mps) === copied
     @test all(copied[i] == mps[i] for i in eachindex(mps))
+end
+
+@testset "PeriodicMPS — rejected writes are atomic" begin
+    mps = random_mps(ComplexF64, 4, 2, 2)
+    original = mps[2]
+
+    bad_left = randn(ComplexF64, ℂ^3 ⊗ ℂ^2, ℂ^2)
+    @test_throws TensorKit.SpaceMismatch mps[2] = bad_left
+    @test mps[2] === original
+
+    bad_right = randn(ComplexF64, ℂ^2 ⊗ ℂ^2, ℂ^3)
+    @test_throws TensorKit.SpaceMismatch mps[2] = bad_right
+    @test mps[2] === original
+    @test assertconsistency(mps) === nothing
+
+    single = random_mps(ComplexF64, 1, 2, 2)
+    replacement = randn(ComplexF64, ℂ^3 ⊗ ℂ^2, ℂ^3)
+    single[1] = replacement
+    @test single[1] === replacement
+
+    old_single = single[1]
+    open_tensor = randn(ComplexF64, ℂ^3 ⊗ ℂ^2, ℂ^2)
+    @test_throws TensorKit.SpaceMismatch single[1] = open_tensor
+    @test single[1] === old_single
+end
+
+@testset "PeriodicMPS — copyto! validates before mutation" begin
+    dst = random_mps(ComplexF64, 4, 2, 2)
+    old_tensors = collect(dst)
+    src = random_mps(ComplexF64, 4, 2, 2)
+    parent(src)[2] = randn(ComplexF64, ℂ^3 ⊗ ℂ^2, ℂ^2)
+
+    @test_throws TensorKit.SpaceMismatch copyto!(dst, src)
+    @test all(dst[i] === old_tensors[i] for i in eachindex(dst))
+    @test assertconsistency(dst) === nothing
+
+    nonuniform = random_mps(
+        ComplexF64,
+        PeriodicVector(fill(ℂ^2, 4)),
+        HalfPeriodicVector(PeriodicVector([ℂ^2, ℂ^3, ℂ^4, ℂ^3])),
+    )
+    @test copyto!(dst, nonuniform) === dst
+    @test all(dst[i] === nonuniform[i] for i in eachindex(dst))
+    @test assertconsistency(dst) === nothing
+
+    short = random_mps(ComplexF64, 3, 2, 2)
+    copied = collect(dst)
+    @test_throws DimensionMismatch copyto!(dst, short)
+    @test all(dst[i] === copied[i] for i in eachindex(dst))
 end
 
 @testset "PeriodicMPS — rejects an empty period" begin
