@@ -7,8 +7,8 @@ import JLD2
 using KrylovKit
 using LinearAlgebra
 using MPSKit: left_virtualspace, right_virtualspace,
-              Algorithm, GenericMPSTensor, TruncationStrategy, PeriodicVector,
-              DefaultAlgorithm
+              AbstractTransferMatrix, Algorithm, GenericMPSTensor,
+              TruncationStrategy, PeriodicVector, DefaultAlgorithm
 import MPSKit
 import MPSKit: physicalspace
 
@@ -21,7 +21,7 @@ export AbstractPeriodicCanonical, ProjectorCanonical
 export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
 export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
-export PeriodicTransferMatrix
+export DenseTransferMatrix, PeriodicTransferMatrix
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
 export left_cache, right_cache, range_product, edge_identity
 

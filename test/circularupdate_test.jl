@@ -237,7 +237,7 @@ end
     product2 = MatrixPeriodicProduct([i == 2 ? new2 : product[i] for i in 1:5])
     v = build_cache(product)
     left_slot = v.left[2]
-    advance!(v, product2, SweepState(2, 1, 0))
+    advance!(v, new2, SweepState(2, 1, 0))
     @test v.left[2] === left_slot
     @test environment(v, 3) ≈ naive_complement(product2, 3)
 
@@ -246,7 +246,7 @@ end
     product4 = MatrixPeriodicProduct([i == 4 ? new4 : product[i] for i in 1:5])
     v = build_cache(product)
     right_slot = v.right[3]
-    advance!(v, product4, SweepState(4, -1, 0))
+    advance!(v, new4, SweepState(4, -1, 0))
     @test v.right[3] === right_slot
     @test environment(v, 3) ≈ naive_complement(product4, 3)
 
@@ -255,6 +255,7 @@ end
     product5 = MatrixPeriodicProduct([i == 5 ? new5 : product[i] for i in 1:5])
     v = build_cache(product)
     right_slots = copy(v.right)
+    @test_throws ArgumentError advance!(v, new5, SweepState(5, 1, 0))
     advance!(v, product5, SweepState(5, 1, 0))
     @test all(v.right[i] === right_slots[i] for i in eachindex(v.right))
     @test environment(v, 1) ≈ naive_complement(product5, 1)
@@ -264,7 +265,7 @@ end
     product1 = MatrixPeriodicProduct([i == 1 ? new1 : product[i] for i in 1:5])
     v = build_cache(product)
     left_slot = v.left[1]
-    advance!(v, product1, SweepState(1, 1, 0))
+    advance!(v, new1, SweepState(1, 1, 0))
     @test v.left[1] === left_slot
     @test environment(v, 2) ≈ naive_complement(product1, 2)
 

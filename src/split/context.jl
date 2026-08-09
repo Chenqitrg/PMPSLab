@@ -12,13 +12,10 @@
 struct SplitContext{
         E, S,
         MA<:PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, MB,
-        TAA, TBB, TAB, CBB, CAB
+        CBB, CAB
     } <: AlgorithmContext{E,S}
     mpsA::MA
     mpsB::MB
-    braketAA::TAA
-    braketBB::TBB
-    braketAB::TAB
     cacheBB::CBB
     cacheAB::CAB
     expectationAA::E
@@ -29,22 +26,30 @@ this_B(ctx::SplitContext, pb::Int) = ctx.mpsB[pb]
 other_B(ctx::SplitContext, pb::Int) = iseven(pb) ? ctx.mpsB[pb - 1] : ctx.mpsB[pb + 1]
 this_A(ctx::SplitContext, pb::Int) = ctx.mpsA[pa_from_pb(pb)]
 
-function SplitContext(mpsA::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, mpsB::PeriodicMPS{<:AbstractTensorMap{E, S, 2, 1}}) where {E, S}
-    braketBB = PeriodicTransferMatrix(mpsB, mpsB)
-    braketAB = PeriodicTransferMatrix(mpsB, mpsA)
-    braketAA = PeriodicTransferMatrix(mpsA, mpsA)
-    return SplitContext(mpsA, mpsB, braketAA, braketBB, braketAB,
-                        build_cache(braketBB),
-                        build_cache(braketAB),
-                        expectation(braketAA))
+function SplitContext(
+        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+    ) where {E,S}
+    cacheBB = build_cache(PeriodicTransferMatrix(mpsB, mpsB))
+    cacheAB = build_cache(PeriodicTransferMatrix(mpsB, mpsA))
+    expectationAA = expectation(PeriodicTransferMatrix(mpsA, mpsA))
+    return SplitContext(
+        mpsA,
+        mpsB,
+        cacheBB,
+        cacheAB,
+        expectationAA,
+    )
 end
 
 function solvenew(ctx::SplitContext, alg::AbstractSolve, st::SweepState)
     pb = st.site
     1 <= pb <= length(ctx.mpsB) || throw(BoundsError(ctx.mpsB, pb))
     pa = pa_from_pb(pb)
-    N = transpose(environment(ctx.cacheBB, pb), ((3, 1), (4, 2)))   # N = E₁ * ... * E_N
-    AB_env = environment(ctx.cacheAB, pa)
+    N = transpose(
+        dense(environment(ctx.cacheBB, pb)), ((3, 1), (4, 2))
+    )   # N = E₁ * ... * E_N
+    AB_env = dense(environment(ctx.cacheAB, pa))
     A = this_A(ctx, pb)
     oB = other_B(ctx, pb)'
     if isodd(pb)
@@ -65,20 +70,32 @@ end
     update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
 
 One site's update + directional cache refresh. Environment (O(1)) → update
-rule → write back the new B tensor and transfer matrices → refresh the affected
-prefix or suffix entries.
+rule → write back the new B tensor → derive its transfer matrix → refresh the
+affected prefix or suffix entry.
 """
 function update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
     new, cost = solvenew(ctx, solve, st)
     ctx.mpsB[st.site] = new
-    ctx.braketBB[st.site] = site_transfer_matrix(new)
-    advance!(ctx.cacheBB, ctx.braketBB, st)
+    if _requires_rebuild(ctx.cacheBB, st)
+        advance!(ctx.cacheBB, PeriodicTransferMatrix(ctx.mpsB, ctx.mpsB), st)
+    else
+        advance!(ctx.cacheBB, DenseTransferMatrix(new), st)
+    end
     if (st.dir == 1 && iseven(st.site)) || (st.dir == -1 && isodd(st.site))
         pa = pa_from_pb(st.site)
-        ctx.braketAB[pa] = site_transfer_matrix(
-            ctx.mpsB[2 * pa - 1], ctx.mpsB[2 * pa], ctx.mpsA[pa]
-        )
-        advance!(ctx.cacheAB, ctx.braketAB, SweepState(pa, st.dir, st.n))
+        transfer_state = SweepState(pa, st.dir, st.n)
+        if _requires_rebuild(ctx.cacheAB, transfer_state)
+            advance!(
+                ctx.cacheAB,
+                PeriodicTransferMatrix(ctx.mpsB, ctx.mpsA),
+                transfer_state,
+            )
+        else
+            transfer = DenseTransferMatrix(
+                ctx.mpsB[2 * pa - 1], ctx.mpsB[2 * pa], ctx.mpsA[pa]
+            )
+            advance!(ctx.cacheAB, transfer, transfer_state)
+        end
     end
     return new, cost
 end

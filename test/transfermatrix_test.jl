@@ -10,6 +10,7 @@ using PMPSLab:
     pair_contraction,
     dense,
     site_transfer_matrix,
+    DenseTransferMatrix,
     PeriodicTransferMatrix,
     edge_identity,
     expectation,
@@ -19,7 +20,8 @@ using PMPSLab:
     gaugefix!,
     ProjectorCanonical
 using TensorKit
-using MPSKit: PeriodicVector, left_virtualspace
+using MPSKit: AbstractTransferMatrix, PeriodicVector, TransferMatrix,
+              left_virtualspace
 
 # Manual pairwise overlap ⟨bra|ket⟩ via the dense states: for one-site states
 # the physical leg orders of dense(bra) and dense(ket) match positionally.
@@ -41,6 +43,18 @@ end
     # manual: E[l l'; r r'] = Σ_p conj(T[l' p r']) · T[l p r]
     @plansor manual[-1 -2; -3 -4] := T[-1 1; -3] * T'[-4; -2 1]
     @test E ≈ manual
+end
+
+@testset "DenseTransferMatrix — MPSKit transfer interface" begin
+    D, d = 3, 2
+    tensor = randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)
+    transfer = DenseTransferMatrix(tensor)
+    bond_tensor = randn(ComplexF64, ℂ^D, ℂ^D)
+
+    @test transfer isa AbstractTransferMatrix
+    @test dense(transfer) === transfer.data
+    @test transfer * bond_tensor ≈
+          TransferMatrix(tensor, tensor) * bond_tensor
 end
 
 @testset "site_transfer_matrix — 2-site ket" begin
@@ -86,10 +100,13 @@ end
     @test eachindex(ptm) == eachindex(ptm.matrices)
     @test collect(ptm) == collect(ptm.matrices)
     for i in 1:N
+        @test ptm[i] isa DenseTransferMatrix
         @test ptm[i] ≈ site_transfer_matrix(mps[i])
     end
     # getindex by HalfInt-style positions via Int; setindex! replaces a site
-    new = site_transfer_matrix(random_mps(ComplexF64, 1, d, D)[1])
+    new = DenseTransferMatrix(
+        site_transfer_matrix(random_mps(ComplexF64, 1, d, D)[1])
+    )
     ptm[2] = new
     @test ptm[2] ≈ new
 end

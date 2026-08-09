@@ -120,11 +120,12 @@ c_{\mathrm{local}} = \operatorname{Re}
 ```
 
 This equals the global squared distance when the local normal equation and its
-mixed environment are consistent. `SplitContext` maintains `braketAB` uniformly
-as `\langle B|A\rangle`; completed B pairs are therefore written with
-`site_transfer_matrix(B₁, B₂, A)`. Exact-solver regression tests require the
-local estimate to agree with a fresh complete-period contraction after every
-site and require non-increase for both circular and zigzag sweeps.
+mixed environment are consistent. `SplitContext` maintains the mixed cache
+uniformly as `\langle B|A\rangle`; its transfer factors are derived from
+completed B pairs with `site_transfer_matrix(B₁, B₂, A)` only when cache
+maintenance needs them. Exact-solver regression tests require the local
+estimate to agree with a fresh complete-period contraction after every site and
+require non-increase for both circular and zigzag sweeps.
 
 The public interface provides a synchronous optional callback after each
 complete sweep:

@@ -143,44 +143,79 @@ function _rebuild_right!(v::PeriodicCache, product::AbstractPeriodicProduct)
     return v
 end
 
-"""
-    advance!(v::PeriodicCache, product, st::SweepState)
-
-Update the directional partial product after `product[st.site]` changed.
-Forward movement refreshes the prefix ending at that site; backward movement
-refreshes the suffix starting there. Crossing a periodic boundary rebuilds the
-opposite side. Existing cache tensors are reused with `copy!` and `mul!`.
-
-Despite its historical name, this function does not own or advance a cursor;
-the caller's [`SweepState`](@ref) is the only position state.
-"""
-function advance!(v::PeriodicCache, product::AbstractPeriodicProduct, st::SweepState)
+function _validate_advance(v::PeriodicCache, st::SweepState)
     N = length(v)
-    length(product) == N || throw(DimensionMismatch(
-        "cache has $N sites but product has $(length(product))"
-    ))
     s = _check_site(v, st.site)
     st.dir in (-1, 1) || throw(ArgumentError(
         "sweep direction must be -1 or 1, got $(st.dir)"
     ))
+    return N, s
+end
+
+"""
+    _requires_rebuild(v::PeriodicCache, st::SweepState) -> Bool
+
+Return whether advancing at `st` crosses a periodic boundary and therefore
+requires the opposite side of the cache to be rebuilt from a complete product.
+"""
+function _requires_rebuild(v::PeriodicCache, st::SweepState)
+    N, s = _validate_advance(v, st)
+    return N > 1 && ((st.dir == 1 && s == N) || (st.dir == -1 && s == 1))
+end
+
+"""
+    advance!(v::PeriodicCache, transfer, st::SweepState)
+
+Update the directional cache after the factor at `st.site` changes. `transfer`
+is the new factor itself, not a complete periodic product. This method handles
+ordinary movement and zigzag turns without retaining all source factors. A
+periodic boundary must instead use the complete-product overload.
+"""
+function advance!(v::PeriodicCache, transfer, st::SweepState)
+    N, s = _validate_advance(v, st)
     N == 1 && return v
+    _requires_rebuild(v, st) && throw(ArgumentError(
+        "advancing across a periodic boundary requires a complete product"
+    ))
 
     if st.dir == 1
-        if s == N
-            _rebuild_right!(v, product)
-        elseif s == 1
-            copy!(v.left[1], product[1])
+        if s == 1
+            copy!(v.left[1], transfer)
         else
-            mul!(v.left[s], v.left[s - 1], product[s])
+            mul!(v.left[s], v.left[s - 1], transfer)
         end
     else
-        if s == 1
-            _rebuild_left!(v, product)
-        elseif s == N
-            copy!(v.right[N - 1], product[N])
+        if s == N
+            copy!(v.right[N - 1], transfer)
         else
-            mul!(v.right[s - 1], product[s], v.right[s])
+            mul!(v.right[s - 1], transfer, v.right[s])
         end
     end
     return v
+end
+
+"""
+    advance!(v::PeriodicCache, product::AbstractPeriodicProduct, st::SweepState)
+
+Update a cache from a complete product. At ordinary sites only the changed
+factor is read. Crossing a periodic boundary rebuilds the opposite cache side.
+"""
+function advance!(
+        v::PeriodicCache,
+        product::AbstractPeriodicProduct,
+        st::SweepState,
+    )
+    length(product) == length(v) || throw(DimensionMismatch(
+        "cache has $(length(v)) sites but product has $(length(product))"
+    ))
+    _, s = _validate_advance(v, st)
+    if _requires_rebuild(v, st)
+        if st.dir == 1
+            _rebuild_right!(v, product)
+        else
+            _rebuild_left!(v, product)
+        end
+        return v
+    end
+    return advance!(v, product[s], st)
 end

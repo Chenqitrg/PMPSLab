@@ -106,7 +106,9 @@ The execution model separates four kinds of data:
 - **Inputs and algorithm configuration** define a particular computation. Their
   types and arity are algorithm-specific and are handled by multiple dispatch.
 - An **algorithm context** contains mutable numerical working state, including
-  tensors and derived contraction caches.
+  tensors and derived contraction caches. Transfer matrices are generated from
+  their source tensors when cache maintenance needs them rather than retained
+  as a second mutable representation.
 - A **run** coordinates a context with its algorithm configuration and execution
   state such as the next safe step, convergence log, and elapsed time.
 - A **snapshot** contains the minimum durable state needed to reconstruct a

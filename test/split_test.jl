@@ -35,7 +35,7 @@ using PMPSLab:
     PeriodicGaugeAnsatz
 import PMPSLab: initial_approximation, split_site, diff_norm,
                 this_B, other_B, this_A, pa_from_pb, expectation,
-                ProjectorCanonical, gaugefix!
+                site_transfer_matrix, ProjectorCanonical, gaugefix!
 using TensorKit
 using KrylovKit: GMRES
 using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace,
@@ -135,7 +135,10 @@ end
     @test !hasproperty(ctx.cacheAB, :site)
     @test length(ctx.cacheBB.left) == length(mpsB) - 1
     @test length(ctx.cacheBB.right) == length(mpsB) - 1
-    @test ctx.expectationAA ≈ expectation(ctx.braketAA)
+    @test !hasproperty(ctx, :braketAA)
+    @test !hasproperty(ctx, :braketBB)
+    @test !hasproperty(ctx, :braketAB)
+    @test ctx.expectationAA ≈ expectation(PeriodicTransferMatrix(mpsA, mpsA))
 
     # mismatched site counts are rejected
     @test_throws DimensionMismatch SplitContext(mpsA, random_mps(ComplexF64, 3, d, D))
@@ -149,7 +152,7 @@ end
 
     _, cost = update!(ctx, solver, SweepState(1, 1, 0))
     @test isfinite(cost)
-    @test ctx.cacheBB.left[1] ≈ ctx.braketBB[1]
+    @test ctx.cacheBB.left[1] ≈ site_transfer_matrix(ctx.mpsB[1])
 end
 
 @testset "update! — SweepState is the site source" begin
@@ -158,7 +161,9 @@ end
     ctx = SplitContext(mpsA, mpsB)
     _, cost = update!(ctx, CholeskySolve(), SweepState(2, 1, 0))
     @test isfinite(cost)
-    @test ctx.cacheBB.left[2] ≈ ctx.braketBB[1] * ctx.braketBB[2]
+    @test ctx.cacheBB.left[2] ≈
+          site_transfer_matrix(ctx.mpsB[1]) *
+          site_transfer_matrix(ctx.mpsB[2])
     @test_throws BoundsError update!(ctx, CholeskySolve(), SweepState(0, 1, 0))
 end
 
@@ -174,15 +179,19 @@ end
     # step 1: update site 1 (odd) — only the BB prefix changes
     update!(ctx, CholeskySolve(), SweepState(1, 1, 0))
     @test !(ctx.mpsB[1] ≈ old1)
-    @test ctx.cacheBB.left[1] ≈ ctx.braketBB[1]
+    @test ctx.cacheBB.left[1] ≈ site_transfer_matrix(ctx.mpsB[1])
     @test ctx.cacheAB.left[1] === ab_left_slot
     @test ctx.cacheAB.left[1] ≈ old_ab_left  # AB changes only after a complete pair
 
     # step 2: update site 2 (even) — both complete prefixes change
     update!(ctx, CholeskySolve(), SweepState(2, 1, 0))
-    @test ctx.cacheBB.left[2] ≈ ctx.braketBB[1] * ctx.braketBB[2]
+    @test ctx.cacheBB.left[2] ≈
+          site_transfer_matrix(ctx.mpsB[1]) *
+          site_transfer_matrix(ctx.mpsB[2])
     @test ctx.cacheAB.left[1] === ab_left_slot
-    @test ctx.cacheAB.left[1] ≈ ctx.braketAB[1]
+    @test ctx.cacheAB.left[1] ≈ site_transfer_matrix(
+        ctx.mpsB[1], ctx.mpsB[2], ctx.mpsA[1]
+    )
 
     # the new tensor keeps the site's space
     @test space(ctx.mpsB[2]) == space(mpsB[2])
@@ -226,7 +235,8 @@ end
     @test event isa SplitSiteCompleted
     @test event.log.state == SweepState(1, 1, 0)
     @test length(run.log.site_logs) == 1
-    @test run.context.cacheBB.left[1] ≈ run.context.braketBB[1]
+    @test run.context.cacheBB.left[1] ≈
+          site_transfer_matrix(run.context.mpsB[1])
     @test first(run.pending_iteration) == SweepState(2, 1, 0)
     @test !isfinished(run)
 
