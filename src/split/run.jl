@@ -34,8 +34,18 @@ struct SplitSiteCompleted{L<:SiteLog} <: AlgorithmEvent
     log::L
 end
 
+function _validate_split_sweep(sweep::AbstractSweep, site_count::Int)
+    expected = Base.OneTo(site_count)
+    domain = sweep_domain(sweep)
+    domain == expected || throw(DimensionMismatch(
+        "sweep domain $domain does not match split site domain $expected"
+    ))
+    return nothing
+end
+
 function initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
     approximation = initial_approximation(mps, algorithm.ansatz)
+    _validate_split_sweep(algorithm.sweep, length(approximation))
     context = SplitContext(mps, approximation)
     pending_iteration = iterate(algorithm.sweep)
     return SplitRun{
@@ -96,6 +106,7 @@ function restore_run(
         "snapshot approximation has $(length(saved.mpsB)) sites but target has " *
         "$(length(mpsA)) two-site tensors (expected $(2 * length(mpsA)))"
     ))
+    _validate_split_sweep(algorithm.sweep, length(saved.mpsB))
     _validate_split_cursor(saved, algorithm.sweep)
 
     mpsB = PeriodicMPS([copy(tensor) for tensor in saved.mpsB])

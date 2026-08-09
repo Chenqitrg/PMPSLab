@@ -231,6 +231,11 @@ end
     end
 end
 
+@testset "sweep domain" begin
+    @test PMPSLab.sweep_domain(CircularSweep(4; maximal_sweep=2)) == Base.OneTo(4)
+    @test PMPSLab.sweep_domain(ZigzagSweep(3; maximal_sweep=2)) == Base.OneTo(3)
+end
+
 @testset "advance! — 按扫描方向刷新缓存" begin
     # 前滑：更新 site 2 的 prefix，下一 site 3 的 environment 随即有效。
     product = random_periodic_product(3, 5)

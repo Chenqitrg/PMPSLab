@@ -128,4 +128,11 @@ end
         algorithm.solve,
     )
     @test_throws ArgumentError restore_run(saved, mpsA, wrong_sweep)
+
+    wrong_domain = PeriodicSplit(
+        algorithm.ansatz,
+        CircularSweep(1; maximal_sweep=2),
+        algorithm.solve,
+    )
+    @test_throws DimensionMismatch restore_run(saved, mpsA, wrong_domain)
 end

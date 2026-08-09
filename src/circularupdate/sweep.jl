@@ -12,6 +12,19 @@
 
 # AbstractSweep defined in split/interface.jl
 
+"""
+    sweep_domain(sweep::AbstractSweep)
+
+Return the complete site domain covered by `sweep`. Custom sweep types must
+define this method so algorithms can validate the sweep against their
+numerical state before the first update.
+"""
+function sweep_domain(sweep::AbstractSweep)
+    throw(ArgumentError(
+        "$(typeof(sweep)) must define PMPSLab.sweep_domain"
+    ))
+end
+
 # ---------------------------------------------------------------------------
 # ZigzagSweep — 往返扫描
 # ---------------------------------------------------------------------------
@@ -35,6 +48,7 @@ struct ZigzagSweep <: AbstractSweep
 end
 
 ZigzagSweep(N::Int; maximal_sweep::Int) = ZigzagSweep(N, maximal_sweep)
+sweep_domain(z::ZigzagSweep) = Base.OneTo(z.N)
 
 Base.IteratorSize(::Type{<:ZigzagSweep}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:ZigzagSweep}) = Base.HasEltype()
@@ -87,6 +101,7 @@ struct CircularSweep <: AbstractSweep
 end
 
 CircularSweep(N::Int; maximal_sweep::Int) = CircularSweep(N, maximal_sweep)
+sweep_domain(cs::CircularSweep) = Base.OneTo(cs.N)
 
 Base.IteratorSize(::Type{<:CircularSweep}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:CircularSweep}) = Base.HasEltype()

@@ -1,3 +1,5 @@
+struct DomainlessSweep <: PMPSLab.AbstractSweep end
+
 @testset "SplitRun — one safe step updates exactly one site" begin
     mpsA = random_mps2(ComplexF64, 2, 2, 1)
     algorithm = PeriodicSplit(
@@ -54,4 +56,23 @@ end
     @test isfinished(run)
     @test isnothing(run.pending_iteration)
     @test isempty(last(run_result(run)).site_logs)
+end
+
+@testset "SplitRun — sweep domain must match approximation" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+
+    for sweep in (
+            CircularSweep(1; maximal_sweep=1),
+            CircularSweep(5; maximal_sweep=1),
+            ZigzagSweep(1; maximal_sweep=0),
+        )
+        algorithm = PeriodicSplit(SVDAnsatz(), sweep, CholeskySolve())
+        @test_throws DimensionMismatch initialize_run(mpsA, algorithm)
+        @test_throws DimensionMismatch split(mpsA, algorithm)
+    end
+
+    domainless = PeriodicSplit(
+        SVDAnsatz(), DomainlessSweep(), CholeskySolve()
+    )
+    @test_throws ArgumentError initialize_run(mpsA, domainless)
 end
