@@ -54,7 +54,9 @@ HTTP API, job registry, authentication, or storage service.
 ### Non-functional requirements
 
 1. The numerical core must not depend on a frontend or deployment platform.
-2. Checkpoint encoding must operate on `IO`, not filesystem paths.
+2. Checkpoint encoding writes to a seekable local file. Platform storage
+   adapters upload the completed file rather than exposing a forward-only
+   stream to the codec.
 3. Runtime-only objects such as tasks, locks, channels, callbacks, and platform
    handles must never be part of a checkpoint.
 4. Derived contraction caches may be rebuilt on restore when this only changes
@@ -378,30 +380,40 @@ snapshots, and restore compose through a parent-child boundary.
 
 ## Checkpoint encoding
 
-### IO-based API
+### File codec and storage boundary
 
-Checkpoint encoding must not assume a local filesystem:
+The initial codec uses a local path:
 
 ```julia
-write_checkpoint(io::IO, snapshot::AbstractAlgorithmSnapshot)
-read_checkpoint(io::IO)::AbstractAlgorithmSnapshot
+write_checkpoint(path::AbstractString, snapshot::AbstractAlgorithmSnapshot)
+read_checkpoint(path::AbstractString)::AbstractAlgorithmSnapshot
 ```
 
-Tests use `IOBuffer`. A future platform adapter may supply a file, object-store
-stream, artifact handle, or another `IO` implementation.
+JLD2 requires seekable storage and checkpoint state may already be very large,
+so PMPSLab must not create an additional checkpoint-sized `IOBuffer`. The codec
+writes a temporary file in the destination directory and publishes it only
+after a successful close. A future platform adapter may upload that completed
+file, preferably with the platform's multipart or atomic-commit mechanism.
+
+The storage adapter owns remote keys, retention, upload retries, and the final
+durability guarantee. Those operations remain outside the numerical core until
+the hosting platform API is known.
 
 ### Header
 
-Each encoded checkpoint begins with a PMPSLab-owned header:
+Each encoded checkpoint contains PMPSLab-owned header metadata:
 
 ```julia
 struct CheckpointHeader
-    magic::NTuple{8,UInt8}
-    schema_version::Int
+    magic::String
+    schema_version::UInt8
     algorithm::Symbol
     package_version::VersionNumber
 end
 ```
+
+The fields are stored as ordinary JLD2 datasets alongside the snapshot payload,
+making the metadata inspectable without a PMPSLab-specific binary parser.
 
 The decoder must reject an invalid magic value, an unsupported schema version,
 or an algorithm/snapshot mismatch with a descriptive error.
@@ -413,9 +425,9 @@ ownership must remain in PMPSLab.
 
 ### Initial codec
 
-The first implementation may use Julia's `Serialization` standard library
-behind the PMPSLab header. This is suitable for same-environment recovery and
-preserves tensor data without designing a complete portable TensorKit schema.
+The first implementation uses JLD2. This is suitable for same-environment
+recovery and preserves TensorKit data without designing a complete portable
+tensor schema.
 
 The codec is not promised to support arbitrary dependency upgrades. If
 long-term cross-version migration becomes necessary, it can be replaced or
@@ -536,7 +548,7 @@ For every possible safe boundary in a small run:
 1. run an uninterrupted reference calculation;
 2. execute to the selected boundary;
 3. create a snapshot;
-4. encode it to an `IOBuffer`;
+4. encode it to a temporary JLD2 file;
 5. decode and restore a new run;
 6. finish the restored run;
 7. compare it with the uninterrupted result within machine precision.
@@ -582,7 +594,8 @@ A synthetic parent run with a resumable child verifies that:
 ### Phase 3: Checkpoint codec
 
 1. Add the versioned checkpoint header.
-2. Implement `IO`-based encoding and decoding.
+2. Implement JLD2 path-based encoding and decoding with temporary-file
+   publication.
 3. Add corruption and version-mismatch tests.
 4. Document the initial same-environment compatibility guarantee.
 
@@ -605,7 +618,7 @@ available:
 
 - the concrete pause and cancellation token API;
 - how progress events are serialized for the frontend;
-- whether the platform streams checkpoint data or provides a path;
+- how the platform uploads or imports a completed checkpoint file;
 - maximum checkpoint size and write timeout;
 - when an in-memory paused run is evicted;
 - how frontend disconnects map to commands;

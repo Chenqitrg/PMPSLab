@@ -3,6 +3,7 @@ module PMPSLab
 import Base: split
 using TensorKit
 import TensorKit: scalartype
+import JLD2
 using KrylovKit
 using LinearAlgebra
 using MPSKit: left_virtualspace, right_virtualspace,
@@ -27,6 +28,7 @@ export left_cache, right_cache, range_product, edge_identity
 # Public API
 export gaugefix!, assertconsistency, dense, pair_contraction, split
 export initialize_run, step!, isfinished, run_result, snapshot, restore_run
+export write_checkpoint, read_checkpoint
 export start_run, start_run!, pause!, resume!, cancel!, run_status
 export squared_norm, squared_distance, diff_norm
 export random_mps, one_mps, random_mps2, one_mps2, random_cdl, random_cdl_mps, lift
@@ -49,6 +51,7 @@ include("solve.jl")
 include("algorithm_context.jl")
 include("split/context.jl")
 include("split/run.jl")
+include("execution/checkpoint.jl")
 include("dense.jl")
 
 end
