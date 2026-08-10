@@ -24,6 +24,7 @@ export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export DenseTransferMatrix, TruncatedTransferMatrix, PeriodicTransferMatrix
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
+export prefix_products, suffix_products
 export left_cache, right_cache, range_product, edge_space, edge_identity
 export FormalIdentity, UnitalElement, compose_product
 
@@ -48,6 +49,7 @@ include("mps/contraction.jl")
 include("mps/lift.jl")
 include("circularupdate/periodicproduct.jl")
 include("circularupdate/formalidentity.jl")
+include("circularupdate/productscans.jl")
 include("logs.jl")
 include("circularupdate/cache.jl")
 include("transfermatrix/dense.jl")
