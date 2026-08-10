@@ -114,7 +114,7 @@ end
     end
 end
 
-@testset "build_cache — incremental factor generation" begin
+@testset "build_cache — direct element generation" begin
     N = 5
     product = random_periodic_product(3, N)
     calls = zeros(Int, N)
@@ -124,10 +124,9 @@ end
             calls[site] += 1
             copy(product[site])
         end,
-        codomain,
     )
 
-    @test calls == ones(Int, N)
+    @test calls == fill(2, N)
     for site in 1:N-1
         @test generated.left[site + 1] ≈
               naive_range_product(product, 1:site)
@@ -139,7 +138,7 @@ end
     @test_throws ArgumentError build_cache(MatrixPeriodicProduct(TensorMap[]))
     @test_throws ArgumentError prefix_products(MatrixPeriodicProduct(TensorMap[]))
     @test_throws ArgumentError suffix_products(MatrixPeriodicProduct(TensorMap[]))
-    @test_throws ArgumentError build_cache(0, identity, identity)
+    @test_throws ArgumentError build_cache(0, identity)
 end
 
 @testset "PeriodicCache — directional lengths must match" begin

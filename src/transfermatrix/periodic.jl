@@ -117,6 +117,34 @@ end
 PeriodicTransferMatrix(mps::PeriodicMPS, trunc::TruncationStrategy) =
     PeriodicTransferMatrix(mps, mps, trunc)
 
+"""
+    build_cache(bra::PeriodicMPS, ket::PeriodicMPS)
+    build_cache(bra::PeriodicMPS, ket::PeriodicMPS, trunc)
+
+Build the cache directly from generated transfer elements. No
+`PeriodicTransferMatrix` or separate period-sized element collection is created.
+"""
+function build_cache(bra::PeriodicMPS, ket::PeriodicMPS)
+    N = _transfer_period_length(bra, ket)
+    product_element_at(site::Int) = transfer_at(bra, ket, site)
+    return build_cache(N, product_element_at)
+end
+
+build_cache(mps::PeriodicMPS) = build_cache(mps, mps)
+
+function build_cache(
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+        trunc::TruncationStrategy,
+    )
+    N = _transfer_period_length(bra, ket)
+    product_element_at(site::Int) = transfer_at(bra, ket, site, trunc)
+    return build_cache(N, product_element_at)
+end
+
+build_cache(mps::PeriodicMPS, trunc::TruncationStrategy) =
+    build_cache(mps, mps, trunc)
+
 # Full-period product E₁ * E₂ * ... * E_N
 Base.:*(ptm::PeriodicTransferMatrix) = range_product(ptm, eachindex(ptm))
 

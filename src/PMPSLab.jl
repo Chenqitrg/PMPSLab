@@ -26,7 +26,6 @@ export DenseTransferMatrix, TruncatedTransferMatrix, PeriodicTransferMatrix
 export transfer_at
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
 export prefix_products, suffix_products
-export stage_factors, accumulate_prefixes, accumulate_suffixes!
 export left_cache_before, right_cache_after, range_product, edge_space, edge_identity
 export FormalIdentity, UnitalElement, compose_product
 export StaleCacheError

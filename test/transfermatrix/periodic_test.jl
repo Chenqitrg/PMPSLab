@@ -29,6 +29,18 @@ end
     @test edge_identity(ptm) ==
           FormalIdentity{eltype(ptm)}(codomain(ptm[1]))
 
+    direct = build_cache(bra, ket)
+    materialized = build_cache(ptm)
+    @test direct.left[1] == materialized.left[1]
+    @test all(
+        direct.left[i] ≈ materialized.left[i]
+        for i in 2:length(direct.left)
+    )
+    @test direct.right[end] == materialized.right[end]
+    @test all(
+        direct.right[i] ≈ materialized.right[i]
+        for i in 1:(length(direct.right) - 1)
+    )
 end
 
 @testset "PeriodicTransferMatrix — mismatched periods throw" begin
@@ -78,12 +90,18 @@ end
     @test identity_transfer.space == codomain(ptm[1])
 
     cache = build_cache(ptm)
+    direct = build_cache(bra, ket, trunc)
     @test edge_space(cache) == edge_space(ptm)
     @test edge_space(cache) == codomain(ptm[1])
     @test all(transfer -> transfer isa eltype(ptm), cache.left[2:end])
     @test all(transfer -> transfer isa eltype(ptm), cache.right[1:end-1])
     @test dense(cache.left[3]) ≈ dense(ptm[1] * ptm[2])
     @test dense(cache.right[2]) ≈ dense(ptm[3] * ptm[4])
+    @test all(
+        dense(direct.left[i]) ≈ dense(cache.left[i])
+        for i in 2:length(cache.left)
+    )
+
     left_slot = cache.left[2]
     rank_one = TruncatedTransferMatrix(
         one_mps(ComplexF64, N, d, D)[1], truncrank(1)
