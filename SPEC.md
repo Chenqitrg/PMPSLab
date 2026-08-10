@@ -120,12 +120,22 @@ c_{\mathrm{local}} = \operatorname{Re}
 ```
 
 This equals the global squared distance when the local normal equation and its
-mixed environment are consistent. `SplitContext` maintains the mixed cache
-uniformly as `\langle B|A\rangle`; its transfer factors are derived from
-completed B pairs with `DenseTransferMatrix(B₁, B₂, A)` only when cache
-maintenance needs them. Exact-solver regression tests require the local
+mixed environment are exact and consistent. `SplitEnvironmentPolicy` selects
+the transfer representation independently for the normal `⟨B|B⟩` and mixed
+`⟨B|A⟩` caches. Both use `DenseTransferPolicy` by default;
+`TruncatedTransferPolicy` keeps accumulated products in factored SVD form and
+reapplies its truncation strategy after multiplication. `KrylovSolve` consumes
+a truncated normal environment through its factored matrix action. Direct
+solvers are also valid and materialize that local environment immediately before
+solving. A truncated mixed environment is contracted into the right-hand side.
+
+`SplitContext` maintains the mixed cache uniformly as `\langle B|A\rangle`;
+its transfer factors are derived from completed B pairs only when cache
+maintenance needs them. Exact dense-solver regression tests require the local
 estimate to agree with a fresh complete-period contraction after every site and
-require non-increase for both circular and zigzag sweeps.
+require non-increase for both circular and zigzag sweeps. With a truncated
+working environment, the logged value is an approximate local cost; explicit
+`squared_distance` remains an exact dense finite-period check.
 
 The public interface provides a synchronous optional callback after each
 complete sweep:

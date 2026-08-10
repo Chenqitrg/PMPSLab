@@ -14,7 +14,7 @@ function _split_norm_action(
         x::AbstractTensorMap,
         transfer::TruncatedTransferMatrix,
     )
-    @plansor result[-1; -2 -3] := x[-1; 1 2] *
+    @plansor opt = true result[-1; -2 -3] := x[-1; 1 2] *
         transfer.vᴴ[4; 1 -2] * transfer.s[5; 4] * transfer.u[2 -3; 5]
     return result
 end
@@ -43,11 +43,11 @@ function _split_rhs(
         site::Int,
     )
     if isodd(site)
-        @plansor W[-1; -2 -3] := transfer.u[1 2; 5] *
+        @plansor opt = true W[-1; -2 -3] := transfer.u[1 2; 5] *
             transfer.s[5; 6] * transfer.vᴴ[6; 3 -2] *
             A[3 -1 4; 1] * other_Bᴴ[2; -3 4]
     else
-        @plansor W[-1; -2 -3] := transfer.u[1 -3; 5] *
+        @plansor opt = true W[-1; -2 -3] := transfer.u[1 -3; 5] *
             transfer.s[5; 6] * transfer.vᴴ[6; 2 4] *
             A[2 3 -1; 1] * other_Bᴴ[-2; 4 3]
     end
@@ -57,7 +57,7 @@ end
 function _solve_split_norm(
         solve::AbstractSolve,
         x0::AbstractTensorMap,
-        transfer::DenseTransferMatrix,
+        transfer::AbstractTransferMatrix,
         W::AbstractTensorMap,
     )
     norm_environment = transpose(
@@ -74,15 +74,4 @@ function _solve_split_norm(
     )
     action = x -> _split_norm_action(x, transfer)
     return rdiv(solve, x0, action, W)
-end
-
-function _solve_split_norm(
-        ::DenseSolve,
-        ::AbstractTensorMap,
-        ::TruncatedTransferMatrix,
-        ::AbstractTensorMap,
-    )
-    throw(ArgumentError(
-        "a truncated split environment requires KrylovSolve"
-    ))
 end

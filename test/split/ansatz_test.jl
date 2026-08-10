@@ -2,7 +2,9 @@
     @test PMPSLab.split === Base.split
     @test all(name -> name in names(PMPSLab), (
         :PeriodicSplit, :RandomAnsatz, :OneAnsatz, :SVDAnsatz,
-        :PeriodicGaugeAnsatz,
+        :PeriodicGaugeAnsatz, :AbstractTransferPolicy,
+        :DenseTransferPolicy, :TruncatedTransferPolicy,
+        :SplitEnvironmentPolicy,
     ))
     @test SVDAnsatz().truncation isa TruncationStrategy
     @test PeriodicGaugeAnsatz().svd_pre isa SVDAnsatz

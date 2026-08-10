@@ -60,7 +60,12 @@ end
     expected = PMPSLab._solve_split_norm(solve, x0, dense_BB, W)
     actual = PMPSLab._solve_split_norm(solve, x0, truncated_BB, W)
     @test actual ≈ expected rtol=1e-10
-    @test_throws ArgumentError PMPSLab._solve_split_norm(
+
+    direct_expected = PMPSLab._solve_split_norm(
+        CholeskySolve(), x0, dense_BB, W
+    )
+    direct_actual = PMPSLab._solve_split_norm(
         CholeskySolve(), x0, truncated_BB, W
     )
+    @test direct_actual ≈ direct_expected rtol=1e-10
 end

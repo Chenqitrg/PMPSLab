@@ -20,9 +20,11 @@ export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
 export AlgorithmEvent, LocalRunSession, LocalRunStatus
 export AbstractPeriodicCanonical, ProjectorCanonical
 export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
+export SplitEnvironmentPolicy
 export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export DenseTransferMatrix, TruncatedTransferMatrix, PeriodicTransferMatrix
+export AbstractTransferPolicy, DenseTransferPolicy, TruncatedTransferPolicy
 export transfer_at
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
 export prefix_products, suffix_products
@@ -62,6 +64,7 @@ include("transfermatrix/dense.jl")
 include("transfermatrix/truncation.jl")
 include("transfermatrix/truncated.jl")
 include("transfermatrix/periodic.jl")
+include("transfermatrix/policy.jl")
 include("transfermatrix/distance.jl")
 include("canonicalize/projector.jl")
 include("canonicalize/interface.jl")

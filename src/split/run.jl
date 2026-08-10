@@ -51,7 +51,7 @@ end
 function initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
     approximation = initial_approximation(mps, algorithm.ansatz)
     _validate_split_sweep(algorithm.sweep, length(approximation))
-    context = SplitContext(mps, approximation)
+    context = _build_split_context(mps, approximation, algorithm.environments)
     pending_iteration = iterate(algorithm.sweep)
     return SplitRun{
         typeof(algorithm),typeof(context),SplitPendingIteration
@@ -115,7 +115,7 @@ function restore_run(
     _validate_split_cursor(saved, algorithm.sweep)
 
     mpsB = PeriodicMPS([copy(tensor) for tensor in saved.mpsB])
-    context = SplitContext(mpsA, mpsB)
+    context = _build_split_context(mpsA, mpsB, algorithm.environments)
     pending_iteration = saved.pending_iteration
     return SplitRun{
         typeof(algorithm),typeof(context),SplitPendingIteration
@@ -134,7 +134,12 @@ function step!(run::SplitRun)
     following_iteration = iterate(run.algorithm.sweep, next_iterator_state)
 
     started_at = time()
-    _, cost = update!(run.context, run.algorithm.solve, state)
+    _, cost = update!(
+        run.context,
+        run.algorithm.solve,
+        run.algorithm.environments,
+        state,
+    )
     site_log = SiteLog(state, cost, time() - started_at)
     push!(run.log.site_logs, site_log)
 

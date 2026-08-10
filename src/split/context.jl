@@ -13,7 +13,7 @@
 struct SplitContext{
         E, S,
         MA<:PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, MB,
-        CBB, CAB
+        CBB, CAB,
     } <: AlgorithmContext{E,S}
     mpsA::MA
     mpsB::MB
@@ -27,12 +27,13 @@ this_B(ctx::SplitContext, pb::Int) = ctx.mpsB[pb]
 other_B(ctx::SplitContext, pb::Int) = iseven(pb) ? ctx.mpsB[pb - 1] : ctx.mpsB[pb + 1]
 this_A(ctx::SplitContext, pb::Int) = ctx.mpsA[pa_from_pb(pb)]
 
-function SplitContext(
+function _build_split_context(
         mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
         mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        environments::SplitEnvironmentPolicy,
     ) where {E,S}
-    cacheBB = build_cache(mpsB, mpsB)
-    cacheAB = build_cache(mpsB, mpsA)
+    cacheBB = build_cache(mpsB, mpsB, environments.norm)
+    cacheAB = build_cache(mpsB, mpsA, environments.mixed)
     expectationAA = expectation(mpsA, mpsA)
     return SplitContext(
         mpsA,
@@ -42,6 +43,11 @@ function SplitContext(
         expectationAA,
     )
 end
+
+SplitContext(
+    mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+    mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+) where {E,S} = _build_split_context(mpsA, mpsB, SplitEnvironmentPolicy())
 
 function solvenew(ctx::SplitContext, alg::AbstractSolve, st::SweepState)
     pb = st.site
@@ -66,16 +72,20 @@ _pair_completed(st::SweepState{Backward}) = isodd(st.site)
 
 """
     update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
+    update!(ctx::SplitContext, solve::AbstractSolve, environments, st::SweepState)
 
 One site's update + validated directional cache refresh. An incomplete B pair
 only invalidates its mixed AB factor; completing the pair constructs that factor
 once and advances the AB cache. Unsupported visit orders fail with
 `StaleCacheError` instead of triggering extra contractions or returning stale
-environments.
+environments. The three-argument method uses the default dense transfer
+policies; non-default policies are supplied explicitly and are never stored in
+`SplitContext`.
 """
 function update!(
         ctx::SplitContext,
         solve::AbstractSolve,
+        environments::SplitEnvironmentPolicy,
         st::SweepState{D},
     ) where {D}
     new, cost = solvenew(ctx, solve, st)
@@ -83,22 +93,34 @@ function update!(
 
     if _requires_rebuild(ctx.cacheBB, st)
         if D === Forward
-            rebuild_right!(ctx.cacheBB, ctx.mpsB, ctx.mpsB)
-            rebuild_right!(ctx.cacheAB, ctx.mpsB, ctx.mpsA)
+            rebuild_right!(
+                ctx.cacheBB, ctx.mpsB, ctx.mpsB, environments.norm
+            )
+            rebuild_right!(
+                ctx.cacheAB, ctx.mpsB, ctx.mpsA, environments.mixed
+            )
         else
-            rebuild_left!(ctx.cacheBB, ctx.mpsB, ctx.mpsB)
-            rebuild_left!(ctx.cacheAB, ctx.mpsB, ctx.mpsA)
+            rebuild_left!(
+                ctx.cacheBB, ctx.mpsB, ctx.mpsB, environments.norm
+            )
+            rebuild_left!(
+                ctx.cacheAB, ctx.mpsB, ctx.mpsA, environments.mixed
+            )
         end
         return new, cost
     end
 
-    bb_transfer = transfer_at(ctx.mpsB, ctx.mpsB, st.site)
+    bb_transfer = transfer_at(
+        ctx.mpsB, ctx.mpsB, st.site, environments.norm
+    )
     advance!(ctx.cacheBB, bb_transfer, st)
 
     pa = pa_from_pb(st.site)
     if _pair_completed(st)
         pair_state = SweepState{D}(pa, st.n)
-        ab_transfer = transfer_at(ctx.mpsB, ctx.mpsA, pa)
+        ab_transfer = transfer_at(
+            ctx.mpsB, ctx.mpsA, pa, environments.mixed
+        )
         advance!(ctx.cacheAB, ab_transfer, pair_state)
     else
         # Avoid constructing the mixed transfer until both B sites are current.
@@ -106,6 +128,10 @@ function update!(
     end
     return new, cost
 end
+
+update!(
+    ctx::SplitContext, solve::AbstractSolve, st::SweepState
+) = update!(ctx, solve, SplitEnvironmentPolicy(), st)
 
 # 工厂：从 MPS 构造迭代器（sweep.jl 只依赖 N，不依赖 PeriodicMPS）
 ZigzagSweep(mps::PeriodicMPS; maximal_sweep::Int)   = ZigzagSweep(length(mps); maximal_sweep)

@@ -28,6 +28,9 @@ using PMPSLab:
     DenseTransferMatrix,
     TruncatedTransferMatrix,
     PeriodicTransferMatrix,
+    AbstractTransferPolicy,
+    DenseTransferPolicy,
+    TruncatedTransferPolicy,
     StaleCacheError,
     environment,
     squared_distance,
@@ -35,6 +38,7 @@ using PMPSLab:
     CholeskySolve,
     KrylovSolve,
     PeriodicSplit,
+    SplitEnvironmentPolicy,
     SplitRun,
     SplitSnapshot,
     SplitSiteCompleted,
@@ -53,6 +57,7 @@ using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace,
 include("ansatz_test.jl")
 include("context_test.jl")
 include("environment_test.jl")
+include("transfer_policy_test.jl")
 include("run_test.jl")
 include("snapshot_test.jl")
 include("algorithm_test.jl")

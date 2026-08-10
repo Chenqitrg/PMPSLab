@@ -17,6 +17,10 @@
     @test !hasproperty(ctx, :braketAA)
     @test !hasproperty(ctx, :braketBB)
     @test !hasproperty(ctx, :braketAB)
+    @test !hasproperty(ctx, :environments)
+    @test fieldnames(typeof(ctx)) == (
+        :mpsA, :mpsB, :cacheBB, :cacheAB, :expectationAA,
+    )
     @test ctx.expectationAA ≈ expectation(PeriodicTransferMatrix(mpsA, mpsA))
 
     @test_throws DimensionMismatch SplitContext(mpsA, random_mps(ComplexF64, 3, d, D))
