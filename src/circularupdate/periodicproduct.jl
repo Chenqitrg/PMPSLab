@@ -7,8 +7,8 @@
 
 Ordered periodic collection whose factors have type `T`.
 
-Subtypes implement `length`, integer `getindex`, and `edge_identity`. Factors
-expose `domain` and `codomain`; the final domain must equal the first codomain.
+Subtypes implement `length` and integer `getindex`. Factors expose `domain` and
+`codomain`; the final domain must equal the first codomain.
 `T` is closed under `*` and supports `copy`, `copy!`, and `mul!` for cache
 construction and refresh. The protocol is independent of any application-level
 factor representation.

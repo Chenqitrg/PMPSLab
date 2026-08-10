@@ -13,7 +13,7 @@ function prefix_products(v::AbstractPeriodicProduct{T}) where {T}
     ))
 
     # --- Boundary identity ---------------------------------------------------
-    identity = FormalIdentity{T}(edge_space(v))
+    identity = edge_identity(v)
     prefixes = Vector{UnitalElement{T,typeof(identity.space)}}(undef, N)
     prefixes[1] = identity
 
@@ -42,7 +42,7 @@ function suffix_products(v::AbstractPeriodicProduct{T}) where {T}
     ))
 
     # --- Boundary identity ---------------------------------------------------
-    identity = FormalIdentity{T}(edge_space(v))
+    identity = edge_identity(v)
     suffixes = Vector{UnitalElement{T,typeof(identity.space)}}(undef, N)
     suffixes[N] = identity
 

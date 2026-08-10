@@ -1,6 +1,6 @@
 using Test
 import TensorKit
-using PMPSLab: AbstractPeriodicProduct, edge_space
+using PMPSLab: AbstractPeriodicProduct, FormalIdentity, edge_identity, edge_space
 using TensorKit: SpaceMismatch, Z2Space, ℂ, codomain, domain
 
 struct EdgeElement{S}
@@ -25,10 +25,14 @@ Base.getindex(product::EdgeProduct, site::Int) = product.elements[site]
         EdgeElement(ℂ^4, complex_space),
     ])
     @test edge_space(product) == complex_space
+    @test edge_identity(product) ==
+          FormalIdentity{eltype(product)}(complex_space)
 
     graded_space = Z2Space(0 => 2, 1 => 1)
     graded = EdgeProduct([EdgeElement(graded_space, graded_space)])
     @test edge_space(graded) == graded_space
+    @test edge_identity(graded) ==
+          FormalIdentity{eltype(graded)}(graded_space)
 
     open_product = EdgeProduct([
         EdgeElement(ℂ^2, ℂ^2),

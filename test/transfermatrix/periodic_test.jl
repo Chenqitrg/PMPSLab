@@ -10,6 +10,7 @@
     for i in 1:N
         @test ptm[i] isa DenseTransferMatrix
         @test ptm[i] ≈ DenseTransferMatrix(mps[i])
+        @test transfer_at(mps, mps, i) ≈ ptm[i]
     end
     new = DenseTransferMatrix(random_mps(ComplexF64, 1, d, D)[1])
     ptm[2] = new
@@ -24,7 +25,10 @@ end
 
     @test length(ptm) == N
     @test ptm[2] ≈ DenseTransferMatrix(bra[2], ket[2])
-    @test edge_identity(ptm) ≈ id(ComplexF64, codomain(ptm[1]))
+    @test transfer_at(bra, ket, 2) ≈ ptm[2]
+    @test edge_identity(ptm) ==
+          FormalIdentity{eltype(ptm)}(codomain(ptm[1]))
+
 end
 
 @testset "PeriodicTransferMatrix — mismatched periods throw" begin
@@ -45,6 +49,9 @@ end
     @test length(ptm) == 2
     @test ptm[1] ≈ DenseTransferMatrix(mpsA[1], mpsB[1], mpsB[2])
     @test ptm[2] ≈ DenseTransferMatrix(mpsA[2], mpsB[3], mpsB[4])
+    @test transfer_at(mpsA, mpsB, 2) ≈ ptm[2]
+    @test transfer_at(mpsB, mpsA, 2) ≈
+          DenseTransferMatrix(mpsB[3], mpsB[4], mpsA[2])
 
     mpsB_short = random_mps(ComplexF64, 3, d, D)
     @test_throws DimensionMismatch PeriodicTransferMatrix(mpsA, mpsB_short)
@@ -64,21 +71,20 @@ end
         dense(TruncatedTransferMatrix(bra[i], ket[i], trunc))
         for i in eachindex(ptm)
     )
+    @test dense(transfer_at(bra, ket, 2, trunc)) ≈ dense(ptm[2])
 
     identity_transfer = edge_identity(ptm)
-    @test identity_transfer isa eltype(ptm)
-    @test identity_transfer.trunc === trunc
-    @test dense(identity_transfer) ≈
-          id(ComplexF64, codomain(ptm[1]))
+    @test identity_transfer isa FormalIdentity{eltype(ptm)}
+    @test identity_transfer.space == codomain(ptm[1])
 
     cache = build_cache(ptm)
-    @test cache.edge_identity isa eltype(ptm)
-    @test all(transfer -> transfer isa eltype(ptm), cache.left)
-    @test all(transfer -> transfer isa eltype(ptm), cache.right)
-    @test dense(cache.left[2]) ≈ dense(ptm[1] * ptm[2])
+    @test edge_space(cache) == edge_space(ptm)
+    @test edge_space(cache) == codomain(ptm[1])
+    @test all(transfer -> transfer isa eltype(ptm), cache.left[2:end])
+    @test all(transfer -> transfer isa eltype(ptm), cache.right[1:end-1])
+    @test dense(cache.left[3]) ≈ dense(ptm[1] * ptm[2])
     @test dense(cache.right[2]) ≈ dense(ptm[3] * ptm[4])
-
-    left_slot = cache.left[1]
+    left_slot = cache.left[2]
     rank_one = TruncatedTransferMatrix(
         one_mps(ComplexF64, N, d, D)[1], truncrank(1)
     )
@@ -86,8 +92,8 @@ end
         rank_one.u, rank_one.s, rank_one.vᴴ, trunc
     )
     advance!(cache, replacement, SweepState{Forward}(1, 0))
-    @test cache.left[1] !== left_slot
-    @test dense(cache.left[1]) ≈ dense(replacement)
+    @test cache.left[2] !== left_slot
+    @test dense(cache.left[2]) ≈ dense(replacement)
 
     self_ptm = PeriodicTransferMatrix(ket, trunc)
     @test all(transfer -> transfer isa TruncatedTransferMatrix, self_ptm)
@@ -108,6 +114,8 @@ end
           dense(TruncatedTransferMatrix(mpsA[1], mpsB[1], mpsB[2], trunc))
     @test dense(ba[1]) ≈
           dense(TruncatedTransferMatrix(mpsB[1], mpsB[2], mpsA[1], trunc))
+    @test dense(transfer_at(mpsA, mpsB, 2, trunc)) ≈ dense(ab[2])
+    @test dense(transfer_at(mpsB, mpsA, 2, trunc)) ≈ dense(ba[2])
 
     mpsB_short = random_mps(ComplexF64, 3, d, D)
     @test_throws DimensionMismatch PeriodicTransferMatrix(mpsA, mpsB_short, trunc)
@@ -121,8 +129,9 @@ end
     cache = build_cache(ptm)
 
     @test all(transfer -> transfer isa TruncatedTransferMatrix, ptm)
-    @test dense(edge_identity(ptm)) ≈ id(ComplexF64, codomain(ptm[1]))
-    @test dense(cache.left[2]) ≈ dense(ptm[1] * ptm[2])
+    @test edge_identity(ptm) ==
+          FormalIdentity{eltype(ptm)}(codomain(ptm[1]))
+    @test dense(cache.left[3]) ≈ dense(ptm[1] * ptm[2])
 end
 
 @testset "full-period product and expectation — 1-site" begin

@@ -7,7 +7,8 @@ end
 Base.length(v::PeriodicTransferMatrix) = length(v.matrices)
 Base.parent(v::PeriodicTransferMatrix) = v.matrices
 Base.eachindex(v::PeriodicTransferMatrix) = eachindex(parent(v))
-Base.iterate(v::PeriodicTransferMatrix, state...) = iterate(parent(v), state...)
+Base.iterate(v::PeriodicTransferMatrix, state::S...) where {S} =
+    iterate(parent(v), state...)
 Base.getindex(v::PeriodicTransferMatrix, i::Int) = v.matrices[i]
 function Base.setindex!(
         v::PeriodicTransferMatrix{T}, transfer::T, i::Int
@@ -15,53 +16,90 @@ function Base.setindex!(
     return v.matrices[i] = transfer
 end
 
-# Construct from a PeriodicMPS. The private builder receives either the dense
-# transfer constructor or a closure which adds a truncation strategy.
-function _periodic_transfer_matrix(
-        make_transfer,
+function _transfer_period_length(
         bra::PeriodicMPS{<:AbstractTensorMap{E,S,M,1}},
         ket::PeriodicMPS{<:AbstractTensorMap{E,S,M,1}},
     ) where {E,S,M}
     length(bra) == length(ket) || throw(DimensionMismatch(
         "bra has $(length(bra)) sites but ket has $(length(ket)) sites"
     ))
-    tmats = [
-        make_transfer(bratensor, kettensor)
-        for (bratensor, kettensor) in zip(bra, ket)
-    ]
-    return PeriodicTransferMatrix(PeriodicVector(tmats))
+    return length(bra)
 end
 
-function _periodic_transfer_matrix(
-        make_transfer,
+function _transfer_period_length(
         mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
         mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
     ) where {E,S}
-    length(mpsB) == 2 * length(mpsA) ||
-        throw(DimensionMismatch("two-site mpsA has $(length(mpsA)) sites but one-site mpsB has $(length(mpsB)) (expected $(2 * length(mpsA)))"))
-    tmats = [
-        make_transfer(mpsA[i], mpsB[2i - 1], mpsB[2i])
-        for i in eachindex(mpsA)
-    ]
-    return PeriodicTransferMatrix(PeriodicVector(tmats))
+    length(mpsB) == 2 * length(mpsA) || throw(DimensionMismatch(
+        "two-site mpsA has $(length(mpsA)) sites but one-site mpsB has " *
+        "$(length(mpsB)) (expected $(2 * length(mpsA)))"
+    ))
+    return length(mpsA)
 end
 
-function _periodic_transfer_matrix(
-        make_transfer,
+_transfer_period_length(
         mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
         mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
-    ) where {E,S}
-    length(mpsB) == 2 * length(mpsA) ||
-        throw(DimensionMismatch("two-site mpsA has $(length(mpsA)) sites but one-site mpsB has $(length(mpsB)) (expected $(2 * length(mpsA)))"))
-    tmats = [
-        make_transfer(mpsB[2i - 1], mpsB[2i], mpsA[i])
-        for i in eachindex(mpsA)
-    ]
-    return PeriodicTransferMatrix(PeriodicVector(tmats))
+    ) where {E,S} = _transfer_period_length(mpsA, mpsB)
+
+"""
+    transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int)
+    transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int, trunc)
+
+Construct the transfer matrix at `site`. Mixed two-site/one-site MPS pairs are
+contracted over the corresponding pair of one-site tensors. Supplying `trunc`
+returns a [`TruncatedTransferMatrix`](@ref); otherwise the result is dense.
+"""
+transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int) =
+    DenseTransferMatrix(bra[site], ket[site])
+
+transfer_at(
+        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        site::Int,
+    ) where {E,S} = DenseTransferMatrix(
+        mpsA[site], mpsB[2site - 1], mpsB[2site]
+    )
+
+transfer_at(
+        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        site::Int,
+    ) where {E,S} = DenseTransferMatrix(
+        mpsB[2site - 1], mpsB[2site], mpsA[site]
+    )
+
+transfer_at(
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+        site::Int,
+        trunc::TruncationStrategy,
+    ) = TruncatedTransferMatrix(bra[site], ket[site], trunc)
+
+transfer_at(
+        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        site::Int,
+        trunc::TruncationStrategy,
+    ) where {E,S} = TruncatedTransferMatrix(
+        mpsA[site], mpsB[2site - 1], mpsB[2site], trunc
+    )
+
+transfer_at(
+        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        site::Int,
+        trunc::TruncationStrategy,
+    ) where {E,S} = TruncatedTransferMatrix(
+        mpsB[2site - 1], mpsB[2site], mpsA[site], trunc
+    )
+
+function PeriodicTransferMatrix(bra::PeriodicMPS, ket::PeriodicMPS)
+    N = _transfer_period_length(bra, ket)
+    matrices = [transfer_at(bra, ket, site) for site in 1:N]
+    return PeriodicTransferMatrix(PeriodicVector(matrices))
 end
 
-PeriodicTransferMatrix(bra::PeriodicMPS, ket::PeriodicMPS) =
-    _periodic_transfer_matrix(DenseTransferMatrix, bra, ket)
 PeriodicTransferMatrix(mps::PeriodicMPS) = PeriodicTransferMatrix(mps, mps)
 
 function PeriodicTransferMatrix(
@@ -69,35 +107,15 @@ function PeriodicTransferMatrix(
         ket::PeriodicMPS,
         trunc::TruncationStrategy,
     )
-    make_transfer(args...) = TruncatedTransferMatrix(args..., trunc)
-    return _periodic_transfer_matrix(make_transfer, bra, ket)
+    N = _transfer_period_length(bra, ket)
+    matrices = [
+        transfer_at(bra, ket, site, trunc) for site in 1:N
+    ]
+    return PeriodicTransferMatrix(PeriodicVector(matrices))
 end
 
 PeriodicTransferMatrix(mps::PeriodicMPS, trunc::TruncationStrategy) =
     PeriodicTransferMatrix(mps, mps, trunc)
-
-edge_identity(ptm::PeriodicTransferMatrix{<:DenseTransferMatrix}) =
-    DenseTransferMatrix(id(scalartype(ptm[1]), codomain(ptm[1])))
-
-function edge_identity(
-        ptm::PeriodicTransferMatrix{<:TruncatedTransferMatrix},
-    )
-    first_transfer = ptm[1]
-    identity_transfer = DenseTransferMatrix(
-        id(scalartype(first_transfer), codomain(first_transfer))
-    )
-
-    # Keep the identity exact even when the product uses a truncating policy.
-    # The policy is metadata for later products, so reuse it after computing an
-    # untruncated SVD representation of the identity.
-    exact = TruncatedTransferMatrix(identity_transfer, TruncationStrategy())
-    return TruncatedTransferMatrix(
-        exact.u,
-        exact.s,
-        exact.vᴴ,
-        first_transfer.trunc,
-    )
-end
 
 # Full-period product E₁ * E₂ * ... * E_N
 Base.:*(ptm::PeriodicTransferMatrix) = range_product(ptm, eachindex(ptm))

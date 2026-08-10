@@ -23,6 +23,7 @@ export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
 export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export DenseTransferMatrix, TruncatedTransferMatrix, PeriodicTransferMatrix
+export transfer_at
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
 export prefix_products, suffix_products
 export stage_factors, accumulate_prefixes, accumulate_suffixes!

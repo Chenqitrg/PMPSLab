@@ -16,6 +16,15 @@ FormalIdentity{T}(space::S) where {T,S} = FormalIdentity{T,S}(space)
 const UnitalElement{T,S} = Union{FormalIdentity{T,S},T}
 
 """
+    edge_identity(v::AbstractPeriodicProduct{T})
+
+Return the formal identity at the periodic edge without materializing a factor
+or performing a factorization.
+"""
+edge_identity(v::AbstractPeriodicProduct{T}) where {T} =
+    FormalIdentity{T}(edge_space(v))
+
+"""
     compose_product(left, right)
 
 Compose two unital elements without constructing or multiplying a dense
