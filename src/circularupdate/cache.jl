@@ -1,244 +1,182 @@
 """
-    PeriodicCache{T}
+    StaleCacheError
 
-O(N) partial-product cache for an [`AbstractPeriodicProduct`](@ref).
-
-Left prefixes and right suffixes live in separate arrays with fixed meanings:
-
-    left[k]  = v[1] * ... * v[k]
-    right[k] = v[k + 1] * ... * v[N]
-
-The cache deliberately stores no active site. A caller supplies the site to
-[`environment`](@ref), so the sweep iterator remains the single source of
-position. Keeping each slot's meaning fixed also lets [`advance!`](@ref) update
-its tensor storage in place whenever the representation remains compatible.
-
-# Fields
-- `left::Vector{T}`: all non-full left prefixes
-- `right::Vector{T}`: all non-full right suffixes
-- `edge_identity::T`: the identity used when one side is empty
+Raised when a query would read a prefix or suffix invalidated by factor updates.
+No factor multiplication is performed to repair stale state implicitly.
 """
-struct PeriodicCache{T}
-    left::Vector{T}
-    right::Vector{T}
-    edge_identity::T
+struct StaleCacheError <: Exception
+    side::Symbol
+    index::Int
+    valid_boundary::Int
 end
 
-Base.length(v::PeriodicCache) = length(v.left) + 1
+function Base.showerror(io::IO, err::StaleCacheError)
+    if err.side == :left
+        print(
+            io,
+            "left cache entry ", err.index,
+            " is stale; valid prefixes end at ", err.valid_boundary,
+        )
+    else
+        print(
+            io,
+            "right cache entry ", err.index,
+            " is stale; valid suffixes start at ", err.valid_boundary,
+        )
+    end
+end
+
+"""
+    PeriodicCache{T,S}
+
+Validated O(N) prefix/suffix cache for an [`AbstractPeriodicProduct`](@ref).
+
+    left[s]  = v[1] * ... * v[s - 1]
+    right[s] = v[s + 1] * ... * v[N]
+
+`left[1]` and `right[N]` are [`FormalIdentity`](@ref) values carrying only the
+periodic cut space. Boundary and one-site queries therefore never construct or
+contract with a dense identity.
+
+Element updates invalidate a suffix of `left` and a prefix of `right`. The cache
+records the two validity frontiers:
+
+    left[s]  is valid when s - 1 <= left_valid_through
+    right[s] is valid when s >= right_valid_from
+
+Queries never repair an invalid entry implicitly, because factor multiplication
+may be the dominant cost. A stale query throws [`StaleCacheError`](@ref). Public
+[`advance!`](@ref) updates exactly one directional slot when its prerequisite is
+valid. A periodic wrap requires an explicit directional rebuild.
+
+The cache stores no sweep cursor or separate factor list. Callers own the
+product and notify the cache through [`advance!`](@ref) or [`invalidate!`](@ref).
+"""
+mutable struct PeriodicCache{T,S}
+    left::Vector{UnitalElement{T,S}}
+    right::Vector{UnitalElement{T,S}}
+    left_valid_through::Int
+    right_valid_from::Int
+end
+
+function edge_space(v::PeriodicCache{T,S}) where {T,S}
+    formal_identity = left_cache_before(v, 1)::FormalIdentity{T,S}
+    return formal_identity.space
+end
+
+function Base.length(v::PeriodicCache)
+    left_length = length(v.left)
+    right_length = length(v.right)
+    left_length == right_length || throw(DimensionMismatch(
+        "left cache has $left_length entries but right cache has $right_length"
+    ))
+    return left_length
+end
 Base.lastindex(v::PeriodicCache) = length(v)
-
-function _check_site(v::PeriodicCache, site::Int)
-    1 <= site <= length(v) || throw(BoundsError(v, site))
-    return site
-end
 
 """
     v[r::AbstractUnitRange] -> product
 
-Return a cached prefix `v[1:k]` or suffix `v[k:N]`. Interior ranges and the
-full period are not represented by a single cache entry and throw an
+Return a valid prefix `v[1:k]` or suffix `v[k:N]`. Stale entries throw
+[`StaleCacheError`](@ref); interior, empty, and full-period ranges throw
 [`ArgumentError`](@ref).
 """
 function Base.getindex(v::PeriodicCache, r::AbstractUnitRange)
     isempty(r) && throw(ArgumentError("Range must be non-empty"))
     if first(r) == 1 && last(r) < length(v)
-        return v.left[last(r)]
+        k = last(r)
+        return left_cache_before(v, k + 1)
     elseif first(r) > 1 && last(r) == length(v)
-        return v.right[first(r) - 1]
+        k = first(r) - 1
+        return right_cache_after(v, k)
     else
         throw(ArgumentError("The range $r is not valid"))
     end
 end
 
 """
-    left_cache(v::PeriodicCache, site::Int)
+    left_cache_before(v::PeriodicCache, site::Int)
 
-Return `v[1] * ... * v[site-1]` in O(1), or `v.edge_identity` when
-`site == 1`.
+Return the prefix before `site`, or a [`FormalIdentity`](@ref) carrying the
+periodic cut space at the left edge. Throw [`StaleCacheError`](@ref) rather than
+contracting an invalid prefix implicitly.
 """
-function left_cache(v::PeriodicCache, site::Int)
-    _check_site(v, site)
-    site == 1 && return v.edge_identity
-    return v.left[site - 1]
+function left_cache_before(v::PeriodicCache, site::Int)
+    prefix = v.left[site]
+    prefix_end = site - 1
+    prefix_end <= v.left_valid_through || throw(StaleCacheError(
+        :left, prefix_end, v.left_valid_through
+    ))
+    return prefix
 end
 
 """
-    right_cache(v::PeriodicCache, site::Int)
+    right_cache_after(v::PeriodicCache, site::Int)
 
-Return `v[site+1] * ... * v[N]` in O(1), or `v.edge_identity` when
-`site == length(v)`.
+Return the suffix after `site`, or a [`FormalIdentity`](@ref) carrying the
+periodic cut space at the right edge. Throw [`StaleCacheError`](@ref) rather
+than contracting an invalid suffix implicitly.
 """
-function right_cache(v::PeriodicCache, site::Int)
-    _check_site(v, site)
-    site == length(v) && return v.edge_identity
-    return v.right[site]
+function right_cache_after(v::PeriodicCache, site::Int)
+    suffix = v.right[site]
+    site >= v.right_valid_from || throw(StaleCacheError(
+        :right, site, v.right_valid_from
+    ))
+    return suffix
 end
 
-"""
-    build_cache(v::AbstractPeriodicProduct) -> PeriodicCache
+function _append_product!(
+        destination::T,
+        prefix::FormalIdentity{T},
+        factor::T,
+    ) where {T}
+    compose_product(prefix, factor)
+    return copy!(destination, factor)
+end
 
-Build every non-full left prefix and right suffix of `v`. Construction uses
-`2N - 4` multiplications for `N > 1` and stores `2N - 2` tensors. Endpoint
-tensors are copied so later in-place cache updates never alias `v` itself.
-Product elements must support `copy`, `copy!`, and three-argument `mul!`.
-`mul!` returns the updated cache value: a representation may reuse the supplied
-destination or return a replacement when its internal space changes.
+_append_product!(destination::T, prefix::T, factor::T) where {T} =
+    mul!(destination, prefix, factor)
+
+function _prepend_product!(
+        destination::T,
+        factor::T,
+        suffix::FormalIdentity{T},
+    ) where {T}
+    compose_product(factor, suffix)
+    return copy!(destination, factor)
+end
+
+_prepend_product!(destination::T, factor::T, suffix::T) where {T} =
+    mul!(destination, factor, suffix)
+
 """
-function build_cache(v::AbstractPeriodicProduct)
+    build_cache(v::AbstractPeriodicProduct{T}) -> PeriodicCache{T,S}
+
+Build all site-aligned prefix and suffix segments. Construction uses
+`max(0, 2N - 4)` multiplications and stores `2N - 2` concrete factors plus two
+formal identities. Endpoint factors are copied so later in-place refresh
+does not alias product factors.
+"""
+function build_cache(v::AbstractPeriodicProduct{T}) where {T}
     N = length(v)
     N > 0 || throw(ArgumentError("cannot cache an empty periodic product"))
-    T = typeof(v[1])
-    left = Vector{T}(undef, N - 1)
-    right = Vector{T}(undef, N - 1)
+    space = edge_space(v)
+    left = prefix_products(v)
+    right = suffix_products(v)
 
-    if N > 1
-        left[1] = copy(v[1])
-        for k in 2:N-1
-            left[k] = left[k - 1] * v[k]
-        end
-
-        right[N - 1] = copy(v[N])
-        for k in N-2:-1:1
-            right[k] = v[k + 1] * right[k + 1]
-        end
-    end
-
-    return PeriodicCache(left, right, edge_identity(v))
+    return PeriodicCache{T,typeof(space)}(
+        left, right, N - 1, 1
+    )
 end
 
 """
     environment(v::PeriodicCache, site::Int)
 
-Return the product of every element except `v[site]`, in periodic order:
-
-    v[site+1] * ... * v[N] * v[1] * ... * v[site-1]
-
-The two partial products are O(1) lookups; an interior site needs one
-multiplication. Boundary sites return an existing cached half directly.
+Return the product of every factor except `site`, in periodic order. The method
+never repairs stale state: invalid halves throw [`StaleCacheError`](@ref).
 """
 function environment(v::PeriodicCache, site::Int)
-    _check_site(v, site)
-    length(v) == 1 && return v.edge_identity
-    site == 1 && return v.right[1]
-    site == length(v) && return v.left[end]
-    return v.right[site] * v.left[site - 1]
-end
-
-function _rebuild_left!(v::PeriodicCache, product::AbstractPeriodicProduct)
-    N = length(v)
-    N == 1 && return v
-    v.left[1] = copy!(v.left[1], product[1])
-    for k in 2:N-1
-        v.left[k] = mul!(v.left[k], v.left[k - 1], product[k])
-    end
-    return v
-end
-
-function _rebuild_right!(v::PeriodicCache, product::AbstractPeriodicProduct)
-    N = length(v)
-    N == 1 && return v
-    v.right[N - 1] = copy!(v.right[N - 1], product[N])
-    for k in N-2:-1:1
-        v.right[k] = mul!(v.right[k], product[k + 1], v.right[k + 1])
-    end
-    return v
-end
-
-function _validate_advance(v::PeriodicCache, st::SweepState)
-    N = length(v)
-    s = _check_site(v, st.site)
-    return N, s
-end
-
-"""
-    _requires_rebuild(v::PeriodicCache, st::SweepState) -> Bool
-
-Return whether advancing at `st` crosses a periodic boundary and therefore
-requires the opposite side of the cache to be rebuilt from a complete product.
-"""
-function _requires_rebuild(v::PeriodicCache, st::SweepState{Forward})
-    N, s = _validate_advance(v, st)
-    return N > 1 && s == N
-end
-
-function _requires_rebuild(v::PeriodicCache, st::SweepState{Backward})
-    N, s = _validate_advance(v, st)
-    return N > 1 && s == 1
-end
-
-"""
-    advance!(v::PeriodicCache, transfer, st::SweepState)
-
-Update the directional cache after the factor at `st.site` changes. `transfer`
-is the new factor itself, not a complete periodic product. This method handles
-ordinary movement and zigzag turns without retaining all source factors. A
-periodic boundary must instead use the complete-product overload.
-"""
-function advance!(v::PeriodicCache, transfer, st::SweepState{Forward})
-    N, s = _validate_advance(v, st)
-    N == 1 && return v
-    _requires_rebuild(v, st) && throw(ArgumentError(
-        "advancing across a periodic boundary requires a complete product"
-    ))
-
-    if s == 1
-        v.left[1] = copy!(v.left[1], transfer)
-    else
-        v.left[s] = mul!(v.left[s], v.left[s - 1], transfer)
-    end
-    return v
-end
-
-function advance!(v::PeriodicCache, transfer, st::SweepState{Backward})
-    N, s = _validate_advance(v, st)
-    N == 1 && return v
-    _requires_rebuild(v, st) && throw(ArgumentError(
-        "advancing across a periodic boundary requires a complete product"
-    ))
-
-    if s == N
-        v.right[N - 1] = copy!(v.right[N - 1], transfer)
-    else
-        v.right[s - 1] = mul!(v.right[s - 1], transfer, v.right[s])
-    end
-    return v
-end
-
-"""
-    advance!(v::PeriodicCache, product::AbstractPeriodicProduct, st::SweepState)
-
-Update a cache from a complete product. At ordinary sites only the changed
-factor is read. Crossing a periodic boundary rebuilds the opposite cache side.
-"""
-function advance!(
-        v::PeriodicCache,
-        product::AbstractPeriodicProduct,
-        st::SweepState{Forward},
-    )
-    length(product) == length(v) || throw(DimensionMismatch(
-        "cache has $(length(v)) sites but product has $(length(product))"
-    ))
-    _, s = _validate_advance(v, st)
-    if _requires_rebuild(v, st)
-        _rebuild_right!(v, product)
-        return v
-    end
-    return advance!(v, product[s], st)
-end
-
-
-function advance!(
-        v::PeriodicCache,
-        product::AbstractPeriodicProduct,
-        st::SweepState{Backward},
-    )
-    length(product) == length(v) || throw(DimensionMismatch(
-        "cache has $(length(v)) sites but product has $(length(product))"
-    ))
-    _, s = _validate_advance(v, st)
-    if _requires_rebuild(v, st)
-        _rebuild_left!(v, product)
-        return v
-    end
-    return advance!(v, product[s], st)
+    left = left_cache_before(v, site)
+    right = right_cache_after(v, site)
+    return compose_product(right, left)
 end

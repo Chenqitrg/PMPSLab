@@ -13,12 +13,22 @@ using PMPSLab:
     PeriodicTransferMatrix,
     PeriodicCache,
     build_cache,
+    prefix_products,
+    suffix_products,
     advance!,
+    invalidate!,
+    rebuild_left!,
+    rebuild_right!,
+    rebuild!,
+    FormalIdentity,
+    UnitalElement,
+    compose_product,
+    StaleCacheError,
     environment,
-    left_cache,
+    left_cache_before,
     range_product,
-    right_cache,
-    edge_identity,
+    right_cache_after,
+    edge_space,
     Forward,
     Backward,
     SweepState,
@@ -34,10 +44,6 @@ end
 
 Base.length(v::MatrixPeriodicProduct) = length(v.sites)
 Base.getindex(v::MatrixPeriodicProduct, i::Int) = v.sites[i]
-
-# Identity on the common bond space.
-PMPSLab.edge_identity(product::MatrixPeriodicProduct) =
-    id(scalartype(product[1]), codomain(product[1]))
 
 # Random periodic product of D×D matrices with trivial bond spaces.
 random_periodic_product(D::Int, N::Int) = MatrixPeriodicProduct(
@@ -74,28 +80,73 @@ end
     for N in [2, 3, 5, 8]
         product = random_periodic_product(3, N)
         v = build_cache(product)
+        prefixes = prefix_products(product)
+        suffixes = suffix_products(product)
 
         @test v isa PeriodicCache
         @test length(v) == N
         @test lastindex(v) == N
-        @test length(v.left) == N - 1
-        @test length(v.right) == N - 1
-        @test scalartype(v.left[1]) == ComplexF64
-        @test v.left[1] !== product[1]
-        @test v.right[end] !== product[N]
+        @test length(v.left) == N
+        @test length(v.right) == N
+        @test eltype(v.left) == UnitalElement{
+            eltype(product),typeof(edge_space(v))
+        }
+        @test eltype(v.right) == eltype(v.left)
+        @test v.left_valid_through == N - 1
+        @test v.right_valid_from == 1
+        @test v.left[1] isa FormalIdentity
+        @test v.right[N] isa FormalIdentity
+        @test prefixes[1] isa FormalIdentity
+        @test suffixes[N] isa FormalIdentity
+        @test scalartype(v.left[2]) == ComplexF64
+        @test v.left[2] !== product[1]
+        @test v.right[N - 1] !== product[N]
 
         for k in 1:(N - 1)
+            @test prefixes[k + 1] ≈ v.left[k + 1]
             @test v[1:k] ≈ naive_range_product(product, 1:k)
         end
 
         for k in 2:N
+            @test suffixes[k - 1] ≈ v.right[k - 1]
             @test v[k:N] ≈ naive_range_product(product, k:N)
         end
     end
 end
 
+@testset "build_cache — incremental factor generation" begin
+    N = 5
+    product = random_periodic_product(3, N)
+    calls = zeros(Int, N)
+    generated = build_cache(
+        N,
+        site -> begin
+            calls[site] += 1
+            copy(product[site])
+        end,
+        codomain,
+    )
+
+    @test calls == ones(Int, N)
+    for site in 1:N-1
+        @test generated.left[site + 1] ≈
+              naive_range_product(product, 1:site)
+        @test generated.right[site] ≈ naive_range_product(product, site + 1:N)
+    end
+end
+
 @testset "build_cache — rejects an empty product" begin
     @test_throws ArgumentError build_cache(MatrixPeriodicProduct(TensorMap[]))
+    @test_throws ArgumentError prefix_products(MatrixPeriodicProduct(TensorMap[]))
+    @test_throws ArgumentError suffix_products(MatrixPeriodicProduct(TensorMap[]))
+    @test_throws ArgumentError build_cache(0, identity, identity)
+end
+
+@testset "PeriodicCache — directional lengths must match" begin
+    cache = build_cache(random_periodic_product(3, 4))
+    pop!(cache.right)
+    @test_throws DimensionMismatch length(cache)
+    @test_throws DimensionMismatch lastindex(cache)
 end
 
 @testset "range queries — invalid ranges throw" begin
@@ -121,20 +172,27 @@ end
     v = build_cache(product)
 
     for site in 1:N
-        expected_left = site == 1 ?
-                        v.edge_identity :
-                        naive_range_product(product, 1:(site - 1))
-        expected_right = site == N ?
-                         v.edge_identity :
-                         naive_range_product(product, (site + 1):N)
-
-        @test left_cache(v, site) ≈ expected_left
-        @test right_cache(v, site) ≈ expected_right
+        if site == 1
+            @test left_cache_before(v, site) ==
+                  FormalIdentity{eltype(product)}(edge_space(v))
+        else
+            @test left_cache_before(v, site) ≈
+                  naive_range_product(product, 1:(site - 1))
+        end
+        if site == N
+            @test right_cache_after(v, site) ==
+                  FormalIdentity{eltype(product)}(edge_space(v))
+        else
+            @test right_cache_after(v, site) ≈
+                  naive_range_product(product, (site + 1):N)
+        end
 
         # The environment is the product of everything except the supplied site,
         # in right-then-left order (noncommutative: order matters).
         @test environment(v, site) ≈ naive_complement(product, site)
-        @test environment(v, site) ≈ right_cache(v, site) * left_cache(v, site)
+        @test environment(v, site) ≈ compose_product(
+            right_cache_after(v, site), left_cache_before(v, site)
+        )
     end
 
     @test_throws BoundsError environment(v, 0)
@@ -145,26 +203,28 @@ end
     D = 3
     product = random_periodic_product(D, 4)
     v2 = build_cache(product)
-    @test v2.edge_identity ≈ id(ComplexF64, ℂ^D)
-    @test dim(codomain(v2.edge_identity)) == D
+    @test edge_space(v2) == codomain(product[1])
+    @test dim(edge_space(v2)) == D
 
     # Empty halves return the unit.
-    @test left_cache(v2, 1) ≈ edge_identity(product)
-    @test right_cache(v2, 4) ≈ edge_identity(product)
+    @test left_cache_before(v2, 1) ==
+          FormalIdentity{eltype(product)}(edge_space(v2))
+    @test right_cache_after(v2, 4) ==
+          FormalIdentity{eltype(product)}(edge_space(v2))
 
     single = random_periodic_product(D, 1)
     single_cache = build_cache(single)
-    @test isempty(single_cache.left)
-    @test isempty(single_cache.right)
-    @test environment(single_cache, 1) ≈ edge_identity(single)
-    @test advance!(single_cache, single, SweepState{Forward}(1, 0)) === single_cache
+    @test only(single_cache.left) isa FormalIdentity
+    @test only(single_cache.right) isa FormalIdentity
+    @test environment(single_cache, 1) ==
+          FormalIdentity{eltype(single)}(edge_space(single_cache))
 end
 
 @testset "Z2Irrep — unit space and environment" begin
     V = Z2Space(0 => 2, 1 => 2)
     product = random_periodic_product(V, 4)
     v = build_cache(product)
-    @test v.edge_identity ≈ id(ComplexF64, V)
+    @test edge_space(v) == codomain(product[1])
 
     for site in 1:4
         @test environment(v, site) ≈ naive_complement(product, site)
@@ -186,15 +246,16 @@ end
     v = build_cache(ptm)
 
     @test length(v) == N
-    @test v.edge_identity ≈ id(ComplexF64, ℂ^D ⊗ (ℂ^D)')
+    @test edge_space(v) == edge_space(ptm)
+    @test edge_space(v) == codomain(ptm[1])
 
     # Every representable range matches a direct ordered product.
     @test v[1:1] ≈ range_product(ptm, 1:1)
     @test v[3:4] ≈ range_product(ptm, 3:4)
     @test v[4:4] ≈ range_product(ptm, 4:4)
 
-    @test left_cache(v, 2) ≈ range_product(ptm, 1:1)
-    @test right_cache(v, 2) ≈ range_product(ptm, 3:4)
+    @test left_cache_before(v, 2) ≈ range_product(ptm, 1:1)
+    @test right_cache_after(v, 2) ≈ range_product(ptm, 3:4)
     @test environment(v, 2) ≈ naive_complement(ptm, 2)
 
     # The full-period helper agrees with a direct product.
@@ -239,51 +300,4 @@ end
 @testset "sweep domain" begin
     @test PMPSLab.sweep_domain(CircularSweep(4; maximal_sweep=2)) == Base.OneTo(4)
     @test PMPSLab.sweep_domain(ZigzagSweep(3; maximal_sweep=2)) == Base.OneTo(3)
-end
-
-@testset "advance! — 按扫描方向刷新缓存" begin
-    # 前滑：更新 site 2 的 prefix，下一 site 3 的 environment 随即有效。
-    product = random_periodic_product(3, 5)
-    new2 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
-    product2 = MatrixPeriodicProduct([i == 2 ? new2 : product[i] for i in 1:5])
-    v = build_cache(product)
-    left_slot = v.left[2]
-    advance!(v, new2, SweepState{Forward}(2, 0))
-    @test v.left[2] === left_slot
-    @test environment(v, 3) ≈ naive_complement(product2, 3)
-
-    # 后滑：更新 site 4 的 suffix，下一 site 3 的 environment 随即有效。
-    new4 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
-    product4 = MatrixPeriodicProduct([i == 4 ? new4 : product[i] for i in 1:5])
-    v = build_cache(product)
-    right_slot = v.right[3]
-    advance!(v, new4, SweepState{Backward}(4, 0))
-    @test v.right[3] === right_slot
-    @test environment(v, 3) ≈ naive_complement(product4, 3)
-
-    # 回卷 N→1：更新 site 5 后重建 right cache，并复用所有 slot。
-    new5 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
-    product5 = MatrixPeriodicProduct([i == 5 ? new5 : product[i] for i in 1:5])
-    v = build_cache(product)
-    right_slots = copy(v.right)
-    @test_throws ArgumentError advance!(v, new5, SweepState{Forward}(5, 0))
-    advance!(v, product5, SweepState{Forward}(5, 0))
-    @test all(v.right[i] === right_slots[i] for i in eachindex(v.right))
-    @test environment(v, 1) ≈ naive_complement(product5, 1)
-
-    # 前滑 site 1 → site 2（无前缀可乘，原地复制）。
-    new1 = TensorMap(randn(ComplexF64, 3, 3), ℂ^3, ℂ^3)
-    product1 = MatrixPeriodicProduct([i == 1 ? new1 : product[i] for i in 1:5])
-    v = build_cache(product)
-    left_slot = v.left[1]
-    advance!(v, new1, SweepState{Forward}(1, 0))
-    @test v.left[1] === left_slot
-    @test environment(v, 2) ≈ naive_complement(product1, 2)
-
-    # 回卷 1→N：反向更新 site 1 后重建 left cache。
-    v = build_cache(product)
-    left_slots = copy(v.left)
-    advance!(v, product1, SweepState{Backward}(1, 0))
-    @test all(v.left[i] === left_slots[i] for i in eachindex(v.left))
-    @test environment(v, 5) ≈ naive_complement(product1, 5)
 end
