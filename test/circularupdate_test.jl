@@ -28,7 +28,7 @@ using TensorKit
 using MPSKit: PeriodicVector
 
 # Minimal periodic-product subtype for testing: a vector of square matrices.
-struct MatrixPeriodicProduct{T} <: AbstractPeriodicProduct
+struct MatrixPeriodicProduct{T} <: AbstractPeriodicProduct{T}
     sites::Vector{T}
 end
 

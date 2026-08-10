@@ -1,10 +1,10 @@
 # Collection of transfer matrices over one period.
-struct PeriodicTransferMatrix{T<:AbstractTransferMatrix} <: AbstractPeriodicProduct
+struct PeriodicTransferMatrix{T<:AbstractTransferMatrix} <:
+       AbstractPeriodicProduct{T}
     matrices::PeriodicVector{T}
 end
 
 Base.length(v::PeriodicTransferMatrix) = length(v.matrices)
-Base.eltype(::Type{<:PeriodicTransferMatrix{T}}) where {T} = T
 Base.parent(v::PeriodicTransferMatrix) = v.matrices
 Base.eachindex(v::PeriodicTransferMatrix) = eachindex(parent(v))
 Base.iterate(v::PeriodicTransferMatrix, state...) = iterate(parent(v), state...)

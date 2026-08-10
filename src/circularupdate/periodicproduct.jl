@@ -2,7 +2,19 @@
 # AbstractPeriodicProduct — ordered products with periodic indexing
 # ------------------------------------------------------------------------------
 
-abstract type AbstractPeriodicProduct end
+"""
+    AbstractPeriodicProduct{T}
+
+Ordered periodic collection whose factors have type `T`.
+
+Subtypes implement `length`, integer `getindex`, and `edge_identity`. Factor
+type `T` is closed under `*` and supports `copy`, `copy!`, and `mul!` for cache
+construction and refresh. The protocol is independent of any application-level
+factor representation.
+"""
+abstract type AbstractPeriodicProduct{T} end
+
+Base.eltype(::Type{<:AbstractPeriodicProduct{T}}) where {T} = T
 
 range_product(v::AbstractPeriodicProduct, r::AbstractUnitRange) =
     mapfoldl(i -> v[i], *, r)
