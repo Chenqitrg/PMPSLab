@@ -24,7 +24,7 @@ export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export DenseTransferMatrix, TruncatedTransferMatrix, PeriodicTransferMatrix
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
-export left_cache, right_cache, range_product, edge_identity
+export left_cache, right_cache, range_product, edge_space, edge_identity
 export FormalIdentity, UnitalElement, compose_product
 
 # Public API
