@@ -22,7 +22,7 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
     @test event isa SplitSiteCompleted
     @test event.log.state == SweepState{Forward}(1, 0)
     @test length(run.log.site_logs) == 1
-    @test run.context.cacheBB.left[1] ≈
+    @test run.context.cacheBB.left[2] ≈
           DenseTransferMatrix(run.context.mpsB[1])
     @test first(run.pending_iteration) == SweepState{Forward}(2, 0)
     @test !isfinished(run)

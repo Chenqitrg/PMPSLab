@@ -3,8 +3,9 @@
 #
 # The context owns mutable numerical working state but no sweep position.
 # `update!` performs one site's update in place from the supplied `SweepState`.
-# The sweep scheme supplies the visit order; the update rule itself is the
-# physics, filled in per algorithm.
+# The sweep scheme supplies the visit order. Caches track which derived products
+# remain valid and reject unsupported update/query sequences without performing
+# implicit tensor contractions.
 # ------------------------------------------------------------------------------
 
 # A site (2 physical legs) maps to two B sites (1 physical leg each):
@@ -30,9 +31,9 @@ function SplitContext(
         mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
         mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
     ) where {E,S}
-    cacheBB = build_cache(PeriodicTransferMatrix(mpsB, mpsB))
-    cacheAB = build_cache(PeriodicTransferMatrix(mpsB, mpsA))
-    expectationAA = expectation(PeriodicTransferMatrix(mpsA, mpsA))
+    cacheBB = build_cache(mpsB, mpsB)
+    cacheAB = build_cache(mpsB, mpsA)
+    expectationAA = expectation(mpsA, mpsA)
     return SplitContext(
         mpsA,
         mpsB,
@@ -63,39 +64,45 @@ end
 _pair_completed(st::SweepState{Forward}) = iseven(st.site)
 _pair_completed(st::SweepState{Backward}) = isodd(st.site)
 
-_pair_state(pa::Int, st::SweepState{D}) where {D} =
-    SweepState{D}(pa, st.n)
-
 """
     update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
 
-One site's update + directional cache refresh. Environment (O(1)) → update
-rule → write back the new B tensor → derive its transfer matrix → refresh the
-affected prefix or suffix entry.
+One site's update + validated directional cache refresh. An incomplete B pair
+only invalidates its mixed AB factor; completing the pair constructs that factor
+once and advances the AB cache. Unsupported visit orders fail with
+`StaleCacheError` instead of triggering extra contractions or returning stale
+environments.
 """
-function update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
+function update!(
+        ctx::SplitContext,
+        solve::AbstractSolve,
+        st::SweepState{D},
+    ) where {D}
     new, cost = solvenew(ctx, solve, st)
     ctx.mpsB[st.site] = new
+
     if _requires_rebuild(ctx.cacheBB, st)
-        advance!(ctx.cacheBB, PeriodicTransferMatrix(ctx.mpsB, ctx.mpsB), st)
-    else
-        advance!(ctx.cacheBB, DenseTransferMatrix(new), st)
-    end
-    if _pair_completed(st)
-        pa = pa_from_pb(st.site)
-        transfer_state = _pair_state(pa, st)
-        if _requires_rebuild(ctx.cacheAB, transfer_state)
-            advance!(
-                ctx.cacheAB,
-                PeriodicTransferMatrix(ctx.mpsB, ctx.mpsA),
-                transfer_state,
-            )
+        if D === Forward
+            rebuild_right!(ctx.cacheBB, ctx.mpsB, ctx.mpsB)
+            rebuild_right!(ctx.cacheAB, ctx.mpsB, ctx.mpsA)
         else
-            transfer = DenseTransferMatrix(
-                ctx.mpsB[2 * pa - 1], ctx.mpsB[2 * pa], ctx.mpsA[pa]
-            )
-            advance!(ctx.cacheAB, transfer, transfer_state)
+            rebuild_left!(ctx.cacheBB, ctx.mpsB, ctx.mpsB)
+            rebuild_left!(ctx.cacheAB, ctx.mpsB, ctx.mpsA)
         end
+        return new, cost
+    end
+
+    bb_transfer = transfer_at(ctx.mpsB, ctx.mpsB, st.site)
+    advance!(ctx.cacheBB, bb_transfer, st)
+
+    pa = pa_from_pb(st.site)
+    if _pair_completed(st)
+        pair_state = SweepState{D}(pa, st.n)
+        ab_transfer = transfer_at(ctx.mpsB, ctx.mpsA, pa)
+        advance!(ctx.cacheAB, ab_transfer, pair_state)
+    else
+        # Avoid constructing the mixed transfer until both B sites are current.
+        invalidate!(ctx.cacheAB, pa)
     end
     return new, cost
 end

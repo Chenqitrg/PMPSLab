@@ -28,6 +28,7 @@ using PMPSLab:
     DenseTransferMatrix,
     TruncatedTransferMatrix,
     PeriodicTransferMatrix,
+    StaleCacheError,
     environment,
     squared_distance,
     LUSolve,
