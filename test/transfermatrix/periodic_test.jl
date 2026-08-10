@@ -85,7 +85,7 @@ end
     replacement = TruncatedTransferMatrix(
         rank_one.u, rank_one.s, rank_one.vᴴ, trunc
     )
-    advance!(cache, replacement, SweepState(1, 1, 0))
+    advance!(cache, replacement, SweepState{Forward}(1, 0))
     @test cache.left[1] !== left_slot
     @test dense(cache.left[1]) ≈ dense(replacement)
 

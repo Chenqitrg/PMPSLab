@@ -23,6 +23,7 @@ using PMPSLab:
     restore_run,
     ZigzagSweep,
     CircularSweep,
+    Forward,
     SweepState,
     DenseTransferMatrix,
     TruncatedTransferMatrix,

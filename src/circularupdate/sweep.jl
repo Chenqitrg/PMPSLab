@@ -3,11 +3,11 @@
 #
 # Each scheme is an iterator yielding `SweepState` values:
 #   site — the position to update next
-#   dir  — the scan direction (+1/-1) after the update
+#   type — the scan direction after the update
 #   n    — completed lap count (internal stop-check)
 #
-# Iteration state is an immutable `SweepState`, separate from the container,
-# so the same scheme can be iterated repeatedly from the start.
+# Iteration state is a monotonic integer cursor. A yielded `SweepState` is
+# derived from that cursor and never reused as mutable control state.
 # ------------------------------------------------------------------------------
 
 # AbstractSweep defined in split/interface.jl
@@ -33,13 +33,17 @@ end
     ZigzagSweep(N; maximal_sweep)
 
 Yields sites `1, 2, …, N, N-1, …, 2` per round trip, repeating up to
-`maximal_sweep` trips. The turn at `N` flips `dir` to -1.
+`maximal_sweep` trips. At least two sites are required; a one-site system has
+no zigzag direction and should use [`CircularSweep`](@ref).
 """
 struct ZigzagSweep <: AbstractSweep
     N::Int
     maximal_sweep::Int
     function ZigzagSweep(N::Int, maximal_sweep::Int)
-        N > 0 || throw(ArgumentError("sweep length must be positive, got $N"))
+        N >= 2 || throw(ArgumentError(
+            "ZigzagSweep requires at least two sites, got $N; " *
+            "use CircularSweep for a one-site sweep"
+        ))
         maximal_sweep >= 0 || throw(ArgumentError(
             "maximal_sweep must be non-negative, got $maximal_sweep"
         ))
@@ -54,28 +58,18 @@ Base.IteratorSize(::Type{<:ZigzagSweep}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:ZigzagSweep}) = Base.HasEltype()
 Base.eltype(::Type{<:ZigzagSweep}) = SweepState
 
-function Base.length(z::ZigzagSweep)
-    z.N == 1 && return z.maximal_sweep
-    return (2z.N - 2) * z.maximal_sweep
-end
+Base.length(z::ZigzagSweep) = (2z.N - 2) * z.maximal_sweep
 
-function Base.iterate(z::ZigzagSweep, st::SweepState = SweepState(1, 1, 0))
-    st.n >= z.maximal_sweep && return nothing
-    site, dir, n = st.site, st.dir, st.n
-    if z.N == 1
-        return (SweepState(1, 1, n), SweepState(1, 1, n + 1))
-    end
-    if site == z.N && dir == 1
-        # 峰值：掉头，扫描方向翻为 -1
-        return (SweepState(site, -1, n), SweepState(z.N - 1, -1, n))
-    elseif site == 2 && dir == -1
-        # 一趟结束（不重访 site 1）
-        return (SweepState(site, dir, n), SweepState(1, 1, n + 1))
-    elseif dir == 1
-        return (SweepState(site, dir, n), SweepState(site + 1, 1, n))
-    else
-        return (SweepState(site, dir, n), SweepState(site - 1, -1, n))
-    end
+Base.iterate(z::ZigzagSweep) = iterate(z, 0)
+
+function Base.iterate(z::ZigzagSweep, step::Int)
+    step == length(z) && return nothing
+    period = 2z.N - 2
+    n, phase = divrem(step, period)
+    state = phase < z.N - 1 ?
+        SweepState{Forward}(phase + 1, n) :
+        SweepState{Backward}(period - phase + 1, n)
+    return state, step + 1
 end
 
 # ---------------------------------------------------------------------------
@@ -108,9 +102,10 @@ Base.IteratorEltype(::Type{<:CircularSweep}) = Base.HasEltype()
 Base.eltype(::Type{<:CircularSweep}) = SweepState
 Base.length(cs::CircularSweep) = cs.N * cs.maximal_sweep
 
-function Base.iterate(cs::CircularSweep, st::SweepState = SweepState(1, 1, 0))
-    st.n >= cs.maximal_sweep && return nothing
-    next_site = mod1(st.site + 1, cs.N)
-    next_n = next_site == 1 ? st.n + 1 : st.n
-    return (st, SweepState(next_site, 1, next_n))
+Base.iterate(cs::CircularSweep) = iterate(cs, 0)
+
+function Base.iterate(cs::CircularSweep, step::Int)
+    step == length(cs) && return nothing
+    n, phase = divrem(step, cs.N)
+    return SweepState{Forward}(phase + 1, n), step + 1
 end

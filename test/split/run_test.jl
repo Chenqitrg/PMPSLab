@@ -13,18 +13,18 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
     @test run.context isa SplitContext
     @test !hasproperty(run, :target)
     @test !isfinished(run)
-    @test first(run.pending_iteration) == SweepState(1, 1, 0)
-    @test last(run.pending_iteration) == SweepState(2, 1, 0)
+    @test first(run.pending_iteration) == SweepState{Forward}(1, 0)
+    @test last(run.pending_iteration) == 1
     @test isempty(run.log.site_logs)
     @test_throws ArgumentError run_result(run)
 
     event = step!(run)
     @test event isa SplitSiteCompleted
-    @test event.log.state == SweepState(1, 1, 0)
+    @test event.log.state == SweepState{Forward}(1, 0)
     @test length(run.log.site_logs) == 1
     @test run.context.cacheBB.left[1] ≈
           DenseTransferMatrix(run.context.mpsB[1])
-    @test first(run.pending_iteration) == SweepState(2, 1, 0)
+    @test first(run.pending_iteration) == SweepState{Forward}(2, 0)
     @test !isfinished(run)
 
     while !isfinished(run)
@@ -64,7 +64,7 @@ end
     for sweep in (
             CircularSweep(1; maximal_sweep=1),
             CircularSweep(5; maximal_sweep=1),
-            ZigzagSweep(1; maximal_sweep=0),
+            ZigzagSweep(3; maximal_sweep=0),
         )
         algorithm = PeriodicSplit(SVDAnsatz(), sweep, CholeskySolve())
         @test_throws DimensionMismatch initialize_run(mpsA, algorithm)

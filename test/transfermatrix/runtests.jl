@@ -14,6 +14,7 @@ using PMPSLab:
     PeriodicTransferMatrix,
     build_cache,
     advance!,
+    Forward,
     SweepState,
     edge_identity,
     expectation,

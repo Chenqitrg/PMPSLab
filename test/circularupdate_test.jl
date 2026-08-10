@@ -19,6 +19,8 @@ using PMPSLab:
     range_product,
     right_cache,
     edge_identity,
+    Forward,
+    Backward,
     SweepState,
     ZigzagSweep,
     CircularSweep
@@ -155,7 +157,7 @@ end
     @test isempty(single_cache.left)
     @test isempty(single_cache.right)
     @test environment(single_cache, 1) ≈ edge_identity(single)
-    @test advance!(single_cache, single, SweepState(1, 1, 0)) === single_cache
+    @test advance!(single_cache, single, SweepState{Forward}(1, 0)) === single_cache
 end
 
 @testset "Z2Irrep — unit space and environment" begin
@@ -203,29 +205,32 @@ end
     # 1, 2, …, N, N-1, …, 2（不重复访问 1）
     @test collect(st.site for st in ZigzagSweep(4; maximal_sweep=1)) == [1, 2, 3, 4, 3, 2]
     @test collect(st.site for st in ZigzagSweep(5; maximal_sweep=1)) == [1, 2, 3, 4, 5, 4, 3, 2]
-    # 掉头处 dir 变号：前滑 +1，掉头后 -1
-    @test collect(st.dir for st in ZigzagSweep(4; maximal_sweep=1)) == [1, 1, 1, -1, -1, -1]
-    # N = 1 只访问一次
-    @test collect(st.site for st in ZigzagSweep(1; maximal_sweep=1)) == [1]
+    # 掉头处状态类型由 Forward 变为 Backward
+    states = collect(ZigzagSweep(4; maximal_sweep=1))
+    @test map(st -> st isa SweepState{Forward}, states) ==
+          [true, true, true, false, false, false]
     # 多趟：maximal_sweep=2 重复两趟
     @test collect(st.site for st in ZigzagSweep(3; maximal_sweep=2)) ==
           [1, 2, 3, 2, 1, 2, 3, 2]
-    @test collect(st.site for st in ZigzagSweep(1; maximal_sweep=3)) == [1, 1, 1]
+    @test collect(st.site for st in ZigzagSweep(2; maximal_sweep=2)) ==
+          [1, 2, 1, 2]
 end
 
 @testset "CircularSweep — 循环与最大趟数" begin
     cs = CircularSweep(4; maximal_sweep = 2)
     @test collect(st.site for st in cs) == [1, 2, 3, 4, 1, 2, 3, 4]
-    # 单向循环：dir 恒为 +1
-    @test all(st.dir == 1 for st in CircularSweep(4; maximal_sweep = 2))
+    # 单向循环：状态类型恒为 Forward
+    @test all(st isa SweepState{Forward} for st in CircularSweep(4; maximal_sweep = 2))
     # 一趟 N 个 site
     @test length(collect(CircularSweep(3; maximal_sweep = 1))) == 3
     @test length(collect(CircularSweep(1; maximal_sweep = 3))) == 3
 end
 
 @testset "sweep constructors validate their configuration" begin
+    @test_throws ArgumentError ZigzagSweep(0; maximal_sweep=1)
+    @test_throws ArgumentError ZigzagSweep(1; maximal_sweep=1)
+    @test_throws ArgumentError CircularSweep(0; maximal_sweep=1)
     for Sweep in (ZigzagSweep, CircularSweep)
-        @test_throws ArgumentError Sweep(0; maximal_sweep=1)
         @test_throws ArgumentError Sweep(2; maximal_sweep=-1)
         @test isempty(collect(Sweep(2; maximal_sweep=0)))
     end
@@ -243,7 +248,7 @@ end
     product2 = MatrixPeriodicProduct([i == 2 ? new2 : product[i] for i in 1:5])
     v = build_cache(product)
     left_slot = v.left[2]
-    advance!(v, new2, SweepState(2, 1, 0))
+    advance!(v, new2, SweepState{Forward}(2, 0))
     @test v.left[2] === left_slot
     @test environment(v, 3) ≈ naive_complement(product2, 3)
 
@@ -252,7 +257,7 @@ end
     product4 = MatrixPeriodicProduct([i == 4 ? new4 : product[i] for i in 1:5])
     v = build_cache(product)
     right_slot = v.right[3]
-    advance!(v, new4, SweepState(4, -1, 0))
+    advance!(v, new4, SweepState{Backward}(4, 0))
     @test v.right[3] === right_slot
     @test environment(v, 3) ≈ naive_complement(product4, 3)
 
@@ -261,8 +266,8 @@ end
     product5 = MatrixPeriodicProduct([i == 5 ? new5 : product[i] for i in 1:5])
     v = build_cache(product)
     right_slots = copy(v.right)
-    @test_throws ArgumentError advance!(v, new5, SweepState(5, 1, 0))
-    advance!(v, product5, SweepState(5, 1, 0))
+    @test_throws ArgumentError advance!(v, new5, SweepState{Forward}(5, 0))
+    advance!(v, product5, SweepState{Forward}(5, 0))
     @test all(v.right[i] === right_slots[i] for i in eachindex(v.right))
     @test environment(v, 1) ≈ naive_complement(product5, 1)
 
@@ -271,14 +276,14 @@ end
     product1 = MatrixPeriodicProduct([i == 1 ? new1 : product[i] for i in 1:5])
     v = build_cache(product)
     left_slot = v.left[1]
-    advance!(v, new1, SweepState(1, 1, 0))
+    advance!(v, new1, SweepState{Forward}(1, 0))
     @test v.left[1] === left_slot
     @test environment(v, 2) ≈ naive_complement(product1, 2)
 
     # 回卷 1→N：反向更新 site 1 后重建 left cache。
     v = build_cache(product)
     left_slots = copy(v.left)
-    advance!(v, product1, SweepState(1, -1, 0))
+    advance!(v, product1, SweepState{Backward}(1, 0))
     @test all(v.left[i] === left_slots[i] for i in eachindex(v.left))
     @test environment(v, 5) ≈ naive_complement(product1, 5)
 end

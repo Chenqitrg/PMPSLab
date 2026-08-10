@@ -5,6 +5,11 @@ Mutable execution state for a [`PeriodicSplit`](@ref). `context` owns the
 numerical working state, while the run owns the algorithm, sweep cursor,
 and progress log.
 """
+const SplitPendingIteration = Union{
+    Nothing,
+    Tuple{SweepState,Int},
+}
+
 mutable struct SplitRun{A<:PeriodicSplit,C<:SplitContext,P} <: AbstractAlgorithmRun
     algorithm::A
     context::C
@@ -49,7 +54,7 @@ function initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
     context = SplitContext(mps, approximation)
     pending_iteration = iterate(algorithm.sweep)
     return SplitRun{
-        typeof(algorithm),typeof(context),typeof(pending_iteration)
+        typeof(algorithm),typeof(context),SplitPendingIteration
     }(
         algorithm,
         context,
@@ -113,7 +118,7 @@ function restore_run(
     context = SplitContext(mpsA, mpsB)
     pending_iteration = saved.pending_iteration
     return SplitRun{
-        typeof(algorithm),typeof(context),typeof(pending_iteration)
+        typeof(algorithm),typeof(context),SplitPendingIteration
     }(
         algorithm,
         context,

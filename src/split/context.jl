@@ -60,6 +60,12 @@ function solvenew(ctx::SplitContext, alg::AbstractSolve, st::SweepState)
     return transpose(x1, ((2, 1), (3,))), cost    # back to (V_left ⊗ P ← V_right)
 end
 
+_pair_completed(st::SweepState{Forward}) = iseven(st.site)
+_pair_completed(st::SweepState{Backward}) = isodd(st.site)
+
+_pair_state(pa::Int, st::SweepState{D}) where {D} =
+    SweepState{D}(pa, st.n)
+
 """
     update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
 
@@ -75,9 +81,9 @@ function update!(ctx::SplitContext, solve::AbstractSolve, st::SweepState)
     else
         advance!(ctx.cacheBB, DenseTransferMatrix(new), st)
     end
-    if (st.dir == 1 && iseven(st.site)) || (st.dir == -1 && isodd(st.site))
+    if _pair_completed(st)
         pa = pa_from_pb(st.site)
-        transfer_state = SweepState(pa, st.dir, st.n)
+        transfer_state = _pair_state(pa, st)
         if _requires_rebuild(ctx.cacheAB, transfer_state)
             advance!(
                 ctx.cacheAB,

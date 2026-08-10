@@ -11,10 +11,12 @@ struct SiteLog{S,E}
     time::Float64
     observable::E
 end
-SiteLog(state, error::Real, time::Real) =
+SiteLog(state::S, error::Real, time::Real) where {S} =
     SiteLog(state, Float64(error), Float64(time), nothing)
-SiteLog(state, error::Real, time::Real, observable) =
-    SiteLog{typeof(state),typeof(observable)}(
+SiteLog(
+    state::S, error::Real, time::Real, observable::E
+) where {S,E} =
+    SiteLog{S,E}(
         state, Float64(error), Float64(time), observable
     )
 
@@ -28,4 +30,5 @@ SweepLog{T}() where {T} = SweepLog{T}(T[], 0.0, false)
 SweepLog(site_logs::Vector{T}, sweep_time::Real, converged::Bool) where {T} =
     SweepLog{T}(site_logs, Float64(sweep_time), converged)
 
-const SplitLog = SweepLog{SiteLog{SweepState,Nothing}}
+const SplitSiteLog = SiteLog{S,Nothing} where {S<:SweepState}
+const SplitLog = SweepLog{SplitSiteLog}
