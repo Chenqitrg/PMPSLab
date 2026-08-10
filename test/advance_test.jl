@@ -109,3 +109,39 @@ end
         repeated, newer2, SweepState{Forward}(0, 0)
     )
 end
+
+@testset "directional rebuild — direct element generation" begin
+    N, D = 4, 3
+    product = random_periodic_product(D, N)
+    cache = build_cache(product)
+
+    new4 = TensorMap(randn(ComplexF64, D, D), ℂ^D, ℂ^D)
+    after4 = MatrixPeriodicProduct([
+        product[1], product[2], product[3], new4,
+    ])
+    right_calls = zeros(Int, N)
+    @test rebuild_right!(
+        cache,
+        site -> begin
+            right_calls[site] += 1
+            copy(after4[site])
+        end,
+    ) === cache
+    @test right_calls == [0, 1, 1, 1]
+    @test environment(cache, 1) ≈ naive_complement(after4, 1)
+
+    new1 = TensorMap(randn(ComplexF64, D, D), ℂ^D, ℂ^D)
+    after1 = MatrixPeriodicProduct([
+        new1, product[2], product[3], new4,
+    ])
+    left_calls = zeros(Int, N)
+    @test rebuild_left!(
+        cache,
+        site -> begin
+            left_calls[site] += 1
+            copy(after1[site])
+        end,
+    ) === cache
+    @test left_calls == [1, 1, 1, 0]
+    @test environment(cache, N) ≈ naive_complement(after1, N)
+end

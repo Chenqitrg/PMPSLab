@@ -15,21 +15,31 @@ end
 
 """
     rebuild_left!(v::PeriodicCache{T}, product::AbstractPeriodicProduct{T})
+    rebuild_left!(v::PeriodicCache{T}, product_element_at)
 
 Explicitly rebuild every non-full prefix from a complete current product.
+The callable overload generates each required product element exactly once and
+does not materialize an `AbstractPeriodicProduct`.
 """
 function rebuild_left!(
         v::PeriodicCache{T},
         product::AbstractPeriodicProduct{T},
     ) where {T}
     _validate_product(v, product)
+    return rebuild_left!(v, site -> product[site])
+end
+
+function rebuild_left!(
+        v::PeriodicCache{T},
+        product_element_at,
+    ) where {T}
     N = length(v)
     v.left_valid_through = 0
     for site in 1:N-1
         slot = site + 1
         prefix = left_cache_before(v, site)
         v.left[slot] = _append_product!(
-            v.left[slot], prefix, product[site]
+            v.left[slot], prefix, product_element_at(site)
         )
         v.left_valid_through = site
     end
@@ -38,21 +48,31 @@ end
 
 """
     rebuild_right!(v::PeriodicCache{T}, product::AbstractPeriodicProduct{T})
+    rebuild_right!(v::PeriodicCache{T}, product_element_at)
 
 Explicitly rebuild every non-full suffix from a complete current product.
+The callable overload generates each required product element exactly once and
+does not materialize an `AbstractPeriodicProduct`.
 """
 function rebuild_right!(
         v::PeriodicCache{T},
         product::AbstractPeriodicProduct{T},
     ) where {T}
     _validate_product(v, product)
+    return rebuild_right!(v, site -> product[site])
+end
+
+function rebuild_right!(
+        v::PeriodicCache{T},
+        product_element_at,
+    ) where {T}
     N = length(v)
     v.right_valid_from = N
     for site in N:-1:2
         slot = site - 1
         suffix = right_cache_after(v, site)
         v.right[slot] = _prepend_product!(
-            v.right[slot], product[site], suffix
+            v.right[slot], product_element_at(site), suffix
         )
         v.right_valid_from = slot
     end

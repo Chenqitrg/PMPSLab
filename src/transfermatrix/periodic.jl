@@ -145,6 +145,92 @@ end
 build_cache(mps::PeriodicMPS, trunc::TruncationStrategy) =
     build_cache(mps, mps, trunc)
 
+"""
+    rebuild_left!(cache, bra::PeriodicMPS, ket::PeriodicMPS)
+    rebuild_right!(cache, bra::PeriodicMPS, ket::PeriodicMPS)
+    rebuild_left!(cache, bra::PeriodicMPS, ket::PeriodicMPS, trunc)
+    rebuild_right!(cache, bra::PeriodicMPS, ket::PeriodicMPS, trunc)
+    rebuild!(cache, bra::PeriodicMPS, ket::PeriodicMPS)
+    rebuild!(cache, bra::PeriodicMPS, ket::PeriodicMPS, trunc)
+
+Rebuild one or both cache directions directly from generated transfer elements
+without materializing a [`PeriodicTransferMatrix`](@ref).
+"""
+function rebuild_left!(
+        cache::PeriodicCache,
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+    )
+    N = _transfer_period_length(bra, ket)
+    N == length(cache) || throw(DimensionMismatch(
+        "cache has $(length(cache)) sites but transfer product has $N"
+    ))
+    product_element_at(site::Int) = transfer_at(bra, ket, site)
+    return rebuild_left!(cache, product_element_at)
+end
+
+function rebuild_right!(
+        cache::PeriodicCache,
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+    )
+    N = _transfer_period_length(bra, ket)
+    N == length(cache) || throw(DimensionMismatch(
+        "cache has $(length(cache)) sites but transfer product has $N"
+    ))
+    product_element_at(site::Int) = transfer_at(bra, ket, site)
+    return rebuild_right!(cache, product_element_at)
+end
+
+function rebuild_left!(
+        cache::PeriodicCache,
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+        trunc::TruncationStrategy,
+    )
+    N = _transfer_period_length(bra, ket)
+    N == length(cache) || throw(DimensionMismatch(
+        "cache has $(length(cache)) sites but transfer product has $N"
+    ))
+    product_element_at(site::Int) = transfer_at(bra, ket, site, trunc)
+    return rebuild_left!(cache, product_element_at)
+end
+
+function rebuild_right!(
+        cache::PeriodicCache,
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+        trunc::TruncationStrategy,
+    )
+    N = _transfer_period_length(bra, ket)
+    N == length(cache) || throw(DimensionMismatch(
+        "cache has $(length(cache)) sites but transfer product has $N"
+    ))
+    product_element_at(site::Int) = transfer_at(bra, ket, site, trunc)
+    return rebuild_right!(cache, product_element_at)
+end
+
+function rebuild!(
+        cache::PeriodicCache,
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+    )
+    rebuild_left!(cache, bra, ket)
+    rebuild_right!(cache, bra, ket)
+    return cache
+end
+
+function rebuild!(
+        cache::PeriodicCache,
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+        trunc::TruncationStrategy,
+    )
+    rebuild_left!(cache, bra, ket, trunc)
+    rebuild_right!(cache, bra, ket, trunc)
+    return cache
+end
+
 # Full-period product E₁ * E₂ * ... * E_N
 Base.:*(ptm::PeriodicTransferMatrix) = range_product(ptm, eachindex(ptm))
 

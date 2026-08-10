@@ -41,6 +41,9 @@ end
         direct.right[i] ≈ materialized.right[i]
         for i in 1:(length(direct.right) - 1)
     )
+    @test rebuild_left!(materialized, bra, ket) === materialized
+    @test rebuild_right!(materialized, bra, ket) === materialized
+    @test rebuild!(materialized, bra, ket) === materialized
 end
 
 @testset "PeriodicTransferMatrix — mismatched periods throw" begin
@@ -102,6 +105,9 @@ end
         dense(direct.left[i]) ≈ dense(cache.left[i])
         for i in 2:length(cache.left)
     )
+    @test rebuild_left!(direct, bra, ket, trunc) === direct
+    @test rebuild_right!(direct, bra, ket, trunc) === direct
+    @test rebuild!(direct, bra, ket, trunc) === direct
 
     left_slot = cache.left[2]
     rank_one = TruncatedTransferMatrix(
