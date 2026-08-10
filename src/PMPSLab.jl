@@ -25,6 +25,7 @@ export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export DenseTransferMatrix, TruncatedTransferMatrix, PeriodicTransferMatrix
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
 export left_cache, right_cache, range_product, edge_identity
+export FormalIdentity, UnitalElement, compose_product
 
 # Public API
 export gaugefix!, assertconsistency, dense, pair_contraction, split
@@ -46,6 +47,7 @@ include("mps/cdl.jl")
 include("mps/contraction.jl")
 include("mps/lift.jl")
 include("circularupdate/periodicproduct.jl")
+include("circularupdate/formalidentity.jl")
 include("logs.jl")
 include("circularupdate/cache.jl")
 include("transfermatrix/dense.jl")
