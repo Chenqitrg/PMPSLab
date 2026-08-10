@@ -84,6 +84,7 @@ end
         for i in eachindex(ptm)
     )
     @test dense(transfer_at(bra, ket, 2, trunc)) ≈ dense(ptm[2])
+    @test expectation(bra, ket, trunc) ≈ expectation(ptm)
 
     identity_transfer = edge_identity(ptm)
     @test identity_transfer isa FormalIdentity{eltype(ptm)}
@@ -115,6 +116,7 @@ end
 
     self_ptm = PeriodicTransferMatrix(ket, trunc)
     @test all(transfer -> transfer isa TruncatedTransferMatrix, self_ptm)
+    @test expectation(ket, trunc) ≈ expectation(self_ptm)
 end
 
 @testset "PeriodicTransferMatrix — truncated mixed construction" begin
@@ -160,9 +162,11 @@ end
     E1, E2, E3 = ptm[1], ptm[2], ptm[3]
     @test *(ptm) ≈ E1 * E2 * E3
     @test expectation(ptm) ≈ overlap(mps, mps)
+    @test expectation(mps) ≈ expectation(ptm)
 
     ket = random_mps(ComplexF64, N, d, D)
     @test expectation(PeriodicTransferMatrix(mps, ket)) ≈ overlap(mps, ket)
+    @test expectation(mps, ket) ≈ overlap(mps, ket)
 end
 
 @testset "full-period product and expectation — one_mps analytic" begin
@@ -170,6 +174,7 @@ end
     mps = one_mps(ComplexF64, N, d, D)
     ptm = PeriodicTransferMatrix(mps)
     @test expectation(ptm) ≈ d^N * D^(2N)
+    @test expectation(mps) ≈ expectation(ptm)
 end
 
 @testset "full-period product and expectation — 2-site MPS" begin
@@ -179,6 +184,7 @@ end
 
     @test length(ptm) == N
     @test expectation(ptm) ≈ overlap(mps, mps)
+    @test expectation(mps) ≈ expectation(ptm)
     @test *(ptm) ≈ ptm[1] * ptm[2]
 end
 
@@ -189,6 +195,7 @@ end
     ptm = PeriodicTransferMatrix(mpsA, mpsB)
 
     @test expectation(ptm) ≈ overlap(mpsA, mpsB)
+    @test expectation(mpsA, mpsB) ≈ expectation(ptm)
 end
 
 @testset "expectation — Z2-graded spaces" begin

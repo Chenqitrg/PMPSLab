@@ -37,6 +37,7 @@ export initialize_run, step!, isfinished, run_result, snapshot, restore_run
 export write_checkpoint, read_checkpoint
 export start_run, start_run!, pause!, resume!, cancel!, run_status
 export squared_norm, squared_distance, diff_norm
+export expectation
 export random_mps, one_mps, random_mps2, one_mps2, random_cdl, random_cdl_mps, lift
 export SweepDirection, Forward, Backward, SweepState
 export AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, SplitContext, update!

@@ -150,5 +150,39 @@ Base.:*(ptm::PeriodicTransferMatrix) = range_product(ptm, eachindex(ptm))
 
 expectation(ptm::PeriodicTransferMatrix) = tr(dense(*(ptm)))
 
+"""
+    expectation(bra::PeriodicMPS, ket::PeriodicMPS)
+    expectation(bra::PeriodicMPS, ket::PeriodicMPS, trunc)
+
+Contract transfer elements one site at a time without materializing a
+[`PeriodicTransferMatrix`](@ref). Each site transfer is constructed exactly once.
+"""
+function expectation(bra::PeriodicMPS, ket::PeriodicMPS)
+    N = _transfer_period_length(bra, ket)
+    product = transfer_at(bra, ket, 1)
+    for site in 2:N
+        product = product * transfer_at(bra, ket, site)
+    end
+    return tr(dense(product))
+end
+
+expectation(mps::PeriodicMPS) = expectation(mps, mps)
+
+function expectation(
+        bra::PeriodicMPS,
+        ket::PeriodicMPS,
+        trunc::TruncationStrategy,
+    )
+    N = _transfer_period_length(bra, ket)
+    product = transfer_at(bra, ket, 1, trunc)
+    for site in 2:N
+        product = product * transfer_at(bra, ket, site, trunc)
+    end
+    return tr(dense(product))
+end
+
+expectation(mps::PeriodicMPS, trunc::TruncationStrategy) =
+    expectation(mps, mps, trunc)
+
 TensorKit.dot(bra::PeriodicMPS, ket::PeriodicMPS) =
-    expectation(PeriodicTransferMatrix(bra, ket))
+    expectation(bra, ket)
