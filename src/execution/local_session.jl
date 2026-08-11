@@ -108,7 +108,7 @@ function _drive_local_session!(session::LocalRunSession)
         end
     catch err
         lock(session.lock) do
-            session.failure = (err, catch_backtrace())
+            session.failure = CapturedException(err, catch_backtrace())
             session.status = LOCAL_FAILED
         end
         return session
@@ -166,4 +166,24 @@ function run_result(session::LocalRunSession)
         "local run has not completed; current status is $(run_status(session))"
     ))
     return run_result(session.run)
+end
+
+"""
+    fetch(session::LocalRunSession)
+
+Wait for the current driver task and return the completed algorithm result. A
+failed run throws its captured exception with the original worker backtrace;
+any nonterminal or controlled stop is rejected with its current status.
+"""
+function Base.fetch(session::LocalRunSession)
+    wait(session)
+    status, failure = lock(session.lock) do
+        session.status, session.failure
+    end
+
+    status == LOCAL_COMPLETED && return run_result(session.run)
+    status == LOCAL_FAILED && throw(failure)
+    throw(ArgumentError(
+        "local run did not complete; current status is $status"
+    ))
 end

@@ -482,6 +482,14 @@ pause_and_checkpoint!(session, "split.jld2")
 cancel_and_checkpoint!(session, "cancelled-split.jld2")
 ```
 
+`wait(session)` reports no interpretation of why the driver stopped; callers
+inspect `run_status(session)` afterward. `fetch(session)` waits and returns the
+algorithm result only for `LOCAL_COMPLETED`, throws the captured worker failure
+for `LOCAL_FAILED`, and rejects paused or cancelled states. Durable helpers
+return `LOCAL_CHECKPOINT_WRITTEN`; when completion wins a cancellation race,
+`cancel_and_checkpoint!` instead returns
+`LOCAL_CHECKPOINT_SKIPPED_COMPLETED` and creates no file.
+
 With multiple Julia threads, a local session may execute on a default worker
 thread so the REPL remains responsive during a step. With one thread, the local
 driver explicitly yields after every safe step; commands typed while a step is

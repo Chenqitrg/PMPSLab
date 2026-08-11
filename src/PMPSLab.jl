@@ -18,7 +18,7 @@ export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
 export ConvergenceLog, SiteLog, SweepLog, SplitLog
 export AbstractAlgorithmConfig
 export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
-export AlgorithmEvent, LocalRunSession, LocalRunStatus
+export AlgorithmEvent, LocalRunSession, LocalRunStatus, LocalCheckpointOutcome
 export AbstractPeriodicCanonical, ProjectorCanonical
 export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
 export SplitEnvironmentPolicy

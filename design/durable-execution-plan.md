@@ -76,20 +76,33 @@ resume!(session::LocalRunSession) -> LocalRunSession
 cancel!(session::LocalRunSession) -> LocalRunSession
 ```
 
+Keep waiting and result interpretation separate:
+
+```julia
+wait(session::LocalRunSession) -> LocalRunSession
+fetch(session::LocalRunSession) -> algorithm result
+```
+
+`wait` returns after the current driver exits regardless of whether it
+completed, paused, cancelled, or failed. `fetch` returns `run_result` only for
+`LOCAL_COMPLETED`, throws the stored `CapturedException` for `LOCAL_FAILED`,
+and rejects every other status.
+
 Add three explicit, blocking durable helpers:
 
 ```julia
-checkpoint!(session::LocalRunSession, path::AbstractString) -> LocalRunSession
+checkpoint!(session::LocalRunSession, path::AbstractString) ->
+    LocalCheckpointOutcome
 
 pause_and_checkpoint!(
     session::LocalRunSession,
     path::AbstractString,
-) -> LocalRunSession
+) -> LocalCheckpointOutcome
 
 cancel_and_checkpoint!(
     session::LocalRunSession,
     path::AbstractString,
-) -> LocalRunSession
+) -> LocalCheckpointOutcome
 ```
 
 Do not add `checkpoint_path` as a keyword to `cancel!`. The current `cancel!`
@@ -159,7 +172,7 @@ multiple controllers must retry after resolving the final status.
 | `LOCAL_READY`, `LOCAL_PAUSED` | cancel immediately, then checkpoint the current safe boundary |
 | `LOCAL_CANCEL_REQUESTED` | wait for the existing request, then checkpoint if cancelled |
 | `LOCAL_CANCELLED` | checkpoint immediately |
-| `LOCAL_COMPLETED` | return completed session; do not create a cancellation checkpoint |
+| `LOCAL_COMPLETED` | return `LOCAL_CHECKPOINT_SKIPPED_COMPLETED`; do not create a cancellation checkpoint |
 | `LOCAL_FAILED` | throw `ArgumentError`; do not write |
 
 Implementation sequence:
@@ -169,8 +182,8 @@ Implementation sequence:
    corresponding cancellation state;
 2. retain an existing cancellation request without changing it;
 3. call `wait(session)` without holding `session.lock`;
-4. if completion won during the final site update, return the completed session
-   without creating a file;
+4. if completion won during the final site update, return
+   `LOCAL_CHECKPOINT_SKIPPED_COMPLETED` without creating a file;
 5. otherwise require `LOCAL_CANCELLED` and delegate to `checkpoint!`.
 
 If checkpoint publication fails after cancellation, the session remains
@@ -262,16 +275,23 @@ session API. Preserve the original exception from `snapshot` or
 `write_checkpoint`; do not wrap it in a generic session error that hides the
 path or filesystem cause.
 
-The helpers return the original `LocalRunSession` on success, allowing the
-normal Julia style:
+The helpers return `LOCAL_CHECKPOINT_WRITTEN` after publishing the requested
+file. `cancel_and_checkpoint!` returns
+`LOCAL_CHECKPOINT_SKIPPED_COMPLETED` when the final step wins the race, making
+the absence of a file explicit:
 
 ```julia
-pause_and_checkpoint!(session, "split.jld2")
+outcome = pause_and_checkpoint!(session, "split.jld2")
+outcome == LOCAL_CHECKPOINT_WRITTEN || error("checkpoint missing")
 resume!(session)
 
-cancel_and_checkpoint!(session, "cancelled-split.jld2")
-saved = read_checkpoint("cancelled-split.jld2")
-resumed = restore_run(saved, target_mps, algorithm)
+outcome = cancel_and_checkpoint!(session, "cancelled-split.jld2")
+if outcome == LOCAL_CHECKPOINT_WRITTEN
+    saved = read_checkpoint("cancelled-split.jld2")
+    resumed = restore_run(saved, target_mps, algorithm)
+else
+    result = fetch(session)
+end
 ```
 
 ### Memory Lifecycle

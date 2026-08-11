@@ -21,6 +21,8 @@ struct DummyStepCompleted <: AlgorithmEvent
     value::Int
 end
 
+struct FailingRun <: AbstractAlgorithmRun end
+
 mutable struct GatedRun <: AbstractAlgorithmRun
     target::Int
     context::DummyContext
@@ -64,6 +66,9 @@ end
 
 PMPSLab.isfinished(run::GatedRun) = run.context.value >= run.target
 PMPSLab.snapshot(run::GatedRun) = DummySnapshot(run.context.value)
+
+PMPSLab.step!(::FailingRun) = error("dummy step failed")
+PMPSLab.isfinished(::FailingRun) = false
 
 @testset "resumable execution interface" begin
     algorithm = DummyAlgorithm()
@@ -113,6 +118,7 @@ end
     wait(session)
     @test run_status(session) == PMPSLab.LOCAL_COMPLETED
     @test run_result(session) == 3
+    @test fetch(session) == 3
 end
 
 @testset "local REPL session cancels at a safe step" begin
@@ -131,6 +137,25 @@ end
     @test run_status(session) == PMPSLab.LOCAL_CANCELLED
     @test session.run.context.value == 1
     @test_throws ArgumentError run_result(session)
+    @test_throws ArgumentError fetch(session)
+end
+
+@testset "local session fetch reports terminal outcomes" begin
+    ready = LocalRunSession(initialize_run(1, DummyAlgorithm()); threaded=false)
+    @test_throws ArgumentError fetch(ready)
+
+    failed = start_run(FailingRun(); threaded=true)
+    @test wait(failed) === failed
+    @test run_status(failed) == PMPSLab.LOCAL_FAILED
+    captured = try
+        fetch(failed)
+    catch err
+        err
+    end
+    @test captured isa CapturedException
+    @test captured.ex isa ErrorException
+    @test captured.ex.msg == "dummy step failed"
+    @test !isempty(captured.processed_bt)
 end
 
 @testset "local session durable pause and cancellation" begin
@@ -140,10 +165,12 @@ end
             initialize_run(3, DummyAlgorithm()); threaded=false
         )
         start_run!(paused)
-        @test pause_and_checkpoint!(paused, paused_path) === paused
+        @test pause_and_checkpoint!(paused, paused_path) ==
+              PMPSLab.LOCAL_CHECKPOINT_WRITTEN
         @test run_status(paused) == PMPSLab.LOCAL_PAUSED
         @test isfile(paused_path)
         @test read_checkpoint(paused_path).value == paused.run.context.value
+        @test_throws ArgumentError fetch(paused)
 
         missing_path = joinpath(directory, "missing", "paused.jld2")
         @test_throws ArgumentError checkpoint!(paused, missing_path)
@@ -157,7 +184,8 @@ end
         cancelled = LocalRunSession(
             initialize_run(3, DummyAlgorithm()); threaded=false
         )
-        @test cancel_and_checkpoint!(cancelled, cancelled_path) === cancelled
+        @test cancel_and_checkpoint!(cancelled, cancelled_path) ==
+              PMPSLab.LOCAL_CHECKPOINT_WRITTEN
         @test run_status(cancelled) == PMPSLab.LOCAL_CANCELLED
         @test read_checkpoint(cancelled_path).value == 0
 
@@ -166,7 +194,8 @@ end
             initialize_run(1, DummyAlgorithm()); threaded=false
         )
         wait(completed)
-        @test cancel_and_checkpoint!(completed, completed_path) === completed
+        @test cancel_and_checkpoint!(completed, completed_path) ==
+              PMPSLab.LOCAL_CHECKPOINT_SKIPPED_COMPLETED
         @test run_status(completed) == PMPSLab.LOCAL_COMPLETED
         @test !ispath(completed_path)
     end
@@ -188,7 +217,7 @@ end
         @test !ispath(paused_path)
 
         put!(paused_run.release, nothing)
-        wait(pause_task)
+        @test fetch(pause_task) == PMPSLab.LOCAL_CHECKPOINT_WRITTEN
         @test run_status(paused) == PMPSLab.LOCAL_PAUSED
         @test paused_run.context.value == 1
         @test read_checkpoint(paused_path).value == 1
@@ -207,7 +236,7 @@ end
         @test !ispath(cancelled_path)
 
         put!(cancelled_run.release, nothing)
-        wait(cancel_task)
+        @test fetch(cancel_task) == PMPSLab.LOCAL_CHECKPOINT_WRITTEN
         @test run_status(cancelled) == PMPSLab.LOCAL_CANCELLED
         @test cancelled_run.context.value == 1
         @test read_checkpoint(cancelled_path).value == 1
@@ -223,7 +252,8 @@ end
         completed_task = @async cancel_and_checkpoint!(completed, completed_path)
         yield()
         put!(completed_run.release, nothing)
-        wait(completed_task)
+        @test fetch(completed_task) ==
+              PMPSLab.LOCAL_CHECKPOINT_SKIPPED_COMPLETED
         @test run_status(completed) == PMPSLab.LOCAL_COMPLETED
         @test !ispath(completed_path)
     end

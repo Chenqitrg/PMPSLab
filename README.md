@@ -95,9 +95,14 @@ session = start_run(
     initialize_run(A, alg);
     observer = event -> display(event.log.error),
 )
-wait(session)
-B, log = run_result(session)
+B, log = fetch(session)
 ```
+
+`wait(session)` only waits for the current driver task and returns the session.
+It may end because the run completed, paused, cancelled, or failed.
+`fetch(session)` also waits, then returns the completed result or throws a
+captured worker exception; paused and cancelled sessions are rejected with
+their current status.
 
 `pause!` and `cancel!` are non-blocking requests. To inspect or snapshot a
 paused run manually, wait for its driving task before reading the numerical
@@ -115,10 +120,14 @@ The durable helpers perform the wait, safe-boundary check, snapshot, and atomic
 file publication as one local operation:
 
 ```julia
-pause_and_checkpoint!(session, "split.jld2")
+pause_outcome = pause_and_checkpoint!(session, "split.jld2")
+pause_outcome == PMPSLab.LOCAL_CHECKPOINT_WRITTEN || error("checkpoint missing")
 resume!(session)  # reuses the in-memory run and its caches
 
-cancel_and_checkpoint!(session, "cancelled-split.jld2")
+cancel_outcome = cancel_and_checkpoint!(session, "cancelled-split.jld2")
+if cancel_outcome == PMPSLab.LOCAL_CHECKPOINT_SKIPPED_COMPLETED
+    B, log = fetch(session)  # the final step completed; no file was created
+end
 ```
 
 After a process restart, supply the original target MPS and complete algorithm
