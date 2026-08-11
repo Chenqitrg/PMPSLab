@@ -10,7 +10,7 @@ products are represented. The policy is separate from the transfer value type:
 `DenseTransferMatrix` and `TruncatedTransferMatrix` contain numerical data,
 while a policy constructs and refreshes values of the chosen representation.
 """
-abstract type AbstractTransferPolicy <: Algorithm end
+abstract type AbstractTransferPolicy <: AbstractAlgorithmConfig end
 
 """
     DenseTransferPolicy()

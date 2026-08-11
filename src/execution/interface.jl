@@ -66,8 +66,8 @@ function snapshot end
     restore_run(snapshot::AbstractAlgorithmSnapshot, inputs..., algorithm) ->
         AbstractAlgorithmRun
 
-Validate `snapshot` against the algorithm-specific immutable inputs and
-configuration, rebuild derived state, and return a run positioned at exactly
-the next safe step.
+Validate `snapshot` for compatibility with the algorithm-specific immutable
+inputs and configuration, rebuild derived state, and return a run positioned
+at exactly the next safe step.
 """
 function restore_run end

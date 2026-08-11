@@ -16,6 +16,7 @@ import MPSKit: physicalspace
 # Types
 export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
 export ConvergenceLog, SiteLog, SweepLog, SplitLog
+export AbstractAlgorithmConfig
 export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
 export AlgorithmEvent, LocalRunSession, LocalRunStatus
 export AbstractPeriodicCanonical, ProjectorCanonical
@@ -38,6 +39,7 @@ export gaugefix!, assertconsistency, dense, pair_contraction, split
 export initialize_run, step!, isfinished, run_result, snapshot, restore_run
 export write_checkpoint, read_checkpoint
 export start_run, start_run!, pause!, resume!, cancel!, run_status
+export checkpoint!, pause_and_checkpoint!, cancel_and_checkpoint!
 export squared_norm, squared_distance, diff_norm
 export expectation
 export random_mps, one_mps, random_mps2, one_mps2, random_cdl, random_cdl_mps, lift
@@ -45,8 +47,10 @@ export SweepDirection, Forward, Backward, SweepState
 export AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, SplitContext, update!
 export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 
+include("algorithm_config.jl")
 include("execution/interface.jl")
 include("execution/local_session.jl")
+include("execution/local_control.jl")
 include("mps/indices.jl")
 include("mps/container.jl")
 include("mps/constructors.jl")
@@ -75,7 +79,9 @@ include("solve.jl")
 include("algorithm_context.jl")
 include("split/environment.jl")
 include("split/context.jl")
+include("split/identity.jl")
 include("split/run.jl")
 include("execution/checkpoint.jl")
+include("execution/local_checkpoint.jl")
 
 end

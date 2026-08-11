@@ -99,6 +99,38 @@ wait(session)
 B, log = run_result(session)
 ```
 
+`pause!` and `cancel!` are non-blocking requests. To inspect or snapshot a
+paused run manually, wait for its driving task before reading the numerical
+state:
+
+```julia
+pause!(session)
+wait(session)
+run_status(session) == PMPSLab.LOCAL_PAUSED || error("run did not pause")
+saved = snapshot(session.run)
+write_checkpoint("split.jld2", saved)
+```
+
+The durable helpers perform the wait, safe-boundary check, snapshot, and atomic
+file publication as one local operation:
+
+```julia
+pause_and_checkpoint!(session, "split.jld2")
+resume!(session)  # reuses the in-memory run and its caches
+
+cancel_and_checkpoint!(session, "cancelled-split.jld2")
+```
+
+After a process restart, supply the original target MPS and complete algorithm
+configuration. Restore validates the target tensor spaces and rejects a
+checkpoint whose ansatz, sweep, solver, or transfer policies do not match;
+the caller remains responsible for supplying the correct target values:
+
+```julia
+saved = read_checkpoint("split.jld2")
+session = start_run(restore_run(saved, A, alg))
+```
+
 The current cost is
 
 ```julia

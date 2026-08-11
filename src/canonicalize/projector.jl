@@ -2,7 +2,7 @@
 # Projector-based periodic gauge fixing
 # ------------------------------------------------------------------------------
 
-abstract type AbstractPeriodicCanonical <: Algorithm end
+abstract type AbstractPeriodicCanonical <: AbstractAlgorithmConfig end
 
 @kwdef struct ProjectorCanonical{
         T<:TruncationStrategy, O

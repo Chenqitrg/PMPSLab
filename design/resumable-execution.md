@@ -185,9 +185,11 @@ observers, tasks, locks, platform commands, or open storage handles.
 
 ### `restore_run`
 
-Validates the snapshot against the immutable inputs and algorithm configuration,
-reconstructs derived state, and returns a run positioned at exactly the next
-safe step.
+Validates the snapshot for compatibility with the immutable inputs and
+algorithm configuration, reconstructs derived state, and returns a run
+positioned at exactly the next safe step. For split runs, target spaces are
+validated while the caller remains responsible for supplying the original
+target tensor values.
 
 ## Split execution model
 
@@ -464,9 +466,9 @@ new worker invocation. PMPSLab does not prescribe how the platform represents
 these outcomes.
 
 A lightweight local adapter provides `LocalRunSession`, `start_run`, `pause!`,
-`resume!`, and `cancel!` for development and Julia REPL use. The session keeps
-only an in-memory run until checkpoint support is implemented and must not grow
-into a second production scheduler.
+`resume!`, and `cancel!` for development and Julia REPL use. Durable helpers
+checkpoint paused or cancelled sessions without serializing the task, lock, or
+observer. The adapter must not grow into a second production scheduler.
 
 ```julia
 run = initialize_run(inputs..., algorithm)
@@ -474,7 +476,10 @@ session = start_run(run)
 
 pause!(session)   # becomes PAUSED after the current safe step
 resume!(session)
-cancel!(session)  # discards progress until checkpoint support is added
+cancel!(session)  # discards progress
+
+pause_and_checkpoint!(session, "split.jld2")
+cancel_and_checkpoint!(session, "cancelled-split.jld2")
 ```
 
 With multiple Julia threads, a local session may execute on a default worker

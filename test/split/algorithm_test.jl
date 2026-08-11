@@ -1,3 +1,38 @@
+@testset "algorithm configurations have value semantics" begin
+    virtual_space = Z2Space(0 => 2, 1 => 1)
+    configurations = (
+        RandomAnsatz(virtual_space, 4),
+        OneAnsatz(virtual_space, 4),
+        SVDAnsatz(),
+        PeriodicGaugeAnsatz(),
+        CircularSweep(4; maximal_sweep=2),
+        ZigzagSweep(4; maximal_sweep=2),
+        LUSolve(),
+        CholeskySolve(),
+        KrylovSolve(GMRES(; maxiter=10)),
+        SplitEnvironmentPolicy(),
+        SplitEnvironmentPolicy(
+            TruncatedTransferPolicy(TruncationStrategy())
+        ),
+    )
+
+    for configuration in configurations
+        copied = deepcopy(configuration)
+        @test configuration isa PMPSLab.AbstractAlgorithmConfig
+        @test configuration == copied
+        @test isequal(configuration, copied)
+        @test hash(configuration) == hash(copied)
+    end
+
+    algorithm = PeriodicSplit(
+        first(configurations),
+        CircularSweep(4; maximal_sweep=1),
+        LUSolve(),
+    )
+    @test algorithm == deepcopy(algorithm)
+    @test hash(algorithm) == hash(deepcopy(algorithm))
+end
+
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin
     B0 = random_mps(ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)

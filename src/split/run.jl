@@ -24,10 +24,16 @@ Durable numerical state captured from a [`SplitRun`](@ref) at a safe site
 boundary. Derived transfer matrices and contraction caches are intentionally
 excluded and will be rebuilt by `restore_run`.
 """
-struct SplitSnapshot{M,P,L<:SplitLog} <: AbstractAlgorithmSnapshot
+struct SplitSnapshot{
+        M,
+        P,
+        L<:SplitLog,
+        I<:SplitProblemIdentity,
+    } <: AbstractAlgorithmSnapshot
     mpsB::M
     pending_iteration::P
     log::L
+    identity::I
 end
 
 """
@@ -74,7 +80,13 @@ function snapshot(run::SplitRun)
     # rather than only copying the PeriodicMPS container, and detach the mutable
     # log vector from the live run.
     mpsB = PeriodicMPS([copy(tensor) for tensor in run.context.mpsB])
-    return SplitSnapshot(mpsB, run.pending_iteration, _copy_split_log(run.log))
+    identity = _split_problem_identity(run.context.mpsA, run.algorithm)
+    return SplitSnapshot(
+        mpsB,
+        run.pending_iteration,
+        _copy_split_log(run.log),
+        identity,
+    )
 end
 
 function _validate_split_cursor(saved::SplitSnapshot, sweep::AbstractSweep)
@@ -112,6 +124,11 @@ function restore_run(
         "$(length(mpsA)) two-site tensors (expected $(2 * length(mpsA)))"
     ))
     _validate_split_sweep(algorithm.sweep, length(saved.mpsB))
+    _matches_split_problem(saved.identity, mpsA, algorithm) || throw(
+        ArgumentError(
+            "snapshot does not match the supplied split target or algorithm configuration"
+        )
+    )
     _validate_split_cursor(saved, algorithm.sweep)
 
     mpsB = PeriodicMPS([copy(tensor) for tensor in saved.mpsB])

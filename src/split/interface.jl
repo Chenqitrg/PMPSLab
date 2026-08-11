@@ -2,10 +2,10 @@
 # 2-site → 1-site splitting — inverse of pair_contraction
 # ------------------------------------------------------------------------------
 
-abstract type AbstractAnsatz <: Algorithm end   # initial ansatz for the 2-site → 1-site splitting
-abstract type AbstractSolve <: Algorithm end   # 每 site 更新规则
-abstract type AbstractSweep <: Algorithm end   # 扫描方案：Zigzag, Circular
-abstract type AbstractPeriodicSplit <: Algorithm end  # Split = sweep + solve 的组合
+abstract type AbstractAnsatz <: AbstractAlgorithmConfig end   # initial ansatz for the 2-site → 1-site splitting
+abstract type AbstractSolve <: AbstractAlgorithmConfig end   # 每 site 更新规则
+abstract type AbstractSweep <: AbstractAlgorithmConfig end   # 扫描方案：Zigzag, Circular
+abstract type AbstractPeriodicSplit <: AbstractAlgorithmConfig end  # Split = sweep + solve 的组合
 
 """
     SplitEnvironmentPolicy(; norm=DenseTransferPolicy(), mixed=DenseTransferPolicy())
@@ -18,7 +18,7 @@ right-hand-side environment.
 struct SplitEnvironmentPolicy{
         N<:AbstractTransferPolicy,
         M<:AbstractTransferPolicy,
-    } <: Algorithm
+    } <: AbstractAlgorithmConfig
     norm::N
     mixed::M
 end

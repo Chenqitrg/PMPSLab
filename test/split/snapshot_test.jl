@@ -119,7 +119,12 @@ end
     end
     saved = snapshot(run)
 
-    bad_cursor = SplitSnapshot(saved.mpsB, iterate(algorithm.sweep), saved.log)
+    bad_cursor = SplitSnapshot(
+        saved.mpsB,
+        iterate(algorithm.sweep),
+        saved.log,
+        saved.identity,
+    )
     @test_throws ArgumentError restore_run(bad_cursor, mpsA, algorithm)
 
     wrong_sweep = PeriodicSplit(
@@ -135,4 +140,59 @@ end
         algorithm.solve,
     )
     @test_throws DimensionMismatch restore_run(saved, mpsA, wrong_domain)
+end
+
+@testset "SplitSnapshot — restore requires compatible inputs" begin
+    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    algorithm = PeriodicSplit(
+        SVDAnsatz(),
+        CircularSweep(4; maximal_sweep=1),
+        CholeskySolve(),
+    )
+    saved = snapshot(initialize_run(mpsA, algorithm))
+
+    different_target = random_mps2(ComplexF64, 2, 2, 1)
+    @test_nowarn restore_run(saved, different_target, algorithm)
+
+    incompatible_target = random_mps2(ComplexF64, 2, 3, 1)
+    @test_throws ArgumentError restore_run(saved, incompatible_target, algorithm)
+
+    different_solver = PeriodicSplit(
+        algorithm.ansatz,
+        algorithm.sweep,
+        LUSolve(),
+    )
+    @test_throws ArgumentError restore_run(saved, mpsA, different_solver)
+
+    different_ansatz = PeriodicSplit(
+        OneAnsatz(Z2Space(0 => 1), 4),
+        algorithm.sweep,
+        algorithm.solve,
+    )
+    @test_throws ArgumentError restore_run(saved, mpsA, different_ansatz)
+
+    different_environments = PeriodicSplit(
+        algorithm.ansatz,
+        algorithm.sweep,
+        algorithm.solve;
+        environments=SplitEnvironmentPolicy(
+            TruncatedTransferPolicy(TruncationStrategy())
+        ),
+    )
+    @test_throws ArgumentError restore_run(saved, mpsA, different_environments)
+
+    virtual_space = Z2Space(0 => 2, 1 => 1)
+    physical_space = Z2Space(0 => 2)
+    graded_target = random_mps2(ComplexF64, 2, physical_space, virtual_space)
+    random_algorithm = PeriodicSplit(
+        RandomAnsatz(virtual_space, 4),
+        CircularSweep(4; maximal_sweep=1),
+        LUSolve(),
+    )
+    random_saved = snapshot(initialize_run(graded_target, random_algorithm))
+    @test_nowarn restore_run(
+        random_saved,
+        graded_target,
+        deepcopy(random_algorithm),
+    )
 end
