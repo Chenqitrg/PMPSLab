@@ -1,5 +1,5 @@
 @testset "SplitSnapshot — captures an isolated safe-boundary state" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=1),
@@ -35,7 +35,7 @@
 end
 
 @testset "SplitSnapshot — restores one mid-sweep boundary" begin
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=1),
@@ -75,7 +75,7 @@ end
 end
 
 @testset "SplitSnapshot — restores every circular and zigzag boundary" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     finish_run! = function(run)
         while !isfinished(run)
             step!(run)
@@ -107,7 +107,7 @@ end
 end
 
 @testset "SplitSnapshot — rejects an inconsistent cursor or sweep" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=2),
@@ -143,7 +143,7 @@ end
 end
 
 @testset "SplitSnapshot — restore requires compatible inputs" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=1),
@@ -151,10 +151,10 @@ end
     )
     saved = snapshot(initialize_run(mpsA, algorithm))
 
-    different_target = random_mps2(ComplexF64, 2, 2, 1)
+    different_target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     @test_nowarn restore_run(saved, different_target, algorithm)
 
-    incompatible_target = random_mps2(ComplexF64, 2, 3, 1)
+    incompatible_target = rand(PeriodicMPS, ComplexF64, 2, (3, 3), 1)
     @test_throws ArgumentError restore_run(saved, incompatible_target, algorithm)
 
     different_solver = PeriodicSplit(
@@ -191,7 +191,7 @@ end
 
     virtual_space = Z2Space(0 => 2, 1 => 1)
     physical_space = Z2Space(0 => 2)
-    graded_target = random_mps2(ComplexF64, 2, physical_space, virtual_space)
+    graded_target = rand(PeriodicMPS, ComplexF64, 2, physical_space ⊗ physical_space, virtual_space)
     random_algorithm = PeriodicSplit(
         RandomAnsatz(virtual_space, 4),
         CircularSweep(4; maximal_sweep=1),

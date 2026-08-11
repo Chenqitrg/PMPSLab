@@ -27,22 +27,22 @@ function test_factored_split_environments(mpsA, mpsB)
 end
 
 @testset "split environments — truncated factored contractions" begin
-    mpsB = random_mps(ComplexF64, 4, 2, 2)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     test_factored_split_environments(mpsA, mpsB)
 end
 
 @testset "split environments — truncated Z2 contractions" begin
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
-    mpsB = random_mps(ComplexF64, 4, P, V)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, P, V))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, P, V)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, P, V))
     test_factored_split_environments(mpsA, mpsB)
 end
 
 @testset "split environments — truncated Krylov solve" begin
-    mpsB = random_mps(ComplexF64, 4, 2, 2)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     ctx = SplitContext(mpsA, mpsB)
     site = 1
     pa = pa_from_pb(site)

@@ -6,9 +6,7 @@ import PMPSLab
 using PMPSLab:
     PeriodicMPS,
     HalfInt,
-    random_mps,
     one_mps,
-    random_mps2,
     random_cdl_mps,
     pair_contraction,
     dense,

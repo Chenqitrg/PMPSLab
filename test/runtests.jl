@@ -1,6 +1,7 @@
 using Test, PMPSLab
 include("execution_test.jl")
 include("composition_test.jl")
+include("tensorcell_test.jl")
 include("mps_test.jl")
 include("transfermatrix/runtests.jl")
 include("canonicalize/runtests.jl")

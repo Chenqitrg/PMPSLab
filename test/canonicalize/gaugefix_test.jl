@@ -1,6 +1,6 @@
 @testset "gaugefix! — integration" begin
     N, d, D = 4, 2, 3
-    mps = random_mps(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     tvec = [copy(mps[i]) for i in 1:N]
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
     @test gaugefix!(mps, alg) === mps
@@ -16,7 +16,7 @@ end
     N = 4
     V = Z2Space(0 => 3, 1 => 2)
     P = Z2Space(0 => 2)
-    mps = random_mps(ComplexF64, N, P, V)
+    mps = rand(PeriodicMPS, ComplexF64, N, P, V)
     tvec = [copy(mps[i]) for i in 1:N]
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
     @test gaugefix!(mps, alg) === mps
@@ -28,7 +28,7 @@ end
 
 @testset "gaugefix! — self-consistency" begin
     N, d, D = 4, 2, 2
-    mps = random_mps(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     dense_before = dense(mps)
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
     gaugefix!(mps, alg)
@@ -38,7 +38,7 @@ end
 
 @testset "gaugefix! — mixed spectrum is split symmetrically" begin
     Random.seed!(20260810)
-    mps = random_mps(ComplexF64, 4, 2, 3)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
     L, R = PMPSLab._mpskit_gauges(mps, alg)
 
@@ -95,9 +95,9 @@ end
     V = Z2Space(0 => 3, 1 => 2)
     P = Z2Space(0 => 2)
     cases = (
-        random_mps(ComplexF64, 4, 2, 3),
-        random_mps2(ComplexF64, 4, 2, 3),
-        random_mps(ComplexF64, 4, P, V),
+        rand(PeriodicMPS, ComplexF64, 4, 2, 3),
+        rand(PeriodicMPS, ComplexF64, 4, (2, 2), 3),
+        rand(PeriodicMPS, ComplexF64, 4, P, V),
     )
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
 
@@ -114,7 +114,7 @@ end
 
 @testset "gaugefix! — truncation is physically idempotent" begin
     Random.seed!(20260808)
-    original = random_mps(ComplexF64, 6, 2, 6)
+    original = rand(PeriodicMPS, ComplexF64, 6, 2, 6)
     alg = ProjectorCanonical(
         ; tol=1e-12, maxiter=100,
         trscheme=MPSKit.TruncationStrategy(maxrank=2),

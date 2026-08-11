@@ -1,5 +1,5 @@
-@testset "random_mps / one_mps" begin
-    mps = random_mps(ComplexF64, 4, 2, 3)
+@testset "rand / one_mps" begin
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
     @test length(mps) == 4
     @test assertconsistency(mps) === nothing
     @test scalartype(mps[1]) == ComplexF64
@@ -17,14 +17,14 @@
     # graded spaces
     V = Z2Space(0 => 2, 1 => 2)
     P = Z2Space(0 => 2)
-    mps_g = random_mps(ComplexF64, 3, P, V)
+    mps_g = rand(PeriodicMPS, ComplexF64, 3, P, V)
     @test length(mps_g) == 3
     @test assertconsistency(mps_g) === nothing
     @test assertconsistency(one_mps(ComplexF64, 3, P, V)) === nothing
 end
 
-@testset "random_mps2 / one_mps2 — two-site tensors" begin
-    mps = random_mps2(ComplexF64, 4, 2, 3)
+@testset "multi-leg rand / one_mps2" begin
+    mps = rand(PeriodicMPS, ComplexF64, 4, (2, 2), 3)
     @test length(mps) == 4
     @test assertconsistency(mps) === nothing
     @test scalartype(mps[1]) == ComplexF64
@@ -44,7 +44,7 @@ end
     # graded spaces
     V = Z2Space(0 => 2, 1 => 2)
     P = Z2Space(0 => 2)
-    mps_g = random_mps2(ComplexF64, 3, P, V)
+    mps_g = rand(PeriodicMPS, ComplexF64, 3, P ⊗ P, V)
     @test length(mps_g) == 3
     @test assertconsistency(mps_g) === nothing
     @test assertconsistency(one_mps2(ComplexF64, 3, P, V)) === nothing
@@ -52,7 +52,7 @@ end
 
 @testset "assertconsistency — valid and invalid" begin
     D = 3
-    mps = random_mps(ComplexF64, 4, 2, D)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, D)
     tvec = [copy(mps[i]) for i in 1:4]
     @test assertconsistency(mps) === nothing
 
@@ -65,7 +65,7 @@ end
 @testset "assertconsistency — Z2Irrep" begin
     V = Z2Space(0 => 3, 1 => 2)
     P = Z2Space(0 => 2)
-    mps = random_mps(ComplexF64, 4, P, V)
+    mps = rand(PeriodicMPS, ComplexF64, 4, P, V)
     tvec = [copy(mps[i]) for i in 1:4]
     @test assertconsistency(mps) === nothing
     tvec_bad = copy(tvec)

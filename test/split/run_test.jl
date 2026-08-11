@@ -1,7 +1,7 @@
 struct DomainlessSweep <: PMPSLab.AbstractSweep end
 
 @testset "SplitRun — one safe step updates exactly one site" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=1),
@@ -45,7 +45,7 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
 end
 
 @testset "SplitRun — an empty sweep is complete at initialization" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=0),
@@ -59,7 +59,7 @@ end
 end
 
 @testset "SplitRun — sweep domain must match approximation" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
 
     for sweep in (
             CircularSweep(1; maximal_sweep=1),

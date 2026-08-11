@@ -37,7 +37,7 @@ Create a period-five MPS whose tensors each have two physical legs. Its virtual
 bond dimension is four and each physical leg has dimension two:
 
 ```julia
-A = random_mps2(ComplexF64, 5, 2, 4)
+A = rand(PeriodicMPS, ComplexF64, 5, (2, 2), 4)
 
 physicalspaces(A)
 @show length(A)
@@ -51,10 +51,27 @@ length(A) = 5
 assertconsistency(A) = nothing
 ```
 
-A one-physical-leg periodic MPS can be created with `random_mps`:
+A one-physical-leg periodic MPS can be generated with `rand`:
 
 ```julia
-mps = random_mps(ComplexF64, 10, 2, 4)
+mps = rand(PeriodicMPS, ComplexF64, 10, 2, 4)
+```
+
+Pass an RNG first when the generated tensors must be reproducible:
+
+```julia
+using Random
+
+mps = rand(Xoshiro(42), PeriodicMPS, ComplexF64, 10, 2, 4)
+```
+
+Tensor unit cells follow the same convention:
+
+```julia
+using TensorKit
+
+gate_space = ℂ^2 ⊗ ℂ^3 ← ℂ^3 ⊗ ℂ^2
+gates = rand(UniformGates, ComplexF64, gate_space)
 ```
 
 ## 2. Gauge-fix a periodic MPS

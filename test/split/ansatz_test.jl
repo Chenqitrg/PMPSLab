@@ -14,7 +14,7 @@ end
     N = 2
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
-    mpsA = random_mps2(ComplexF64, N, P, V)
+    mpsA = rand(PeriodicMPS, ComplexF64, N, P ⊗ P, V)
 
     for ansatz in (RandomAnsatz(V, 2N), OneAnsatz(V, 2N))
         @test length(ansatz.virtual_space) == 2N
@@ -54,7 +54,7 @@ end
 end
 
 @testset "SVDAnsatz — initial approximation preserves periodic density" begin
-    B0 = random_mps(ComplexF64, 4, 2, 2)
+    B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
     mpsB = initial_approximation(A, SVDAnsatz(TruncationStrategy()))
 

@@ -18,7 +18,7 @@ function initial_approximation(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, ansatz::RandomAnsatz
     ) where {E,S}
     P = _ansatz_physicalspaces(mps, ansatz.virtual_space)
-    return random_mps(E, P, ansatz.virtual_space)
+    return Random.rand(PeriodicMPS, E, P, ansatz.virtual_space)
 end
 
 struct OneAnsatz{V<:GradedSpace} <: AbstractAnsatz

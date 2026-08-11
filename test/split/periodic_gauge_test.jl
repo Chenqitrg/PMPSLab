@@ -28,7 +28,7 @@ end
 
 @testset "split — PeriodicGaugeAnsatz end-to-end cost monitoring" begin
     Random.seed!(20260809)
-    mpsA = random_mps2(ComplexF64, 2, 2, 3)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 3)
     ansatz = PeriodicGaugeAnsatz(
         SVDAnsatz(TruncationStrategy(maxrank=2)),
         ProjectorCanonical(; tol=1e-12, maxiter=100),
@@ -36,7 +36,7 @@ end
     test_end_to_end_cost(mpsA, ansatz)
 
     Random.seed!(20260810)
-    mpsA_truncated = random_mps2(ComplexF64, 2, 2, 3)
+    mpsA_truncated = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 3)
     truncated_ansatz = PeriodicGaugeAnsatz(
         SVDAnsatz(TruncationStrategy(maxrank=2)),
         ProjectorCanonical(
@@ -49,7 +49,7 @@ end
     Random.seed!(20260811)
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
-    mpsA_z2 = random_mps2(ComplexF64, 2, P, V)
+    mpsA_z2 = rand(PeriodicMPS, ComplexF64, 2, P ⊗ P, V)
     test_end_to_end_cost(mpsA_z2, truncated_ansatz)
 end
 
@@ -89,7 +89,7 @@ end
 
 @testset "PeriodicGaugeAnsatz — SVD pre-split + projector gauge fixing" begin
     D, d = 2, 2
-    B0 = random_mps(ComplexF64, 4, d, D)
+    B0 = rand(PeriodicMPS, ComplexF64, 4, d, D)
     A = pair_contraction(B0)
     ansatz = PeriodicGaugeAnsatz(SVDAnsatz(TruncationStrategy()), ProjectorCanonical())
     mpsB = initial_approximation(A, ansatz)
@@ -103,7 +103,7 @@ end
 @testset "PeriodicGaugeAnsatz — Z2-graded spaces" begin
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
-    mpsA = random_mps2(ComplexF64, 2, P, V)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, P ⊗ P, V)
     ansatz = PeriodicGaugeAnsatz(SVDAnsatz(TruncationStrategy()), ProjectorCanonical())
     mpsB = initial_approximation(mpsA, ansatz)
 

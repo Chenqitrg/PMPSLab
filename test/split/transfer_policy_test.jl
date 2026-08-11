@@ -20,7 +20,7 @@
 end
 
 @testset "SplitContext — norm and mixed transfer policies are independent" begin
-    mpsB = random_mps(ComplexF64, 4, 2, 2)
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     mpsA = pair_contraction(mpsB)
     dense_policy = DenseTransferPolicy()
     truncated_policy = TruncatedTransferPolicy(TruncationStrategy())
@@ -46,7 +46,7 @@ end
 
 @testset "split transfer policies — supported solver combinations" begin
     Random.seed!(20260810)
-    mpsA = random_mps2(ComplexF64, 2, 2, 2)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     mpsB = initial_approximation(mpsA, SVDAnsatz())
     dense_policy = DenseTransferPolicy()
     truncated_policy = TruncatedTransferPolicy(TruncationStrategy())
@@ -105,7 +105,7 @@ end
 
 @testset "split — truncated transfer policy is wired through a complete run" begin
     Random.seed!(20260811)
-    mpsA = random_mps2(ComplexF64, 2, 2, 2)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     policy = SplitEnvironmentPolicy(
         TruncatedTransferPolicy(TruncationStrategy())
     )

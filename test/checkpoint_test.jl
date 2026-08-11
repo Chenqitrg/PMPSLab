@@ -19,7 +19,7 @@ function write_test_checkpoint(
 end
 
 @testset "SplitSnapshot checkpoint — JLD2 file round trip" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=1),
@@ -57,7 +57,7 @@ end
 end
 
 @testset "Checkpoint metadata validation" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=1),

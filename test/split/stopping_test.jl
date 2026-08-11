@@ -25,7 +25,7 @@ end
 
 @testset "PeriodicSplit — stopping failures preserve the next cursor" begin
     Random.seed!(20260814)
-    target = random_mps2(ComplexF64, 2, 2, 1)
+    target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=2),
@@ -50,7 +50,7 @@ end
 
 @testset "PeriodicSplit — cost convergence stops at complete sweeps" begin
     Random.seed!(20260811)
-    initial = random_mps(ComplexF64, 4, 2, 2)
+    initial = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     target = pair_contraction(initial)
 
     for (sweep, steps_per_sweep) in (
@@ -78,7 +78,7 @@ end
 
 @testset "PeriodicSplit — convergence patience and minimum sweeps" begin
     Random.seed!(20260812)
-    target = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    target = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=10),
@@ -113,7 +113,7 @@ end
 
 @testset "SplitSnapshot — restores cost convergence state" begin
     Random.seed!(20260813)
-    target = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    target = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=10),

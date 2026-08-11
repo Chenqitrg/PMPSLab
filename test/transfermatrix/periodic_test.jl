@@ -1,6 +1,6 @@
 @testset "PeriodicTransferMatrix — construction from one MPS" begin
     N, d, D = 4, 2, 2
-    mps = random_mps(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     ptm = PeriodicTransferMatrix(mps)
 
     @test length(ptm) == N
@@ -14,15 +14,15 @@
         @test transfer_at(mps, i, DenseTransferPolicy()) ≈ ptm[i]
         @test transfer_at(mps, mps, i) ≈ ptm[i]
     end
-    new = DenseTransferMatrix(random_mps(ComplexF64, 1, d, D)[1])
+    new = DenseTransferMatrix(rand(PeriodicMPS, ComplexF64, 1, d, D)[1])
     ptm[2] = new
     @test ptm[2] ≈ new
 end
 
 @testset "PeriodicTransferMatrix — construction from (bra, ket)" begin
     N, d, D = 3, 2, 3
-    bra = random_mps(ComplexF64, N, d, D)
-    ket = random_mps(ComplexF64, N, d, D)
+    bra = rand(PeriodicMPS, ComplexF64, N, d, D)
+    ket = rand(PeriodicMPS, ComplexF64, N, d, D)
     ptm = PeriodicTransferMatrix(bra, ket)
 
     @test length(ptm) == N
@@ -49,8 +49,8 @@ end
 end
 
 @testset "PeriodicTransferMatrix — mismatched periods throw" begin
-    bra = random_mps(ComplexF64, 2, 2, 2)
-    ket = random_mps(ComplexF64, 3, 2, 2)
+    bra = rand(PeriodicMPS, ComplexF64, 2, 2, 2)
+    ket = rand(PeriodicMPS, ComplexF64, 3, 2, 2)
 
     @test_throws DimensionMismatch PeriodicTransferMatrix(bra, ket)
     @test_throws DimensionMismatch dot(bra, ket)
@@ -59,8 +59,8 @@ end
 
 @testset "PeriodicTransferMatrix — mixed 2-site/1-site construction" begin
     D, d = 2, 2
-    mpsB = random_mps(ComplexF64, 4, d, D)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, d, D))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, d, D)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, d, D))
     ptm = PeriodicTransferMatrix(mpsA, mpsB)
 
     @test length(ptm) == 2
@@ -70,15 +70,15 @@ end
     @test transfer_at(mpsB, mpsA, 2) ≈
           DenseTransferMatrix(mpsB[3], mpsB[4], mpsA[2])
 
-    mpsB_short = random_mps(ComplexF64, 3, d, D)
+    mpsB_short = rand(PeriodicMPS, ComplexF64, 3, d, D)
     @test_throws DimensionMismatch PeriodicTransferMatrix(mpsA, mpsB_short)
 end
 
 @testset "PeriodicTransferMatrix — truncated construction and cache" begin
     D, d, N = 2, 2, 4
     trunc = truncrank(2)
-    bra = random_mps(ComplexF64, N, d, D)
-    ket = random_mps(ComplexF64, N, d, D)
+    bra = rand(PeriodicMPS, ComplexF64, N, d, D)
+    ket = rand(PeriodicMPS, ComplexF64, N, d, D)
     ptm = PeriodicTransferMatrix(bra, ket, trunc)
 
     @test ptm isa PeriodicTransferMatrix{<:TruncatedTransferMatrix}
@@ -134,8 +134,8 @@ end
 @testset "PeriodicTransferMatrix — truncated mixed construction" begin
     D, d = 2, 2
     trunc = truncrank(2)
-    mpsB = random_mps(ComplexF64, 4, d, D)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, d, D))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, d, D)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, d, D))
 
     ab = PeriodicTransferMatrix(mpsA, mpsB, trunc)
     ba = PeriodicTransferMatrix(mpsB, mpsA, trunc)
@@ -149,14 +149,14 @@ end
     @test dense(transfer_at(mpsA, mpsB, 2, trunc)) ≈ dense(ab[2])
     @test dense(transfer_at(mpsB, mpsA, 2, trunc)) ≈ dense(ba[2])
 
-    mpsB_short = random_mps(ComplexF64, 3, d, D)
+    mpsB_short = rand(PeriodicMPS, ComplexF64, 3, d, D)
     @test_throws DimensionMismatch PeriodicTransferMatrix(mpsA, mpsB_short, trunc)
 end
 
 @testset "PeriodicTransferMatrix — truncated Z2 cache" begin
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
-    mps = random_mps(ComplexF64, 3, P, V)
+    mps = rand(PeriodicMPS, ComplexF64, 3, P, V)
     ptm = PeriodicTransferMatrix(mps, truncrank(3))
     cache = build_cache(ptm)
 
@@ -168,7 +168,7 @@ end
 
 @testset "full-period product and expectation — 1-site" begin
     N, d, D = 3, 2, 2
-    mps = random_mps(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     ptm = PeriodicTransferMatrix(mps)
 
     E1, E2, E3 = ptm[1], ptm[2], ptm[3]
@@ -176,7 +176,7 @@ end
     @test expectation(ptm) ≈ overlap(mps, mps)
     @test expectation(mps) ≈ expectation(ptm)
 
-    ket = random_mps(ComplexF64, N, d, D)
+    ket = rand(PeriodicMPS, ComplexF64, N, d, D)
     @test expectation(PeriodicTransferMatrix(mps, ket)) ≈ overlap(mps, ket)
     @test expectation(mps, ket) ≈ overlap(mps, ket)
 end
@@ -191,7 +191,7 @@ end
 
 @testset "full-period product and expectation — 2-site MPS" begin
     N, d, D = 2, 2, 2
-    mps = random_mps2(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, (d, d), D)
     ptm = PeriodicTransferMatrix(mps)
 
     @test length(ptm) == N
@@ -202,8 +202,8 @@ end
 
 @testset "expectation — mixed 2-site bra / 1-site ket" begin
     D, d = 2, 2
-    mpsB = random_mps(ComplexF64, 4, d, D)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, d, D))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, d, D)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, d, D))
     ptm = PeriodicTransferMatrix(mpsA, mpsB)
 
     @test expectation(ptm) ≈ overlap(mpsA, mpsB)
@@ -214,8 +214,8 @@ end
     N = 3
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
-    bra = random_mps(ComplexF64, N, P, V)
-    ket = random_mps(ComplexF64, N, P, V)
+    bra = rand(PeriodicMPS, ComplexF64, N, P, V)
+    ket = rand(PeriodicMPS, ComplexF64, N, P, V)
 
     @test expectation(PeriodicTransferMatrix(bra, ket)) ≈ overlap(bra, ket)
     @test expectation(PeriodicTransferMatrix(bra)) ≈ overlap(bra, bra)

@@ -1,7 +1,7 @@
 @testset "dot — agrees with expectation of PeriodicTransferMatrix" begin
     N, d, D = 3, 2, 2
-    bra = random_mps(ComplexF64, N, d, D)
-    ket = random_mps(ComplexF64, N, d, D)
+    bra = rand(PeriodicMPS, ComplexF64, N, d, D)
+    ket = rand(PeriodicMPS, ComplexF64, N, d, D)
 
     @test dot(bra, ket) ≈ expectation(PeriodicTransferMatrix(bra, ket))
     @test dot(bra, ket) ≈ overlap(bra, ket)
@@ -12,7 +12,7 @@ end
 
 @testset "norm — real, non-negative, analytic for one_mps" begin
     N, d, D = 4, 2, 2
-    mps = random_mps(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     @test norm(mps)^2 ≈ dot(mps, mps)
     @test squared_norm(mps) ≈ real(dot(mps, mps))
     @test norm(mps) > 0
@@ -29,13 +29,13 @@ end
 
 @testset "norm — 2-site MPS" begin
     N, d, D = 2, 2, 2
-    mps = random_mps2(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, (d, d), D)
     @test norm(mps)^2 ≈ expectation(PeriodicTransferMatrix(mps))
     @test norm(mps)^2 ≈ real(overlap(mps, mps)) rtol=1e-10
 end
 
 @testset "normalize — returns a unit-norm copy" begin
-    mps = random_mps(ComplexF64, 4, 2, 3)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
     original_norm = norm(mps)
     normalized = normalize(mps)
     site_scale = exp(log(original_norm) / length(mps))
@@ -57,14 +57,14 @@ end
         for site in eachindex(normalized)
     )
 
-    two_leg_mps = random_mps2(ComplexF64, 3, 2, 2)
+    two_leg_mps = rand(PeriodicMPS, ComplexF64, 3, (2, 2), 2)
     dense_two_leg_state = dense(two_leg_mps)
     @test dense(normalize(two_leg_mps)) ≈
           dense_two_leg_state / norm(dense_two_leg_state)
 end
 
 @testset "normalize! — updates and returns its MPS" begin
-    mps = random_mps(ComplexF64, 4, 2, 3)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
     tensor_objects = collect(mps)
     original_tensors = copy.(mps.tensors)
     original_dense = dense(mps)
@@ -91,14 +91,14 @@ end
 end
 
 @testset "normalize — one-site and Z2 states" begin
-    one_site = random_mps(ComplexF64, 1, 3, 2)
+    one_site = rand(PeriodicMPS, ComplexF64, 1, 3, 2)
     @test norm(normalize(one_site)) ≈ 1
     @test normalize!(one_site) === one_site
     @test norm(one_site) ≈ 1
 
     virtual_space = Z2Space(0 => 2, 1 => 1)
     physical_space = Z2Space(0 => 2)
-    graded = random_mps(ComplexF64, 3, physical_space, virtual_space)
+    graded = rand(PeriodicMPS, ComplexF64, 3, physical_space, virtual_space)
     dense_graded = dense(graded)
     normalized = normalize(graded)
 
@@ -112,7 +112,7 @@ end
 end
 
 @testset "normalize! — rejects zero states without mutation" begin
-    mps = random_mps(ComplexF64, 3, 2, 2)
+    mps = rand(PeriodicMPS, ComplexF64, 3, 2, 2)
     mps[1] = zero(mps[1])
     tensor_objects = collect(mps)
     tensor_values = copy.(mps.tensors)
@@ -153,8 +153,8 @@ end
 
 @testset "diff_norm — zero for identical, positive for distinct" begin
     N, d, D = 3, 2, 2
-    mps1 = random_mps(ComplexF64, N, d, D)
-    mps2 = random_mps(ComplexF64, N, d, D)
+    mps1 = rand(PeriodicMPS, ComplexF64, N, d, D)
+    mps2 = rand(PeriodicMPS, ComplexF64, N, d, D)
 
     @test diff_norm(mps1, mps1) ≈ 0 atol=1e-12
     @test diff_norm(mps1, mps2) > 0
@@ -164,7 +164,7 @@ end
 
 @testset "isapprox — gauge-equivalent states tolerate contraction roundoff" begin
     Random.seed!(310)
-    mps = random_mps(ComplexF64, 4, 2, 3)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
     gauged = PeriodicMPS(copy.(mps.tensors))
     gaugefix!(gauged, ProjectorCanonical(; tol=1e-12, maxiter=100))
 
@@ -180,8 +180,8 @@ end
     N = 3
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
-    mps1 = random_mps(ComplexF64, N, P, V)
-    mps2 = random_mps(ComplexF64, N, P, V)
+    mps1 = rand(PeriodicMPS, ComplexF64, N, P, V)
+    mps2 = rand(PeriodicMPS, ComplexF64, N, P, V)
 
     @test diff_norm(mps1, mps1) ≈ 0 atol=1e-12
     @test diff_norm(mps1, mps2) > 0

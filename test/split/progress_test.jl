@@ -1,5 +1,5 @@
 function split_progress_fixture()
-    target = random_mps2(ComplexF64, 2, 2, 1)
+    target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=1),

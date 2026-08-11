@@ -3,9 +3,7 @@ using Random
 import PMPSLab
 using PMPSLab:
     PeriodicMPS,
-    random_mps,
     one_mps,
-    random_mps2,
     pair_contraction,
     dense,
     combine_truncation,

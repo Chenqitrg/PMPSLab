@@ -2,6 +2,7 @@
 # PeriodicMPS, the random/one constructors and lift.
 
 using Test
+using Random
 using PMPSLab:
     PeriodicMPS,
     HalfInt,
@@ -10,9 +11,7 @@ using PMPSLab:
     virtualspaces,
     physicalspace,
     physicalspaces,
-    random_mps,
     one_mps,
-    random_mps2,
     one_mps2,
     random_cdl,
     random_cdl_mps,
@@ -106,8 +105,22 @@ end
 # PeriodicMPS — container behaviour
 # ==============================================================================
 
+@testset "PeriodicMPS — random generation" begin
+    first_sample = rand(Xoshiro(1), PeriodicMPS, Float64, 3, 2, 4)
+    replayed_sample = rand(Xoshiro(1), PeriodicMPS, Float64, 3, 2, 4)
+    two_leg_sample = rand(PeriodicMPS, ComplexF64, 3, (2, 3), 4)
+
+    @test all(
+        first_sample[i] == replayed_sample[i] for i in eachindex(first_sample)
+    )
+    @test length(codomain(two_leg_sample[1])) == 3
+    @test codomain(two_leg_sample[1])[2] == ℂ^2
+    @test codomain(two_leg_sample[1])[3] == ℂ^3
+    @test_throws ArgumentError rand(PeriodicMPS, ComplexF64, 3, (), 4)
+end
+
 @testset "PeriodicMPS — container behaviour" begin
-    mps = random_mps(ComplexF64, 4, 2, 3)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
 
     @test length(mps) == 4
     @test firstindex(mps) == 1
@@ -133,7 +146,7 @@ end
 end
 
 @testset "PeriodicMPS — rejected writes are atomic" begin
-    mps = random_mps(ComplexF64, 4, 2, 2)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     original = mps[2]
 
     bad_left = randn(ComplexF64, ℂ^3 ⊗ ℂ^2, ℂ^2)
@@ -145,7 +158,7 @@ end
     @test mps[2] === original
     @test assertconsistency(mps) === nothing
 
-    single = random_mps(ComplexF64, 1, 2, 2)
+    single = rand(PeriodicMPS, ComplexF64, 1, 2, 2)
     replacement = randn(ComplexF64, ℂ^3 ⊗ ℂ^2, ℂ^3)
     single[1] = replacement
     @test single[1] === replacement
@@ -157,16 +170,17 @@ end
 end
 
 @testset "PeriodicMPS — copyto! validates before mutation" begin
-    dst = random_mps(ComplexF64, 4, 2, 2)
+    dst = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     old_tensors = collect(dst)
-    src = random_mps(ComplexF64, 4, 2, 2)
+    src = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     parent(src)[2] = randn(ComplexF64, ℂ^3 ⊗ ℂ^2, ℂ^2)
 
     @test_throws TensorKit.SpaceMismatch copyto!(dst, src)
     @test all(dst[i] === old_tensors[i] for i in eachindex(dst))
     @test assertconsistency(dst) === nothing
 
-    nonuniform = random_mps(
+    nonuniform = rand(
+        PeriodicMPS,
         ComplexF64,
         PeriodicVector(fill(ℂ^2, 4)),
         HalfPeriodicVector(PeriodicVector([ℂ^2, ℂ^3, ℂ^4, ℂ^3])),
@@ -175,22 +189,22 @@ end
     @test all(dst[i] === nonuniform[i] for i in eachindex(dst))
     @test assertconsistency(dst) === nothing
 
-    short = random_mps(ComplexF64, 3, 2, 2)
+    short = rand(PeriodicMPS, ComplexF64, 3, 2, 2)
     copied = collect(dst)
     @test_throws DimensionMismatch copyto!(dst, short)
     @test all(dst[i] === copied[i] for i in eachindex(dst))
 end
 
 @testset "PeriodicMPS — rejects an empty period" begin
-    @test_throws ArgumentError random_mps(ComplexF64, 0, 2, 3)
+    @test_throws ArgumentError rand(PeriodicMPS, ComplexF64, 0, 2, 3)
     @test_throws ArgumentError one_mps(ComplexF64, 0, 2, 3)
-    @test_throws ArgumentError random_mps2(ComplexF64, 0, 2, 3)
+    @test_throws ArgumentError rand(PeriodicMPS, ComplexF64, 0, (2, 2), 3)
     @test_throws ArgumentError one_mps2(ComplexF64, 0, 2, 3)
 end
 
 @testset "PeriodicMPS — space queries" begin
     N, d, D = 4, 2, 3
-    mps = random_mps(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, d, D)
 
     @test virtualspace(mps) == ℂ^D
     @test physicalspace(mps) == ℂ^d
@@ -212,7 +226,8 @@ end
     @test vs[HalfInt(N)] == right_virtualspace(mps[N])
     @test [vs[HalfInt(i)] for i in 1:N] == [right_virtualspace(mps[i]) for i in 1:N]
 
-    nonuniform = random_mps(
+    nonuniform = rand(
+        PeriodicMPS,
         ComplexF64,
         PeriodicVector(fill(ℂ^d, N)),
         HalfPeriodicVector(PeriodicVector([ℂ^2, ℂ^3, ℂ^4, ℂ^3])),
@@ -231,7 +246,7 @@ end
 end
 
 @testset "PeriodicMPS — plain-text display" begin
-    mps = random_mps(ComplexF64, 4, 2, 3)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
     summary_text = summary(mps)
 
     @test startswith(summary_text, "4-site PeriodicMPS(ComplexF64, ")
@@ -247,7 +262,7 @@ end
     compact = sprint(show, MIME"text/plain"(), mps; context = (:compact => true,))
     @test compact == summary_text
 
-    long_mps = random_mps(ComplexF64, 10, 2, 3)
+    long_mps = rand(PeriodicMPS, ComplexF64, 10, 2, 3)
     limited = sprint(
         show,
         MIME"text/plain"(),
@@ -259,7 +274,7 @@ end
     @test occursin("│ ├─[1]─", limited)
     @test !occursin("│ ├─[8]─", limited)
 
-    two_leg_mps = random_mps2(ComplexF64, 2, 2, 3)
+    two_leg_mps = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 3)
     two_leg_shown = sprint(
         show, MIME"text/plain"(), two_leg_mps; context = (:limit => false,)
     )
@@ -271,11 +286,11 @@ end
 # (the graded analogue of the (d, D) constructors)
 # ==============================================================================
 
-@testset "random_mps / one_mps — PeriodicVector + HalfPeriodicVector spaces" begin
+@testset "rand / one_mps — PeriodicVector + HalfPeriodicVector spaces" begin
     P = PeriodicVector([ℂ^2, ℂ^2, ℂ^2, ℂ^2])
     V = HalfPeriodicVector(PeriodicVector([ℂ^3, ℂ^3, ℂ^3, ℂ^3]))
 
-    mps = random_mps(ComplexF64, P, V)
+    mps = rand(PeriodicMPS, ComplexF64, P, V)
     @test length(mps) == 4
     @test assertconsistency(mps) === nothing
     @test scalartype(mps[1]) == ComplexF64
@@ -290,21 +305,22 @@ end
     # Z2-graded spaces
     Pg = PeriodicVector([Z2Space(0 => 2), Z2Space(0 => 2), Z2Space(0 => 2)])
     Vg = HalfPeriodicVector(PeriodicVector([Z2Space(0 => 2, 1 => 1), Z2Space(0 => 2, 1 => 1), Z2Space(0 => 2, 1 => 1)]))
-    mg = random_mps(ComplexF64, Pg, Vg)
+    mg = rand(PeriodicMPS, ComplexF64, Pg, Vg)
     @test length(mg) == 3
     @test assertconsistency(mg) === nothing
     @test left_virtualspace(mg[1]) == Z2Space(0 => 2, 1 => 1)
 
-    @test_throws DimensionMismatch random_mps(
+    @test_throws DimensionMismatch rand(
+        PeriodicMPS,
         ComplexF64, PeriodicVector(fill(ℂ^2, 3)), HalfPeriodicVector(fill(ℂ^2, 2))
     )
 end
 
-@testset "random_mps2 / one_mps2 — PeriodicVector + HalfPeriodicVector spaces" begin
+@testset "multi-leg rand / one_mps2 — periodic spaces" begin
     P = PeriodicVector([ℂ^2 ⊗ ℂ^2, ℂ^2 ⊗ ℂ^2])
     V = HalfPeriodicVector(PeriodicVector([ℂ^3, ℂ^3]))
 
-    mps = random_mps2(ComplexF64, P, V)
+    mps = rand(PeriodicMPS, ComplexF64, P, V)
     @test length(mps) == 2
     @test assertconsistency(mps) === nothing
     @test scalartype(mps[1]) == ComplexF64
@@ -345,7 +361,7 @@ end
 # ==============================================================================
 
 @testset "lift — finite fold" begin
-    mps = random_mps(ComplexF64, 3, 2, 2)
+    mps = rand(PeriodicMPS, ComplexF64, 3, 2, 2)
 
     for fold in 1:3
         m = lift(mps, fold)
@@ -358,14 +374,14 @@ end
     @test collect(lift(mps, 1)) == collect(mps)
 
     # works for 2-site MPS as well
-    mps2 = random_mps2(ComplexF64, 2, 2, 2)
+    mps2 = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     m2 = lift(mps2, 2)
     @test length(m2) == 4
     @test assertconsistency(m2) === nothing
 end
 
 @testset "lift — Val{Inf} to InfiniteMPS" begin
-    mps = random_mps(ComplexF64, 3, 2, 2)
+    mps = rand(PeriodicMPS, ComplexF64, 3, 2, 2)
     inf = lift(mps, Val(Inf))
     @test inf isa MPSKit.InfiniteMPS
     @test length(inf) == 3

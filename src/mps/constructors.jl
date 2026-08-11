@@ -1,4 +1,4 @@
-# Random and uniform one-site and two-site MPS constructors.
+# Random and uniform periodic MPS constructors.
 
 function _check_matching_periods(P, V)
     length(P) == length(V) || throw(DimensionMismatch(
@@ -9,47 +9,76 @@ function _check_matching_periods(P, V)
 end
 
 """
-    random_mps(elt, N, d, D) -> PeriodicMPS
+    rand([rng], PeriodicMPS, elt, N, d, D)
+    rand([rng], PeriodicMPS, elt, N, physical_dimensions, D)
+    rand([rng], PeriodicMPS, elt, N, P, V)
+    rand([rng], PeriodicMPS, elt, P, V)
 
-Random periodic MPS with `N` sites: physical space `ℂ^d`, virtual space
-`ℂ^D`. Every site carries the same spaces, so the period closes.
-
-    random_mps(elt, N, P, V) -> PeriodicMPS
-
-Same with graded spaces `P` (physical) and `V` (virtual), e.g. Z2Irrep.
+Generate a periodic MPS. An integer `d` creates one physical leg, while a tuple
+such as `(d₁, d₂)` creates multiple physical legs. `P` may likewise be an
+elementary or product space. The final form accepts periodic physical spaces
+`P` and half-periodic virtual spaces `V`.
 """
-function random_mps(elt::Type{<:Number}, N::Int, d::Int, D::Int)
-    tensors = [randn(elt, ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
-    return PeriodicMPS(tensors)
+function Random.rand(
+        rng::Random.AbstractRNG,
+        ::Type{PeriodicMPS},
+        elt::Type{<:Number},
+        N::Integer,
+        d::Integer,
+        D::Integer,
+    )
+    return Random.rand(rng, PeriodicMPS, elt, N, (d,), D)
 end
 
-function random_mps(
+function Random.rand(
+        rng::Random.AbstractRNG,
+        ::Type{PeriodicMPS},
         elt::Type{<:Number},
-        N::Int,
-        P::ElementarySpace,
+        N::Integer,
+        physical_dimensions::Tuple{Vararg{Integer}},
+        D::Integer,
+    )
+    isempty(physical_dimensions) && throw(ArgumentError(
+        "at least one physical dimension is required"
+    ))
+    physical_space = reduce(⊗, ℂ^d for d in physical_dimensions)
+    return Random.rand(rng, PeriodicMPS, elt, N, physical_space, ℂ^D)
+end
+
+function Random.rand(
+        rng::Random.AbstractRNG,
+        ::Type{PeriodicMPS},
+        elt::Type{<:Number},
+        N::Integer,
+        P::Union{ElementarySpace,ProductSpace},
         V::ElementarySpace,
     )
-    tensors = [rand(elt, V ⊗ P ← V) for _ in 1:N]
+    tensors = [Random.rand(rng, elt, V ⊗ P ← V) for _ in 1:N]
     return PeriodicMPS(tensors)
 end
 
-function random_mps(
+function Random.rand(
+        rng::Random.AbstractRNG,
+        ::Type{PeriodicMPS},
         elt::Type{<:Number},
-        P::PeriodicVector{<:ElementarySpace},
+        P::PeriodicVector{<:Union{ElementarySpace,ProductSpace}},
         V::HalfPeriodicVector{<:ElementarySpace},
     )
     tensors = [
-        rand(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
+        Random.rand(rng, elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
         for i in _check_matching_periods(P, V)
     ]
     return PeriodicMPS(tensors)
 end
 
+Random.rand(::Type{PeriodicMPS}, args...) =
+    Random.rand(Random.default_rng(), PeriodicMPS, args...)
+
 """
     one_mps(elt, N, d, D) -> PeriodicMPS
 
 Uniform periodic MPS whose tensors are all-ones matrices: physical space
-`ℂ^d`, virtual space `ℂ^D`. Deterministic, in contrast to `random_mps`.
+`ℂ^d`, virtual space `ℂ^D`.
 
     one_mps(elt, N, P, V) -> PeriodicMPS
 
@@ -77,44 +106,6 @@ function one_mps(
     )
     tensors = [
         ones(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
-        for i in _check_matching_periods(P, V)
-    ]
-    return PeriodicMPS(tensors)
-end
-
-"""
-    random_mps2(elt, N, d, D) -> PeriodicMPS
-
-Random two-site periodic MPS with `N` sites: each site carries two physical
-legs `ℂ^d` (periodic order: site a, site b) and virtual space `ℂ^D`. The tensors
-live in `ℂ^D ⊗ ℂ^d ⊗ ℂ^d ← ℂ^D`, as produced by `pair_contraction`.
-
-    random_mps2(elt, N, P, V) -> PeriodicMPS
-
-Same with graded spaces `P` (physical) and `V` (virtual), e.g. Z2Irrep.
-"""
-function random_mps2(elt::Type{<:Number}, N::Int, d::Int, D::Int)
-    tensors = [randn(elt, ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D) for _ in 1:N]
-    return PeriodicMPS(tensors)
-end
-
-function random_mps2(
-        elt::Type{<:Number},
-        N::Int,
-        P::ElementarySpace,
-        V::ElementarySpace,
-    )
-    tensors = [rand(elt, V ⊗ P ⊗ P ← V) for _ in 1:N]
-    return PeriodicMPS(tensors)
-end
-
-function random_mps2(
-        elt::Type{<:Number},
-        P::PeriodicVector{<:ProductSpace},
-        V::HalfPeriodicVector{<:ElementarySpace},
-    )
-    tensors = [
-        rand(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
         for i in _check_matching_periods(P, V)
     ]
     return PeriodicMPS(tensors)

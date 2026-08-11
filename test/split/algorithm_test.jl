@@ -35,7 +35,7 @@
 end
 
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin
-    B0 = random_mps(ComplexF64, 4, 2, 2)
+    B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
     alg = PeriodicSplit(
         SVDAnsatz(TruncationStrategy()),
@@ -51,7 +51,7 @@ end
 end
 
 @testset "split — exact B0 stays unchanged after full sweep" begin
-    B0 = random_mps(ComplexF64, 4, 2, 2)
+    B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
     ctx = SplitContext(A, deepcopy(B0))
     for st in CircularSweep(4; maximal_sweep=1)
@@ -63,7 +63,7 @@ end
 @testset "split — RandomAnsatz + Z2 spaces, zigzag sweep" begin
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
-    mpsA = random_mps2(ComplexF64, 2, P, V)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, P ⊗ P, V)
     alg = PeriodicSplit(
         RandomAnsatz(V, 4),
         ZigzagSweep(4; maximal_sweep=1),
@@ -78,7 +78,7 @@ end
 
 @testset "update! — exact periodic cost descends for both sweep orders" begin
     Random.seed!(1234)
-    mpsA = random_mps2(ComplexF64, 2, 2, 2)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     ansatz = SVDAnsatz(TruncationStrategy(maxrank=1))
 
     for sweep in (
@@ -100,7 +100,7 @@ end
 
 @testset "split — sweep progress log" begin
     Random.seed!(4321)
-    mpsA = random_mps2(ComplexF64, 2, 2, 2)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     nsweeps = 3
     alg = PeriodicSplit(
         SVDAnsatz(TruncationStrategy(maxrank=1)),

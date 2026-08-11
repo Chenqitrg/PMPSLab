@@ -8,7 +8,7 @@ end
 @testset "MPSKit gauges — normalized on nonuniform virtual bonds" begin
     P = PeriodicVector(fill(ℂ^2, 4))
     V = HalfPeriodicVector(PeriodicVector([ℂ^2, ℂ^3, ℂ^4, ℂ^3]))
-    mps = random_mps(ComplexF64, P, V)
+    mps = rand(PeriodicMPS, ComplexF64, P, V)
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
 
     L, R = PMPSLab._mpskit_gauges(mps, alg)
@@ -36,7 +36,7 @@ end
 end
 
 @testset "find_projectors — without input copies" begin
-    mps = random_mps(ComplexF64, 4, 2, 3)
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
     tensor_objects = [mps[i] for i in 1:length(mps)]
     alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
     PR, PL = find_projectors(mps, alg)

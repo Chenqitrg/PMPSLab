@@ -1,7 +1,7 @@
 @testset "SplitContext — construction and accessors" begin
     D, d = 2, 2
-    mpsB = random_mps(ComplexF64, 4, d, D)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, d, D))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, d, D)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, d, D))
     ctx = SplitContext(mpsA, mpsB)
 
     @test this_B(ctx, 1) == mpsB[1]
@@ -23,11 +23,11 @@
     )
     @test ctx.expectationAA ≈ expectation(PeriodicTransferMatrix(mpsA, mpsA))
 
-    @test_throws DimensionMismatch SplitContext(mpsA, random_mps(ComplexF64, 3, d, D))
+    @test_throws DimensionMismatch SplitContext(mpsA, rand(PeriodicMPS, ComplexF64, 3, d, D))
 end
 
 @testset "update! — Krylov solver follows the split protocol" begin
-    mpsA = random_mps2(ComplexF64, 2, 2, 1)
+    mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     mpsB = initial_approximation(mpsA, SVDAnsatz())
     ctx = SplitContext(mpsA, mpsB)
     solver = KrylovSolve(GMRES(; maxiter=100, tol=1e-12))
@@ -38,8 +38,8 @@ end
 end
 
 @testset "update! — SweepState is the site source" begin
-    mpsB = random_mps(ComplexF64, 4, 2, 2)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     ctx = SplitContext(mpsA, mpsB)
     _, cost = update!(ctx, CholeskySolve(), SweepState{Forward}(2, 0))
     @test isfinite(cost)
@@ -53,8 +53,8 @@ end
 
 @testset "update! — incomplete pairs invalidate without contraction" begin
     D, d = 2, 2
-    mpsB = random_mps(ComplexF64, 4, d, D)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, d, D))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, d, D)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, d, D))
     ctx = SplitContext(mpsA, mpsB)
     old1 = copy(mpsB[1])
     ab_left_slot = ctx.cacheAB.left[2]
@@ -81,8 +81,8 @@ end
 end
 
 @testset "update! — out-of-order sites fail before using stale caches" begin
-    mpsB = random_mps(ComplexF64, 4, 2, 2)
-    mpsA = pair_contraction(random_mps(ComplexF64, 4, 2, 2))
+    mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
+    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     ctx = SplitContext(mpsA, mpsB)
 
     update!(ctx, CholeskySolve(), SweepState{Forward}(1, 0))
@@ -101,7 +101,7 @@ end
 end
 
 @testset "update! — one step recovers exact B from perturbed guess" begin
-    B0 = random_mps(ComplexF64, 4, 2, 2)
+    B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
     B_init = deepcopy(B0)
     B_init[1] = rand(ComplexF64, space(B0[1]))

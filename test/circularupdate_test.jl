@@ -8,7 +8,6 @@ using Test
 import PMPSLab
 using PMPSLab:
     PeriodicMPS,
-    random_mps,
     AbstractPeriodicProduct,
     PeriodicTransferMatrix,
     PeriodicCache,
@@ -240,7 +239,7 @@ end
 
 @testset "PeriodicTransferMatrix integration" begin
     N, d, D = 4, 2, 2
-    mps = random_mps(ComplexF64, N, d, D)
+    mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     ptm = PeriodicTransferMatrix(mps)
     v = build_cache(ptm)
 
