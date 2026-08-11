@@ -7,11 +7,10 @@ import JLD2
 using KrylovKit
 using LinearAlgebra
 import MatrixAlgebraKit
-using MPSKit: left_virtualspace, right_virtualspace,
-              AbstractTransferMatrix, Algorithm, GenericMPSTensor,
+using MPSKit: AbstractTransferMatrix, Algorithm, GenericMPSTensor,
               TruncationStrategy, PeriodicVector, DefaultAlgorithm
 import MPSKit
-import MPSKit: physicalspace
+import MPSKit: left_virtualspace, right_virtualspace, physicalspace
 
 # Algorithm configuration and execution
 export AbstractAlgorithmConfig
@@ -30,6 +29,7 @@ export AbstractStoppingCriterion, CostConvergence, should_stop
 export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
 export assertconsistency, dense, pair_contraction
 export squared_norm, squared_distance, diff_norm, expectation
+export normalize, normalize!
 
 # Canonicalization
 export AbstractPeriodicCanonical, ProjectorCanonical
@@ -40,7 +40,7 @@ export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
 export SplitEnvironmentPolicy
 export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
-export split
+export initial_approximation, split
 
 # Sweep and numerical context
 export SweepDirection, Forward, Backward, SweepState
@@ -72,6 +72,7 @@ include("execution/local_session.jl")
 include("execution/local_control.jl")
 include("mps/indices.jl")
 include("mps/container.jl")
+include("mps/show.jl")
 include("mps/constructors.jl")
 include("mps/cdl.jl")
 include("mps/contraction.jl")

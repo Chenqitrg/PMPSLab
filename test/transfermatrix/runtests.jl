@@ -12,6 +12,8 @@ using PMPSLab:
     DenseTransferMatrix,
     TruncatedTransferMatrix,
     PeriodicTransferMatrix,
+    DenseTransferPolicy,
+    TruncatedTransferPolicy,
     FormalIdentity,
     transfer_at,
     Forward,
@@ -27,6 +29,8 @@ using PMPSLab:
     squared_norm,
     squared_distance,
     diff_norm,
+    normalize,
+    normalize!,
     gaugefix!,
     ProjectorCanonical
 using TensorKit

@@ -32,6 +32,9 @@ struct TruncatedTransferPolicy{
 end
 
 transfer_at(
+    mps::PeriodicMPS, site::Int, policy::AbstractTransferPolicy
+) = transfer_at(mps, mps, site, policy)
+transfer_at(
     bra::PeriodicMPS, ket::PeriodicMPS, site::Int, ::DenseTransferPolicy
 ) = transfer_at(bra, ket, site)
 transfer_at(

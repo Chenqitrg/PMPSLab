@@ -43,6 +43,8 @@ _transfer_period_length(
     ) where {E,S} = _transfer_period_length(mpsA, mpsB)
 
 """
+    transfer_at(mps::PeriodicMPS, site::Int)
+    transfer_at(mps::PeriodicMPS, site::Int, trunc)
     transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int)
     transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int, trunc)
 
@@ -50,6 +52,8 @@ Construct the transfer matrix at `site`. Mixed two-site/one-site MPS pairs are
 contracted over the corresponding pair of one-site tensors. Supplying `trunc`
 returns a [`TruncatedTransferMatrix`](@ref); otherwise the result is dense.
 """
+transfer_at(mps::PeriodicMPS, site::Int) = transfer_at(mps, mps, site)
+
 transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int) =
     DenseTransferMatrix(bra[site], ket[site])
 
@@ -68,6 +72,12 @@ transfer_at(
     ) where {E,S} = DenseTransferMatrix(
         mpsB[2site - 1], mpsB[2site], mpsA[site]
     )
+
+transfer_at(
+        mps::PeriodicMPS,
+        site::Int,
+        trunc::TruncationStrategy,
+    ) = transfer_at(mps, mps, site, trunc)
 
 transfer_at(
         bra::PeriodicMPS,

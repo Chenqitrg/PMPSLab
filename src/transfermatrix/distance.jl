@@ -5,12 +5,61 @@ function _nonnegative_squared(value::Real, scale::Real, quantity::AbstractString
     throw(DomainError(value, "$quantity is negative beyond roundoff tolerance"))
 end
 
+function _scaled_self_transfer(mps::PeriodicMPS, site::Int)
+    tensor = mps[site]
+    tensor_scale = norm(tensor)
+    iszero(tensor_scale) && return nothing
+    isfinite(tensor_scale) || throw(DomainError(
+        tensor_scale, "cannot normalize an MPS with non-finite tensor norms"
+    ))
+    transfer = DenseTransferMatrix(tensor / tensor_scale)
+    return transfer, 2 * log(tensor_scale)
+end
+
+function _rescale_transfer(transfer::DenseTransferMatrix)
+    transfer_scale = norm(dense(transfer))
+    iszero(transfer_scale) && return nothing
+    isfinite(transfer_scale) || throw(DomainError(
+        transfer_scale, "non-finite intermediate while normalizing an MPS"
+    ))
+    scaled = DenseTransferMatrix(dense(transfer) / transfer_scale)
+    return scaled, log(transfer_scale)
+end
+
+function _log_squared_norm(mps::PeriodicMPS)
+    first_transfer = _scaled_self_transfer(mps, 1)
+    isnothing(first_transfer) && return -Inf
+    product, log_scale = first_transfer
+
+    scaled_product = _rescale_transfer(product)
+    isnothing(scaled_product) && return -Inf
+    product, product_log_scale = scaled_product
+    log_scale += product_log_scale
+
+    for site in 2:length(mps)
+        site_transfer = _scaled_self_transfer(mps, site)
+        isnothing(site_transfer) && return -Inf
+        transfer, transfer_log_scale = site_transfer
+
+        scaled_product = _rescale_transfer(product * transfer)
+        isnothing(scaled_product) && return -Inf
+        product, product_log_scale = scaled_product
+        log_scale += transfer_log_scale + product_log_scale
+    end
+
+    trace_value = real(tr(dense(product)))
+    trace_value = _nonnegative_squared(
+        trace_value, norm(dense(product)), "scaled squared MPS norm"
+    )
+    iszero(trace_value) && return -Inf
+    return log_scale + log(trace_value)
+end
+
 function squared_norm(mps::PeriodicMPS)
-    value = real(dot(mps, mps))
-    return _nonnegative_squared(value, value, "squared MPS norm")
+    return exp(_log_squared_norm(mps))
 end
 function TensorKit.norm(mps::PeriodicMPS)
-    return sqrt(squared_norm(mps))
+    return exp(_log_squared_norm(mps) / 2)
 end
 
 function _squared_distance_data(
@@ -51,10 +100,34 @@ function Base.isapprox(
     return distance2 <= max(tolerance^2, roundoff2)
 end
 
+"""
+    normalize(mps::PeriodicMPS)
+
+Return a normalized copy of `mps`, leaving the original state unchanged. The
+global normalization is computed with logarithmic scale accumulation and
+distributed evenly over all site tensors.
+"""
 function LinearAlgebra.normalize(mps::PeriodicMPS)
-    n = norm(mps)
-    iszero(n) && throw(ArgumentError("cannot normalize a zero periodic MPS"))
-    result = copy(mps)
-    result[1] = result[1] / n
-    return result
+    return normalize!(PeriodicMPS(copy.(mps)))
+end
+
+"""
+    normalize!(mps::PeriodicMPS)
+
+Normalize `mps` in place and return it. The underlying tensor data is scaled
+directly, preserving both the MPS and site-tensor object identities.
+"""
+function LinearAlgebra.normalize!(mps::PeriodicMPS)
+    log_squared_norm = _log_squared_norm(mps)
+    log_squared_norm == -Inf && throw(ArgumentError(
+        "cannot normalize a zero periodic MPS"
+    ))
+    isfinite(log_squared_norm) || throw(DomainError(
+        log_squared_norm, "cannot normalize an MPS with a non-finite norm"
+    ))
+
+    site_scale = exp(log_squared_norm / (2 * length(mps)))
+    inverse_site_scale = inv(site_scale)
+    foreach(tensor -> rmul!(tensor, inverse_site_scale), mps)
+    return mps
 end

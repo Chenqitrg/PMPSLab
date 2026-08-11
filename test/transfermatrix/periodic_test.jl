@@ -10,6 +10,8 @@
     for i in 1:N
         @test ptm[i] isa DenseTransferMatrix
         @test ptm[i] ≈ DenseTransferMatrix(mps[i])
+        @test transfer_at(mps, i) ≈ ptm[i]
+        @test transfer_at(mps, i, DenseTransferPolicy()) ≈ ptm[i]
         @test transfer_at(mps, mps, i) ≈ ptm[i]
     end
     new = DenseTransferMatrix(random_mps(ComplexF64, 1, d, D)[1])
@@ -86,6 +88,10 @@ end
         dense(TruncatedTransferMatrix(bra[i], ket[i], trunc))
         for i in eachindex(ptm)
     )
+    @test dense(transfer_at(ket, 2, trunc)) ≈
+          dense(TruncatedTransferMatrix(ket[2], trunc))
+    @test dense(transfer_at(ket, 2, TruncatedTransferPolicy(trunc))) ≈
+          dense(TruncatedTransferMatrix(ket[2], trunc))
     @test dense(transfer_at(bra, ket, 2, trunc)) ≈ dense(ptm[2])
     @test expectation(bra, ket, trunc) ≈ expectation(ptm)
 

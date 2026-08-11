@@ -195,6 +195,11 @@ end
     @test virtualspace(mps) == ℂ^D
     @test physicalspace(mps) == ℂ^d
     @test scalartype(mps) == ComplexF64
+    @test left_virtualspace(mps, 2) == left_virtualspace(mps[2])
+    @test right_virtualspace(mps, 2) == right_virtualspace(mps[2])
+    @test MPSKit.physicalspace(mps, 2) == physicalspace(mps[2])
+    @test collect(left_virtualspace(mps)) == fill(ℂ^D, N)
+    @test collect(right_virtualspace(mps)) == fill(ℂ^D, N)
 
     # HalfInt getindex: bond label → right virtual space of site n = left of site n+1
     @test mps[HalfInt(2)] == right_virtualspace(mps[2])
@@ -223,6 +228,42 @@ end
     @test ps isa PeriodicVector
     @test length(ps) == N
     @test all(ps[i] == ℂ^d for i in 1:N)
+end
+
+@testset "PeriodicMPS — plain-text display" begin
+    mps = random_mps(ComplexF64, 4, 2, 3)
+    summary_text = summary(mps)
+
+    @test startswith(summary_text, "4-site PeriodicMPS(ComplexF64, ")
+    @test endswith(summary_text, ") with maximal bond dimension 3")
+
+    shown = sprint(show, MIME"text/plain"(), mps; context = (:limit => false,))
+    @test startswith(shown, summary_text * ":\n")
+    @test occursin("╭─╮\n│ │ ℂ^3", shown)
+    @test occursin("│ ├─[4]─ ℂ^2", shown)
+    @test occursin("│ ├─[1]─ ℂ^2\n╰─╯", shown)
+    @test !occursin("TensorMap", shown)
+
+    compact = sprint(show, MIME"text/plain"(), mps; context = (:compact => true,))
+    @test compact == summary_text
+
+    long_mps = random_mps(ComplexF64, 10, 2, 3)
+    limited = sprint(
+        show,
+        MIME"text/plain"(),
+        long_mps;
+        context = (:limit => true, :displaysize => (12, 80)),
+    )
+    @test occursin("│ │ ⋮", limited)
+    @test occursin("│ ├─[10]─", limited)
+    @test occursin("│ ├─[1]─", limited)
+    @test !occursin("│ ├─[8]─", limited)
+
+    two_leg_mps = random_mps2(ComplexF64, 2, 2, 3)
+    two_leg_shown = sprint(
+        show, MIME"text/plain"(), two_leg_mps; context = (:limit => false,)
+    )
+    @test occursin("(ℂ^2 ⊗ ℂ^2)", two_leg_shown)
 end
 
 # ==============================================================================

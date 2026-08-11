@@ -114,6 +114,13 @@ Base.similar(mps::PeriodicMPS) =
 Base.getindex(mps::PeriodicMPS, pos::HalfInt) =
     right_virtualspace(mps[pos.n])
 
+left_virtualspace(mps::PeriodicMPS, site::Integer) =
+    left_virtualspace(mps[Int(site)])
+right_virtualspace(mps::PeriodicMPS, site::Integer) =
+    right_virtualspace(mps[Int(site)])
+physicalspace(mps::PeriodicMPS, site::Integer) =
+    physicalspace(mps[Int(site)])
+
 virtualspace(mps::PeriodicMPS{<:GenericMPSTensor}) =
     left_virtualspace(first(mps))
 virtualspaces(mps::PeriodicMPS{<:GenericMPSTensor}) =
