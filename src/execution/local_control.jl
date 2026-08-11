@@ -50,18 +50,22 @@ running run takes effect after the current safe step; a paused run is cancelled
 immediately.
 """
 function cancel!(session::LocalRunSession)
-    lock(session.lock) do
+    cancelled = lock(session.lock) do
         if session.status == LOCAL_RUNNING ||
            session.status == LOCAL_PAUSE_REQUESTED
             session.status = LOCAL_CANCEL_REQUESTED
+            return false
         elseif session.status == LOCAL_READY || session.status == LOCAL_PAUSED
             session.status = LOCAL_CANCELLED
+            return true
         elseif session.status != LOCAL_CANCEL_REQUESTED &&
                session.status != LOCAL_CANCELLED
             throw(ArgumentError(
                 "cannot cancel local run from status $(session.status)"
             ))
         end
+        return false
     end
+    cancelled && _observer_cancelled!(session.observer, session.run)
     return session
 end

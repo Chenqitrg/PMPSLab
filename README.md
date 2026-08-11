@@ -182,8 +182,46 @@ or no criterion was configured.
 
 ## 6. Observe a controllable run
 
-For per-site progress and asynchronous execution, initialize a run and place it
-inside a `LocalRunSession`:
+In an interactive Julia REPL, `split` and `start_run` select a default split
+observer when the `observer` keyword is omitted. It emits structured progress
+for every completed site and keeps one permanent summary line per completed
+sweep. VS Code displays the progress events in its progress UI; other loggers
+may choose their own rendering.
+
+The simplest usage needs no logging configuration:
+
+```julia
+B, log = split(A, algorithm)
+```
+
+While the blocking split runs, the REPL reports sweep summaries such as:
+
+```text
+[ Info: Periodic split started
+[ Info: Periodic split sweep 1 completed: cost=<Float64>, time=<Float64>s
+[ Info: Periodic split sweep 2 completed: cost=<Float64>, time=<Float64>s
+...
+[ Info: Periodic split completed after <integer> site updates
+```
+
+For asynchronous execution, initialize a run and place it inside a
+`LocalRunSession`:
+
+```julia
+session = start_run(initialize_run(A, algorithm))
+B, log = fetch(session)
+```
+
+The asynchronous run uses the same default observer and log format.
+
+Non-interactive scripts remain silent by default. Pass `observer=nothing` to
+disable the default observer explicitly in a REPL:
+
+```julia
+session = start_run(initialize_run(A, algorithm); observer=nothing)
+```
+
+A custom observer replaces the default output completely:
 
 ```julia
 session = start_run(
@@ -198,7 +236,7 @@ session = start_run(
 B, log = fetch(session)
 ```
 
-The observer prints one line per completed site, for example:
+The custom observer above prints one line per completed site, for example:
 
 ```text
 sweep=1 site=1 cost=<Float64>

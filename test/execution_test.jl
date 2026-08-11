@@ -142,6 +142,11 @@ end
 
 @testset "local session fetch reports terminal outcomes" begin
     ready = LocalRunSession(initialize_run(1, DummyAlgorithm()); threaded=false)
+    @test isnothing(ready.observer)
+    @test sprint(show, ready) ==
+          "LocalRunSession(DummyRun; status=LOCAL_READY, threaded=false)"
+    @test sprint(show, MIME"text/plain"(), ready) == sprint(show, ready)
+    @test !occursin("DummyContext", sprint(show, MIME"text/plain"(), ready))
     @test_throws ArgumentError fetch(ready)
 
     failed = start_run(FailingRun(); threaded=true)

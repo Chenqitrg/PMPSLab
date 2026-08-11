@@ -215,18 +215,39 @@ function run_result(run::SplitRun)
 end
 
 """
-    split(mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, alg::PeriodicSplit)
+    split(
+        mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        alg::PeriodicSplit;
+        observer,
+    )
 
 Given a periodic MPS with 2 physical legs per site (3 codim legs), produce a
 periodic MPS with 1 physical leg per site (2 codim legs) that best approximates
 the periodic state. Returns `(mps_1site, log)` where `log` is a [`SplitLog`](@ref)
 with one `SiteLog` per update. This blocking convenience API uses the same
 [`SplitRun`](@ref) stepper as controllable local and platform execution.
+
+Interactive sessions use the default split progress observer when `observer`
+is omitted. Pass `observer=nothing` to disable output or supply a callable to
+replace the default observer.
 """
-function split(mps::PeriodicMPS, algorithm::PeriodicSplit)
+function split(
+        mps::PeriodicMPS,
+        algorithm::PeriodicSplit;
+        observer = _DEFAULT_OBSERVER,
+    )
     run = initialize_run(mps, algorithm)
-    while !isfinished(run)
-        step!(run)
+    resolved_observer = _resolve_observer(run, observer)
+    try
+        _observer_running!(resolved_observer, run)
+        while !isfinished(run)
+            event = step!(run)
+            _observer_step!(resolved_observer, event, run)
+        end
+        _observer_completed!(resolved_observer, run)
+    catch err
+        _observer_failed!(resolved_observer, run, err)
+        rethrow()
     end
     return run_result(run)
 end

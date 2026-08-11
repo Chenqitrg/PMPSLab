@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "1f41d723cd5e4a69855230eed4be03b7abb248f6"
+project_hash = "0e3adf1994d3326af552e3b2cd3cca03d1dc9991"
 
 [[deps.Accessors]]
 deps = ["CompositionsBase", "ConstructionBase", "Dates", "InverseFunctions", "MacroTools"]
@@ -494,6 +494,12 @@ deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 version = "1.11.0"
 
+[[deps.ProgressLogging]]
+deps = ["Logging", "SHA", "UUIDs"]
+git-tree-sha1 = "f0803bc1171e455a04124affa9c21bba5ac4db32"
+uuid = "33c8b6b6-d38a-422a-b730-caa89a2f386c"
+version = "0.1.6"
+
 [[deps.PtrArrays]]
 git-tree-sha1 = "4fbbafbc6251b883f4d2705356f3641f3652a7fe"
 uuid = "43287f4e-b6f4-7ad1-bb20-aadabca52c3d"
@@ -680,7 +686,7 @@ version = "5.6.2"
     cuTENSOR = "011b41b2-24ef-40a8-b3eb-fa098493e9e1"
 
 [[deps.TensorRing]]
-deps = ["JLD2", "KrylovKit", "LinearAlgebra", "MPSKit", "MatrixAlgebraKit", "TensorKit"]
+deps = ["JLD2", "KrylovKit", "LinearAlgebra", "Logging", "MPSKit", "MatrixAlgebraKit", "ProgressLogging", "TensorKit", "UUIDs"]
 path = "."
 uuid = "dd4302de-b7e4-496a-84b6-645ce13c7f0e"
 version = "0.1.0"

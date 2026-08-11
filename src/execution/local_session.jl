@@ -10,11 +10,15 @@
 end
 
 """
-    LocalRunSession(run; observer=nothing, threaded=Threads.nthreads(:default) > 1)
+    LocalRunSession(run; observer, threaded=Threads.nthreads(:default) > 1)
 
 Lightweight local adapter for controlling an [`AbstractAlgorithmRun`](@ref)
 from a Julia REPL. It provides cooperative, in-memory pause and cancellation at
 algorithm-defined safe-step boundaries; it is not a production job scheduler.
+
+When `observer` is omitted, interactive sessions use the algorithm's default
+observer. Pass `observer=nothing` to disable output or supply a callable to
+replace the default observer.
 
 With more than one default Julia thread, `threaded=true` executes the run on a
 worker thread so the REPL remains responsive during a step. With one thread,
@@ -33,11 +37,18 @@ end
 
 function LocalRunSession(
         run::AbstractAlgorithmRun;
-        observer = nothing,
+        observer = _DEFAULT_OBSERVER,
         threaded::Bool = Threads.nthreads(:default) > 1,
     )
+    resolved_observer = _resolve_observer(run, observer)
     return LocalRunSession(
-        run, observer, threaded, ReentrantLock(), LOCAL_READY, nothing, nothing
+        run,
+        resolved_observer,
+        threaded,
+        ReentrantLock(),
+        LOCAL_READY,
+        nothing,
+        nothing,
     )
 end
 
@@ -60,22 +71,28 @@ function _set_status!(session::LocalRunSession, status::LocalRunStatus)
 end
 
 function _finish_if_requested!(session::LocalRunSession)
-    lock(session.lock) do
+    should_stop, transition = lock(session.lock) do
         if session.status == LOCAL_PAUSE_REQUESTED
             session.status = LOCAL_PAUSED
-            return true
+            return true, LOCAL_PAUSED
         elseif session.status == LOCAL_CANCEL_REQUESTED
             session.status = LOCAL_CANCELLED
-            return true
+            return true, LOCAL_CANCELLED
         elseif session.status != LOCAL_RUNNING
-            return true
+            return true, nothing
         end
-        return false
+        return false, nothing
     end
+    if transition == LOCAL_PAUSED
+        _observer_paused!(session.observer, session.run)
+    elseif transition == LOCAL_CANCELLED
+        _observer_cancelled!(session.observer, session.run)
+    end
+    return should_stop
 end
 
 function _notify_observer(session::LocalRunSession, event::AlgorithmEvent)
-    isnothing(session.observer) || session.observer(event)
+    _observer_step!(session.observer, event, session.run)
     return nothing
 end
 
@@ -84,11 +101,13 @@ function _drive_local_session!(session::LocalRunSession)
         session.task = current_task()
     end
     try
+        _observer_running!(session.observer, session.run)
         while true
             _finish_if_requested!(session) && return session
 
             if isfinished(session.run)
                 _set_status!(session, LOCAL_COMPLETED)
+                _observer_completed!(session.observer, session.run)
                 return session
             end
 
@@ -99,6 +118,7 @@ function _drive_local_session!(session::LocalRunSession)
             # the final step was executing.
             if isfinished(session.run)
                 _set_status!(session, LOCAL_COMPLETED)
+                _observer_completed!(session.observer, session.run)
                 return session
             end
 
@@ -111,6 +131,7 @@ function _drive_local_session!(session::LocalRunSession)
             session.failure = CapturedException(err, catch_backtrace())
             session.status = LOCAL_FAILED
         end
+        _observer_failed!(session.observer, session.run, err)
         return session
     end
 end

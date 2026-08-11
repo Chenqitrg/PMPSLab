@@ -1,5 +1,7 @@
 using Test
 using Random
+using Logging
+import ProgressLogging
 import PMPSLab
 using PMPSLab:
     PeriodicMPS,
@@ -61,6 +63,7 @@ include("context_test.jl")
 include("environment_test.jl")
 include("transfer_policy_test.jl")
 include("run_test.jl")
+include("progress_test.jl")
 include("stopping_test.jl")
 include("snapshot_test.jl")
 include("algorithm_test.jl")
