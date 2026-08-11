@@ -75,6 +75,14 @@ function _copy_split_log(log::SplitLog)
     return SplitLog(copy(log.site_logs), log.sweep_time, log.converged)
 end
 
+function _completes_sweep(
+        state::SweepState,
+        following_iteration::SplitPendingIteration,
+    )
+    return isnothing(following_iteration) ||
+           first(following_iteration).n > state.n
+end
+
 function snapshot(run::SplitRun)
     # A snapshot must remain unchanged if the run continues. Copy every tensor,
     # rather than only copying the PeriodicMPS container, and detach the mutable
@@ -89,9 +97,13 @@ function snapshot(run::SplitRun)
     )
 end
 
-function _validate_split_cursor(saved::SplitSnapshot, sweep::AbstractSweep)
+function _replay_split_progress(
+        site_logs::AbstractVector{<:SplitSiteLog},
+        sweep::AbstractSweep,
+        stopping::Union{Nothing,AbstractStoppingCriterion},
+    )
     expected_iteration = iterate(sweep)
-    for (step, site_log) in enumerate(saved.log.site_logs)
+    for (step, site_log) in enumerate(site_logs)
         isnothing(expected_iteration) && throw(ArgumentError(
             "snapshot contains a log for step $step after the supplied sweep is complete"
         ))
@@ -99,8 +111,35 @@ function _validate_split_cursor(saved::SplitSnapshot, sweep::AbstractSweep)
         site_log.state == expected_state || throw(ArgumentError(
             "snapshot step $step has state $(site_log.state), expected $expected_state for the supplied sweep"
         ))
-        expected_iteration = iterate(sweep, next_iterator_state)
+        following_iteration = iterate(sweep, next_iterator_state)
+        if _completes_sweep(expected_state, following_iteration) &&
+                should_stop(
+                    stopping,
+                    @view(site_logs[begin:step]),
+                )
+            step == length(site_logs) || throw(ArgumentError(
+                "snapshot contains logs after the configured cost criterion converged"
+            ))
+            return nothing, true
+        end
+        expected_iteration = following_iteration
     end
+    return expected_iteration, false
+end
+
+function _validate_split_cursor(
+        saved::SplitSnapshot,
+        sweep::AbstractSweep,
+        stopping::Union{Nothing,AbstractStoppingCriterion},
+    )
+    expected_iteration, expected_converged = _replay_split_progress(
+        saved.log.site_logs,
+        sweep,
+        stopping,
+    )
+    saved.log.converged == expected_converged || throw(ArgumentError(
+        "snapshot convergence flag does not match its cost history"
+    ))
     isequal(saved.pending_iteration, expected_iteration) || throw(ArgumentError(
         "snapshot cursor does not match its completed logs and the supplied sweep"
     ))
@@ -129,7 +168,7 @@ function restore_run(
             "snapshot does not match the supplied split target or algorithm configuration"
         )
     )
-    _validate_split_cursor(saved, algorithm.sweep)
+    _validate_split_cursor(saved, algorithm.sweep, algorithm.stopping)
 
     mpsB = PeriodicMPS([copy(tensor) for tensor in saved.mpsB])
     context = _build_split_context(mpsA, mpsB, algorithm.environments)
@@ -162,6 +201,11 @@ function step!(run::SplitRun)
 
     run.log.sweep_time += site_log.time
     run.pending_iteration = following_iteration
+    if _completes_sweep(state, following_iteration) &&
+            should_stop(run.algorithm.stopping, run.log.site_logs)
+        run.log.converged = true
+        run.pending_iteration = nothing
+    end
     return SplitSiteCompleted(site_log)
 end
 

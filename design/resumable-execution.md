@@ -242,9 +242,13 @@ function step!(run::SplitRun)
     push!(run.log.site_logs, site_log)
     run.log.sweep_time += site_log.time
 
-    # Commit the durable cursor only after the site update and log append
-    # have both succeeded.
-    run.pending_iteration = following_iteration
+    if completes_sweep(state, following_iteration) &&
+            should_stop(run.algorithm.stopping, run.log.site_logs)
+        run.log.converged = true
+        run.pending_iteration = nothing
+    else
+        run.pending_iteration = following_iteration
+    end
 
     return SplitSiteCompleted(site_log)
 end
@@ -254,6 +258,13 @@ Initialization prefetches the first iterator item. Consequently,
 `isfinished(run)` is equivalent to `isnothing(run.pending_iteration)`, and the
 run becomes complete as part of its final real site step rather than requiring
 an extra completion-only call to `step!`.
+
+An optional `CostConvergence` policy may also make the run complete at a full
+sweep boundary. It compares only complete-sweep endpoint costs and requires a
+configurable minimum sweep count and number of consecutive stable comparisons.
+Without a stopping policy, the sweep iterator remains the sole completion
+condition. `SplitLog.converged` is true only when the cost policy stopped the
+run; exhausting `maximal_sweep` leaves it false.
 
 `pending_iteration` stores the unmodified result of Julia's `iterate`: the next
 `SweepState` to execute and the opaque iterator state for the call after it.
@@ -531,10 +542,12 @@ bitwise identity. Tests compare the final MPS, costs, and relevant observables
 with suitable `isapprox` tolerances.
 
 The algorithm-specific inputs and algorithm configuration are immutable. Restore must not
-allow a caller to change the ansatz, solver, sweep order, truncation policy, or
-maximum sweep count. A snapshot must be rejected when its dimensions, spaces,
-algorithm kind, or schema are incompatible with the supplied inputs and
-configuration.
+allow a caller to change the ansatz, solver, sweep order, truncation policy,
+stopping criterion, or maximum sweep count. A snapshot must be rejected when
+its dimensions, spaces, algorithm kind, or schema are incompatible with the
+supplied inputs and configuration. Cursor validation replays complete sweep
+boundaries and verifies that the stored convergence flag agrees with the saved
+cost history.
 
 Random initial approximations are stored through `mpsB`; they are never
 regenerated during restore. Any future algorithm that uses randomness after a

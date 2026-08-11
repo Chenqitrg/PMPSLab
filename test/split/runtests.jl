@@ -38,6 +38,8 @@ using PMPSLab:
     CholeskySolve,
     KrylovSolve,
     PeriodicSplit,
+    AbstractStoppingCriterion,
+    CostConvergence,
     SplitEnvironmentPolicy,
     SplitRun,
     SplitSnapshot,
@@ -59,6 +61,7 @@ include("context_test.jl")
 include("environment_test.jl")
 include("transfer_policy_test.jl")
 include("run_test.jl")
+include("stopping_test.jl")
 include("snapshot_test.jl")
 include("algorithm_test.jl")
 include("periodic_gauge_test.jl")

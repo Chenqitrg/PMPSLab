@@ -34,22 +34,32 @@ SplitEnvironmentPolicy(policy::AbstractTransferPolicy) =
     SplitEnvironmentPolicy(policy, policy)
 
 """
-    PeriodicSplit(ansatz, sweep, solve; environments=SplitEnvironmentPolicy())
+    PeriodicSplit(
+        ansatz,
+        sweep,
+        solve;
+        environments=SplitEnvironmentPolicy(),
+        stopping=nothing,
+    )
     PeriodicSplit(ansatz, sweep, solve, environments)
 
 Compose the initial ansatz, sweep order, local solver, and normal/mixed transfer
-representations for a periodic 2-to-1 split.
+representations for a periodic 2-to-1 split. An optional `stopping` criterion
+may end execution at a complete sweep boundary before the sweep iterator is
+exhausted.
 """
 struct PeriodicSplit{
         A<:AbstractAnsatz,
         S<:AbstractSweep,
         V<:AbstractSolve,
         E<:SplitEnvironmentPolicy,
+        C<:Union{Nothing,AbstractStoppingCriterion},
     } <: AbstractPeriodicSplit
     ansatz::A
     sweep::S
     solve::V
     environments::E
+    stopping::C
 end
 
 function PeriodicSplit(
@@ -57,8 +67,16 @@ function PeriodicSplit(
         sweep::AbstractSweep,
         solve::AbstractSolve;
         environments::SplitEnvironmentPolicy = SplitEnvironmentPolicy(),
+        stopping::Union{Nothing,AbstractStoppingCriterion} = nothing,
     )
-    return PeriodicSplit(ansatz, sweep, solve, environments)
+    return PeriodicSplit(ansatz, sweep, solve, environments, stopping)
 end
+
+PeriodicSplit(
+    ansatz::AbstractAnsatz,
+    sweep::AbstractSweep,
+    solve::AbstractSolve,
+    environments::SplitEnvironmentPolicy,
+) = PeriodicSplit(ansatz, sweep, solve, environments, nothing)
 
 # split(mps, alg) defined in run.jl — drives SplitRun to completion

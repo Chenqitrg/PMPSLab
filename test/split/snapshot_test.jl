@@ -181,6 +181,14 @@ end
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_environments)
 
+    different_stopping = PeriodicSplit(
+        algorithm.ansatz,
+        algorithm.sweep,
+        algorithm.solve;
+        stopping=CostConvergence(),
+    )
+    @test_throws ArgumentError restore_run(saved, mpsA, different_stopping)
+
     virtual_space = Z2Space(0 => 2, 1 => 1)
     physical_space = Z2Space(0 => 2)
     graded_target = random_mps2(ComplexF64, 2, physical_space, virtual_space)

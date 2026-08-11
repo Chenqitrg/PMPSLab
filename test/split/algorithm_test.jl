@@ -10,6 +10,7 @@
         LUSolve(),
         CholeskySolve(),
         KrylovSolve(GMRES(; maxiter=10)),
+        CostConvergence(),
         SplitEnvironmentPolicy(),
         SplitEnvironmentPolicy(
             TruncatedTransferPolicy(TruncationStrategy())

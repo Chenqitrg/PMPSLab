@@ -13,20 +13,46 @@ using MPSKit: left_virtualspace, right_virtualspace,
 import MPSKit
 import MPSKit: physicalspace
 
-# Types
-export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
-export ConvergenceLog, SiteLog, SweepLog, SplitLog
+# Algorithm configuration and execution
 export AbstractAlgorithmConfig
 export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
 export AlgorithmEvent, LocalRunSession, LocalRunStatus, LocalCheckpointOutcome
+export initialize_run, step!, isfinished, run_result, snapshot, restore_run
+export write_checkpoint, read_checkpoint
+export start_run, start_run!, pause!, resume!, cancel!, run_status
+export checkpoint!, pause_and_checkpoint!, cancel_and_checkpoint!
+
+# Progress reporting and stopping
+export ConvergenceLog, SiteLog, SweepLog, SplitLog
+export AbstractStoppingCriterion, CostConvergence, should_stop
+
+# Periodic MPS containers and operations
+export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
+export assertconsistency, dense, pair_contraction
+export squared_norm, squared_distance, diff_norm, expectation
+
+# Canonicalization
 export AbstractPeriodicCanonical, ProjectorCanonical
+export gaugefix!
+
+# Periodic split
 export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
 export SplitEnvironmentPolicy
 export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
+export split
+
+# Sweep and numerical context
+export SweepDirection, Forward, Backward, SweepState
+export AbstractSweep, ZigzagSweep, CircularSweep
+export AlgorithmContext, SplitContext, update!
+
+# Transfer matrices and policies
 export DenseTransferMatrix, TruncatedTransferMatrix, PeriodicTransferMatrix
 export AbstractTransferPolicy, DenseTransferPolicy, TruncatedTransferPolicy
 export transfer_at
+
+# Periodic products and caches
 export AbstractPeriodicProduct, PeriodicCache, build_cache, environment
 export prefix_products, suffix_products
 export left_cache_before, right_cache_after, range_product, edge_space, edge_identity
@@ -34,18 +60,11 @@ export FormalIdentity, UnitalElement, compose_product
 export StaleCacheError
 export invalidate!, advance!, rebuild_left!, rebuild_right!, rebuild!
 
-# Public API
-export gaugefix!, assertconsistency, dense, pair_contraction, split
-export initialize_run, step!, isfinished, run_result, snapshot, restore_run
-export write_checkpoint, read_checkpoint
-export start_run, start_run!, pause!, resume!, cancel!, run_status
-export checkpoint!, pause_and_checkpoint!, cancel_and_checkpoint!
-export squared_norm, squared_distance, diff_norm
-export expectation
-export random_mps, one_mps, random_mps2, one_mps2, random_cdl, random_cdl_mps, lift
-export SweepDirection, Forward, Backward, SweepState
-export AbstractSweep, ZigzagSweep, CircularSweep, AlgorithmContext, SplitContext, update!
+# Local solvers
 export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
+
+# Constructors and examples
+export random_mps, one_mps, random_mps2, one_mps2, random_cdl, random_cdl_mps, lift
 
 include("algorithm_config.jl")
 include("execution/interface.jl")
@@ -72,6 +91,7 @@ include("transfermatrix/policy.jl")
 include("transfermatrix/distance.jl")
 include("canonicalize/projector.jl")
 include("canonicalize/interface.jl")
+include("split/stopping.jl")
 include("split/interface.jl")
 include("split/ansatz.jl")
 include("circularupdate/sweep.jl")

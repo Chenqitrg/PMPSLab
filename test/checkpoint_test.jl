@@ -23,7 +23,8 @@ end
     algorithm = PeriodicSplit(
         SVDAnsatz(),
         CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+        CholeskySolve();
+        stopping=CostConvergence(min_sweeps=2),
     )
     run = initialize_run(mpsA, algorithm)
     step!(run)
