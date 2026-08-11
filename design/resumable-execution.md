@@ -2,9 +2,11 @@
 
 ## Status
 
-This document proposes a platform-independent execution model for pausing,
-checkpointing, restoring, and cancelling long-running PMPSLab algorithms. It
-does not define a job service, frontend protocol, or storage backend.
+This document records the platform-independent execution model for pausing,
+checkpointing, restoring, and cancelling long-running PMPSLab algorithms. The
+split run, snapshots, checkpoint codec, and synthetic parent-child composition
+proof are implemented. The platform adapter remains deferred until its hosting
+interfaces are known.
 
 The first implementation target is the existing 2-to-1 periodic MPS `split`
 algorithm. The design must also compose with future algorithms, especially a
@@ -627,9 +629,9 @@ A synthetic parent run with a resumable child verifies that:
 3. Add corruption and version-mismatch tests.
 4. Document the initial same-environment compatibility guarantee.
 
-### Phase 4: Composition proof
+### Phase 4: Composition proof — implemented
 
-1. Add a synthetic parent-child run in tests.
+1. Add a synthetic parent-child run in `test/composition_test.jl`.
 2. Verify nested stepping, progress, snapshot, and restore.
 3. Refine the protocol only where composition exposes a concrete need.
 

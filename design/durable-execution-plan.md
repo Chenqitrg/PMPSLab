@@ -2,23 +2,20 @@
 
 ## Status and Scope
 
-This is an implementation plan for the remaining local durable-execution work
-around `PeriodicSplit`. It is deliberately narrower than a job platform.
+**Implemented.** This document records the local durable-execution design around
+`PeriodicSplit`. It is deliberately narrower than a job platform.
 
-The completed baseline is:
+The completed implementation provides:
 
 - `SplitRun` advances one complete site through `step!`;
 - `LocalRunSession` supports in-memory `pause!`, `resume!`, and `cancel!`;
 - `snapshot`, `write_checkpoint`, `read_checkpoint`, and `restore_run` exist;
 - checkpoints are atomically published by rename;
-- a restored split run rebuilds derived transfer matrices and caches.
-
-This plan adds:
-
-1. a snapshot identity that records target spaces and the complete
-   `PeriodicSplit` configuration;
-2. explicit local helpers for durable pause and durable cancellation;
-3. focused tests and user documentation for the resulting lifecycle.
+- a restored split run rebuilds derived transfer matrices and caches;
+- snapshot identity records target spaces and the complete `PeriodicSplit`
+  configuration;
+- local helpers provide durable pause and durable cancellation;
+- focused tests and README examples cover the resulting lifecycle.
 
 This plan does not add job IDs, a persistent registry, automatic checkpoint
 discovery, HTTP/WebSocket transport, object storage, worker assignment, or
@@ -402,7 +399,7 @@ Update `design/resumable-execution.md` to mark the local checkpoint codec and
 durable local helpers accurately, while leaving platform responsibilities and
 nested LoopTNR execution as deferred.
 
-## Delivery Sequence
+## Delivery Sequence (completed)
 
 1. Implement `SplitProblemIdentity` from target spaces and algorithm configuration.
 2. Update JLD2 round-trip/metadata tests for the identity field.

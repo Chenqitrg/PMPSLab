@@ -109,7 +109,7 @@ replace the finite-periodic tensors or preserve their amplitude.
 `gaugefix!(mps, ProjectorCanonical(...))` in place. The later split/ALS machinery
 continues to work exclusively with `PeriodicMPS` values.
 
-### Split cost log and callback
+### Split cost log and observer
 
 `split(mps, alg)` currently returns `(mpsB, log)`. Each `SiteLog.error` records
 the cheap local quantity produced by `solvenew`,
@@ -137,27 +137,29 @@ require non-increase for both circular and zigzag sweeps. With a truncated
 working environment, the logged value is an approximate local cost; explicit
 `squared_distance` remains an exact dense finite-period check.
 
-The public interface provides a synchronous optional callback after each
-complete sweep:
+The public interface accepts an optional observer that receives each completed
+site event:
 
 ```julia
-split(mps, alg; callback = nothing)
-callback(log)
-cost = last(log.site_logs).error
+split(mps, alg; observer = event -> println(event.log.error))
 ```
 
-No separate progress type or duplicate cost storage is needed. The error in the
-last `SiteLog` is the cost after the most recent update,
+Omitting `observer` selects the split progress observer in an interactive Julia
+session and remains silent in a non-interactive script. Passing
+`observer=nothing` is always silent. A custom observer replaces the default and
+receives the same [`SplitSiteCompleted`](@ref) event emitted by [`step!`](@ref).
+It adds no contraction or MPS copy.
+
+The error in the last `SiteLog` is the cost after the most recent update,
 
 ```math
 c = \langle A|A\rangle + \langle B|B\rangle
     - 2\operatorname{Re}\langle B|A\rangle.
 ```
 
-The callback fires at a change of `SweepState.n` and once after the final
-sweep. It receives the same mutable `SplitLog` that is eventually returned and
-adds no contraction or MPS copy. Rendering, channels, progress bars, stopping
-policy, and cancellation remain frontend responsibilities.
+The default observer renders site progress and one persistent summary for each
+completed sweep. Numerical stopping remains part of `PeriodicSplit`; pause and
+cancellation remain execution-session responsibilities.
 
 ## Norm semantics
 
