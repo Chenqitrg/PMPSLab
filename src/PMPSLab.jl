@@ -19,6 +19,7 @@ import MPSKit: left_virtualspace, right_virtualspace, physicalspace
 # Algorithm configuration and execution
 export AbstractAlgorithmConfig
 export AbstractMeasurement, AbstractMeasurementResult, MeasurementHistory, measure
+export AbstractNormalization, InfinityNormNormalization, NormalizationResult
 export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
 export AlgorithmEvent, LocalRunSession, LocalRunStatus, LocalCheckpointOutcome
 export initialize_run, step!, isfinished, run_result, snapshot, restore_run
@@ -80,6 +81,7 @@ include("measurement/history.jl")
 include("tensorcell/container.jl")
 include("tensorcell/constructors.jl")
 include("tensorcell/show.jl")
+include("looptnr/normalization.jl")
 include("execution/interface.jl")
 include("execution/observer.jl")
 include("execution/local_session.jl")

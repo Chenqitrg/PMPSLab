@@ -869,6 +869,10 @@ LoopTNR-specific measurement。
 
 ### Phase 2：TensorCell infinity normalization
 
+**实现状态：已完成。** 已加入 `InfinityNormNormalization`、
+`NormalizationResult` 与事务式 `normalize!`，按 gate object identity 去重并
+使用 logarithmic geometric mean 避免直接乘积溢出。
+
 **目标：** 完成可独立验证的 normalization primitive。
 
 实现：
