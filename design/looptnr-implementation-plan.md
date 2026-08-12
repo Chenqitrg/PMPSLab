@@ -709,7 +709,7 @@ struct LoopTNRSnapshot{C,P,L,H,I} <: AbstractAlgorithmSnapshot
     cell::C
     completed_rg::Int
     phase::LoopTNRPhase
-    child::P
+    active_split::P
     log::L
     measurement_results::H
     identity::I
@@ -772,9 +772,9 @@ restore 必须验证：
 - `0 <= completed_rg <= maximal_rg`，初始化 phase 除外；
 - log/history 的 RG 序列连续且都从 0 开始；
 - log/history 长度等于 `completed_rg + 1`；
-- child presence 和 completion status 与 phase 一致；
-- active child target spaces 与 saved cell 转换得到的 target 一致；
-- finished snapshot 没有 child；
+- active split presence 和 completion status 与 phase 一致；
+- active split target spaces 与 saved cell 转换得到的 target 一致；
+- finished snapshot 没有 active split；
 - saved `completed_rg` 不超过 supplied `maximal_rg`。
 
 ### Checkpoint codec
@@ -984,6 +984,10 @@ event、multi-RG、safe-boundary pause/resume 和事务式 coarse-grain commit�
 - final result history 长度为 `maximal_rg + 1`。
 
 ### Phase 6：Snapshot 与 restore
+
+**实现状态：已完成。** root snapshot 保存 committed cell、outer measurement history
+和 control logs；split 活跃时嵌套 `SplitSnapshot`，可从任意 phase safe boundary
+恢复且不重复 site 或 RG measurement。
 
 **目标：** 每个 phase 都可 durable restore。
 

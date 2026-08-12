@@ -163,6 +163,7 @@ end
         completed.mpsB,
         completed.pending_iteration,
         inconsistent_log,
+        completed.measurement_results,
         completed.identity,
     )
     @test_throws ArgumentError restore_run(inconsistent, target, algorithm)

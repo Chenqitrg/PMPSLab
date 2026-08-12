@@ -7,6 +7,7 @@
     )
     run = initialize_run(mpsA, algorithm)
     step!(run)
+    push!(run.measurement_results, NormalizationResult(2.0, log(2.0)))
 
     saved = snapshot(run)
     @test saved isa SplitSnapshot
@@ -18,12 +19,15 @@
     @test saved.log.site_logs !== run.log.site_logs
     @test saved.log.site_logs == run.log.site_logs
     @test saved.log.sweep_time == run.log.sweep_time
+    @test saved.measurement_results !== run.measurement_results
+    @test collect(saved.measurement_results) == collect(run.measurement_results)
 
     saved_next_tensor = copy(saved.mpsB[2])
     step!(run)
     @test saved.pending_iteration != run.pending_iteration
     @test length(saved.log.site_logs) == 1
     @test length(run.log.site_logs) == 2
+    @test length(saved.measurement_results) == 1
     @test saved.mpsB[2] == saved_next_tensor
 
     while !isfinished(run)
@@ -131,6 +135,7 @@ end
         saved.mpsB,
         iterate(algorithm.sweep),
         saved.log,
+        saved.measurement_results,
         saved.identity,
     )
     @test_throws ArgumentError restore_run(bad_cursor, mpsA, algorithm)

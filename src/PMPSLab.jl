@@ -29,7 +29,7 @@ export start_run, start_run!, pause!, resume!, cancel!, run_status
 export checkpoint!, pause_and_checkpoint!, cancel_and_checkpoint!
 
 # Loop tensor-network renormalization
-export LoopTNR, LoopTNRRun, LoopTNRPhase, LoopTNRResult
+export LoopTNR, LoopTNRRun, LoopTNRSnapshot, LoopTNRPhase, LoopTNRResult
 export RGLog, LoopTNRLog, LoopTNRCoarseGrained
 export LoopTNRSplitStepCompleted, renormalize
 
@@ -132,6 +132,7 @@ include("looptnr/interface.jl")
 include("looptnr/logs.jl")
 include("looptnr/coarsegrain.jl")
 include("looptnr/run.jl")
+include("looptnr/snapshot.jl")
 include("execution/checkpoint.jl")
 include("execution/local_checkpoint.jl")
 

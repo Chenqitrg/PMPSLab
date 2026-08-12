@@ -44,11 +44,13 @@ struct SplitSnapshot{
         M,
         P,
         L<:SplitLog,
+        H<:MeasurementHistory,
         I<:SplitProblemIdentity,
     } <: AbstractAlgorithmSnapshot
     mpsB::M
     pending_iteration::P
     log::L
+    measurement_results::H
     identity::I
 end
 
@@ -110,6 +112,7 @@ function snapshot(run::SplitRun)
         mpsB,
         run.pending_iteration,
         _copy_split_log(run.log),
+        deepcopy(run.measurement_results),
         identity,
     )
 end
@@ -197,7 +200,7 @@ function restore_run(
         context,
         pending_iteration,
         _copy_split_log(saved.log),
-        MeasurementHistory(),
+        deepcopy(saved.measurement_results),
     )
 end
 
