@@ -391,16 +391,17 @@ matrix，因为 Uniform 和 Checkerboard 的 periodic indexing 会重复返回 t
 
 ## Coarse-graining 数值接缝
 
-### 公共接口
+### 内部接口
 
-先声明 generic function：
+coarse-graining contraction 是 LoopTNR 的内部数值接缝，不作为独立公共 API
+导出：
 
 ```julia
-function coarse_grain end
+_coarse_grain(mps)
 ```
 
-LoopTNR 所需方法接受八站点单物理腿 `PeriodicMPS`，返回
-`CheckerboardGates`。outer run 在调用前后负责结构检查：
+该方法接受由 LoopTNR active split 产生的八站点单物理腿 `PeriodicMPS`，返回
+`CheckerboardGates`。outer run 与内部方法共同负责结构检查：
 
 - 输入长度必须为八；
 - 每个 optimized tensor 必须是单物理腿 MPS tensor；
@@ -803,7 +804,7 @@ src/
     interface.jl          # LoopTNR config and constructors
     normalization.jl      # InfinityNormNormalization
     measurement.jl        # TNRMeasurement and TNRMeasurementResult
-    coarsegrain.jl        # function declaration + maintainer implementation
+    coarsegrain.jl        # internal maintainer-provided contraction
     logs.jl               # RGLog and LoopTNRLog
     run.jl                # LoopTNRRun, phases, step!, result
     identity.jl           # snapshot identity validation
@@ -899,9 +900,8 @@ LoopTNR-specific measurement。
 
 ### Phase 3：TNR measurement、config、log 与 RG 0
 
-**实现状态：已完成 RG 0 边界。** `maximal_rg=0` 已可通过 resumable run 与
-blocking `renormalize` 执行。为避免在 coarse-grain contraction 尚未实现时暴露半成品
-multi-RG execution，当前 `initialize_run` 明确拒绝正的 `maximal_rg`。
+**实现状态：已完成 RG 0 边界。** `maximal_rg=0` 可通过 resumable run 与
+blocking `renormalize` 执行；后续 Phase 5 已在此基础上接通 positive `maximal_rg`。
 
 **目标：** 在没有 coarse-grain contraction 的情况下交付一个完整可运行的
 `maximal_rg=0` LoopTNR。
@@ -936,6 +936,9 @@ multi-RG execution，当前 `initialize_run` 明确拒绝正的 `maximal_rg`。
 
 **负责人：项目维护者。**
 
+**实现状态：已完成。** 维护者确认的八站点 contraction 已作为内部
+`_coarse_grain` kernel 接入，并以 Checkerboard→SVD 的设计输入验证空间一致性。
+
 实现：
 
 - 八站点 optimized PMPS → `CheckerboardGates` contraction；
@@ -953,6 +956,9 @@ multi-RG execution，当前 `initialize_run` 明确拒绝正的 `maximal_rg`。
 其他 session 不应代写这个 contraction。
 
 ### Phase 5：嵌套 SplitRun 与 multi-RG
+
+**实现状态：已完成。** `active_split` 已接入 outer state machine；支持 nested site
+event、multi-RG、safe-boundary pause/resume 和事务式 coarse-grain commit。
 
 **目标：** 将真实 `SplitRun` 作为 child 接入 outer state machine。
 

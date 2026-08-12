@@ -31,11 +31,12 @@ struct LoopTNRCoarseGrained{L<:RGLog,R<:TNRMeasurementResult} <: AlgorithmEvent
     result::R
 end
 
+struct LoopTNRSplitStepCompleted{E<:AlgorithmEvent} <: AlgorithmEvent
+    rg::Int
+    event::E
+end
+
 function initialize_run(cell::AbstractTensorCell, algorithm::LoopTNR)
-    algorithm.maximal_rg == 0 || throw(ArgumentError(
-        "LoopTNR execution currently supports maximal_rg=0; positive RG " *
-        "counts require the project-specific coarse-grain contraction"
-    ))
     return LoopTNRRun(
         algorithm,
         copy(cell),
@@ -68,16 +69,74 @@ function _initialize_tnr_step(run::LoopTNRRun)
     push!(run.log.rg_logs, rg_log)
     push!(run.measurement_results, measurement_result)
     run.completed_rg = 0
-    run.phase = TNR_FINISHED
+    run.phase = run.algorithm.maximal_rg == 0 ?
+        TNR_FINISHED : TNR_PREPARE_SPLIT
     return LoopTNRCoarseGrained(0, rg_log, measurement_result)
+end
+
+function _step_active_split!(run::LoopTNRRun)
+    active_split = something(run.active_split)
+    rg = run.completed_rg + 1
+    event = step!(active_split)
+    isfinished(active_split) && (run.phase = TNR_COARSE_GRAIN)
+    return LoopTNRSplitStepCompleted(rg, event)
+end
+
+function _prepare_split_step!(run::LoopTNRRun)
+    target = PeriodicMPS(run.cell)
+    active_split = initialize_run(target, run.algorithm.split)
+    run.active_split = active_split
+
+    if isfinished(active_split)
+        run.phase = TNR_COARSE_GRAIN
+        return _coarse_grain_tnr_step!(run)
+    end
+
+    run.phase = TNR_OPTIMIZE
+    return _step_active_split!(run)
+end
+
+function _coarse_grain_tnr_step!(run::LoopTNRRun)
+    active_split = something(run.active_split)
+    isfinished(active_split) || throw(ArgumentError(
+        "LoopTNR cannot coarse grain an unfinished active split"
+    ))
+
+    split_result = run_result(active_split)
+    started_at = time()
+    candidate = _coarse_grain(split_result.mps)
+    coarse_grain_time = time() - started_at
+    assertconsistency(candidate)
+
+    normalization_result = normalize!(
+        candidate, run.algorithm.measurement.normalization
+    )
+    fixed_point_result = _fixed_point_measurement(
+        run.algorithm.measurement.fixed_point, candidate
+    )
+    rg = run.completed_rg + 1
+    measurement_result = TNRMeasurementResult(
+        rg, normalization_result, fixed_point_result
+    )
+    rg_log = RGLog(rg, split_result.log, coarse_grain_time)
+
+    run.cell = candidate
+    push!(run.log.rg_logs, rg_log)
+    push!(run.measurement_results, measurement_result)
+    run.completed_rg = rg
+    run.active_split = nothing
+    run.phase = rg == run.algorithm.maximal_rg ?
+        TNR_FINISHED : TNR_PREPARE_SPLIT
+    return LoopTNRCoarseGrained(rg, rg_log, measurement_result)
 end
 
 function step!(run::LoopTNRRun)
     isfinished(run) && throw(ArgumentError("LoopTNR run is already complete"))
-    run.phase == TNR_INITIALIZE || throw(ArgumentError(
-        "LoopTNR phase $(run.phase) is not implemented without coarse graining"
-    ))
-    return _initialize_tnr_step(run)
+    run.phase == TNR_INITIALIZE && return _initialize_tnr_step(run)
+    run.phase == TNR_PREPARE_SPLIT && return _prepare_split_step!(run)
+    run.phase == TNR_OPTIMIZE && return _step_active_split!(run)
+    run.phase == TNR_COARSE_GRAIN && return _coarse_grain_tnr_step!(run)
+    throw(ArgumentError("invalid LoopTNR phase $(run.phase)"))
 end
 
 function run_result(run::LoopTNRRun)

@@ -30,7 +30,8 @@ export checkpoint!, pause_and_checkpoint!, cancel_and_checkpoint!
 
 # Loop tensor-network renormalization
 export LoopTNR, LoopTNRRun, LoopTNRPhase, LoopTNRResult
-export RGLog, LoopTNRLog, LoopTNRCoarseGrained, renormalize
+export RGLog, LoopTNRLog, LoopTNRCoarseGrained
+export LoopTNRSplitStepCompleted, renormalize
 
 # Tensor-network unit cells
 export AbstractTensorCell, UniformGates, CheckerboardGates, PlaquetteGates
@@ -129,6 +130,7 @@ include("split/run.jl")
 include("split/progress.jl")
 include("looptnr/interface.jl")
 include("looptnr/logs.jl")
+include("looptnr/coarsegrain.jl")
 include("looptnr/run.jl")
 include("execution/checkpoint.jl")
 include("execution/local_checkpoint.jl")

@@ -3,10 +3,7 @@
     LoopTNR(maxrank; maximal_rg, measurement=TNRMeasurement())
 
 Configuration for Loop tensor-network renormalization. The convenience
-constructor builds the standard eight-site periodic gauge split. The current
-execution implementation supports the independently useful `maximal_rg=0`
-boundary; later RG transformations require the project-specific coarse-grain
-contraction.
+constructor builds the standard eight-site periodic gauge split.
 """
 struct LoopTNR{
         S<:PeriodicSplit,
