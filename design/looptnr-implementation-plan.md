@@ -2,7 +2,7 @@
 
 ## 状态与用途
 
-**状态：仅设计，尚未实施。**
+**状态：分阶段实施中；Phase 1 已完成。**
 
 本文用于把当前已经讨论并确认的 LoopTNR 设计交接给后续 GPT session。后续
 session 应按本文的阶段顺序逐步实现，每次只完成一个可独立验收的小阶段，不应在
@@ -17,7 +17,7 @@ TensorCell
 → user-defined LoopTNR coarse graining
 → CheckerboardGates
 → in-place normalization
-→ fixed-point observation
+→ fixed-point measurement
 → next RG step
 ```
 
@@ -26,8 +26,8 @@ TensorCell
 - 在任意 split site 完成后暂停；
 - 在任意完整 RG 完成后暂停；
 - snapshot、checkpoint 和 restore；
-- 将每个 RG 的 observation 通过 observer event 即时发送给前端绘图；
-- 在恢复后保留已经得到且无法重建的 observation history。
+- 将每个 RG 的 measurement result 通过 observer event 即时发送给前端绘图；
+- 在恢复后保留已经得到且无法重建的 measurement history。
 
 本文不实现任何源码，不确定具体 coarse-graining contraction 公式，也不实现
 conformal transfer matrix。
@@ -60,24 +60,24 @@ conformal transfer matrix。
 10. 默认 sweep 是 `CircularSweep(8; maximal_sweep=40)`。
 11. `maximal_rg` 必须显式提供，表示最多执行多少次 coarse-graining RG
     transformation。
-12. `maximal_rg=0` 仍然执行 RG 0 normalization 和 observation，因此最终
-    observation history 长度为一。
+12. `maximal_rg=0` 仍然执行 RG 0 normalization 和 measurement，因此最终
+    measurement history 长度为一。
 13. 未来可以加入 outer RG stopping criterion，但第一版只使用显式
     `maximal_rg` hard cap，不预留无行为的 stopping 字段。
-14. RG 0 也必须计算 observation。
+14. RG 0 也必须执行 measurement。
 15. 每轮先原地 normalize 当前候选 TensorCell，再从 normalized tensor 计算
-    fixed-point observable。
+    fixed-point measurement。
 16. normalization 使用所有独立存储 gate tensor 的 infinity norm 几何平均，
     不使用 2×2 torus contraction，也不使用 Frobenius norm。
-17. conformal spectrum 暂时只保留为 future fixed-point observable interface，
+17. conformal spectrum 暂时只保留为 future fixed-point measurement interface，
     第一版不实现。
 18. `LoopTNRLog` 只存控制和收敛数据，例如时间、cost 和 child `SplitLog`；
-    不存 TensorCell，也不存 outer fixed-point observation。
-19. 现有 `SiteLog.observable` 必须保留。它属于更内层的 split/site observable，
-    未来可记录 loop entanglement entropy 等诊断量，不等同于 outer RG
-    observation。
-20. outer `ObservationHistory` 是 durable scientific result。历史 RG tensor
-    不再存在时 observation 无法重建，因此 snapshot 和 result 都必须保存它。
+    不存 TensorCell，也不存 outer fixed-point measurement result。
+19. `SiteLog` 只存 `state`、`error` 和 `time` 等控制信息，不存任何
+    物理 measurement result。未来的 split/site measurement 应使用独立容器和
+    snapshot ownership，不得塞入 `SplitLog`。
+20. outer `MeasurementHistory` 是 durable scientific result。历史 RG tensor
+    不再存在时 measurement result 无法重建，因此 snapshot 和 result 都必须保存它。
 21. `LoopTNRResult` 使用命名字段 struct，不返回长 tuple。
 22. blocking convenience API 名为 `renormalize`。
 23. 前端回调继续使用 execution observer，不向数值配置、run 或 snapshot 中加入
@@ -112,19 +112,19 @@ snapshot 和恢复。LoopTNR 应把这个测试模式落到真实 `SplitRun` 上
 
 ### RG 0
 
-`initialize_run` 只复制输入并建立 cursor，不执行 normalization 或 observation。
+`initialize_run` 只复制输入并建立 cursor，不执行 normalization 或 measurement。
 第一次 outer `step!` 完成 RG 0：
 
 ```text
 copy internal input into a local candidate
 → normalize candidate in place
-→ evaluate fixed-point observable on normalized candidate
-→ construct RG-0 observation and control log
+→ evaluate fixed-point measurement on normalized candidate
+→ construct RG-0 measurement result and control log
 → atomically commit candidate, history and log
 → emit LoopTNRStepCompleted(rg=0)
 ```
 
-必须用 local candidate。若 fixed-point observation 抛错，不能让 `run.cell` 已经
+必须用 local candidate。若 fixed-point measurement 抛错，不能让 `run.cell` 已经
 被 normalize 而 normalization result 尚未进入 history；否则重试时原始 scale 已
 丢失。
 
@@ -141,8 +141,8 @@ current normalized TensorCell
 → coarse_grain(optimized child result)
 → assertconsistency(candidate CheckerboardGates)
 → normalize candidate in place
-→ evaluate fixed-point observable
-→ atomically commit cell, RGLog and observation
+→ evaluate fixed-point measurement
+→ atomically commit cell, RGLog and measurement result
 → emit LoopTNRStepCompleted(rg=k)
 ```
 
@@ -150,7 +150,7 @@ current normalized TensorCell
 
 1. final child site 完成后，outer `step!` 返回
    `LoopTNRSplitStepCompleted`，phase 进入 coarse grain；
-2. 下一次 outer `step!` 才执行 coarse grain、normalization、observation 和 RG
+2. 下一次 outer `step!` 才执行 coarse grain、normalization、measurement 和 RG
    commit，并返回 `LoopTNRStepCompleted`。
 
 这样用户既能在最后一个 site 后暂停，也能在完整 RG commit 后暂停。
@@ -164,11 +164,11 @@ current normalized TensorCell
 ```julia
 struct LoopTNR{
         S<:PeriodicSplit,
-        O<:AbstractObservable,
+        O<:AbstractMeasurement,
     } <: AbstractAlgorithmConfig
     split::S
     maximal_rg::Int
-    observable::O
+    measurement::O
 end
 ```
 
@@ -186,7 +186,7 @@ inner constructor 至少验证：
 LoopTNR(
     split::PeriodicSplit;
     maximal_rg::Integer,
-    observable::AbstractObservable=TNRObservable(),
+    measurement::AbstractMeasurement=TNRMeasurement(),
 )
 ```
 
@@ -196,7 +196,7 @@ LoopTNR(
 LoopTNR(
     maxrank::Integer;
     maximal_rg::Integer,
-    observable::AbstractObservable=TNRObservable(),
+    measurement::AbstractMeasurement=TNRMeasurement(),
 )
 ```
 
@@ -228,54 +228,53 @@ split = PeriodicSplit(
 `maxrank` 必须为正整数。需要不同 solver、environment、sweep 或 stopping 的调用者
 应先构造 `PeriodicSplit`，再调用核心构造器；便利构造器不要不断增加透传 keyword。
 
-## Observable 体系
+## Measurement 体系
 
 ### 分层原则
 
-项目需要区分两类 observable：
+项目需要区分两类 measurement：
 
-1. **split/site observable**：与某个 site update 对齐，保存在现有
-   `SiteLog.observable` 中；
-2. **outer fixed-point observation**：从每个 normalized RG TensorCell 计算，
-   保存在独立 `ObservationHistory` 中。
+1. **split/site measurement**：与某个 site update 对齐，若未来实现，保存在
+   `SplitLog` 之外的独立 measurement history 中；
+2. **outer fixed-point measurement**：从每个 normalized RG TensorCell 计算，
+   保存在独立 `MeasurementHistory` 中。
 
-不要删除或复用 `SiteLog.observable`。不要把 outer observation 塞进
-`LoopTNRLog`。
+任何 measurement result 都不得塞进 `SiteLog`、`SplitLog` 或 `LoopTNRLog`。
 
 ### 通用接口
 
-建议在独立 generic observable 层定义：
+建议在独立 generic measurement 层定义：
 
 ```julia
-abstract type AbstractObservable <: AbstractAlgorithmConfig end
-abstract type AbstractObservation end
+abstract type AbstractMeasurement <: AbstractAlgorithmConfig end
+abstract type AbstractMeasurementResult end
 
-function observe end
+function measure end
 ```
 
 fixed-point 配置可以进一步使用：
 
 ```julia
-abstract type AbstractFixedPointObservable <: AbstractObservable end
+abstract type AbstractFixedPointMeasurement <: AbstractMeasurement end
 ```
 
-第一版允许 `TNRObservable.fixed_point === nothing`，并定义 no-op 行为返回
+第一版允许 `TNRMeasurement.fixed_point === nothing`，并定义 no-op 行为返回
 `nothing`。不要为了未来 conformal spectrum 现在就写空数组或虚假的物理结果。
 
-### TNR observable 配置
+### TNR measurement 配置
 
 ```julia
 abstract type AbstractNormalization <: AbstractAlgorithmConfig end
 
 struct InfinityNormNormalization <: AbstractNormalization end
 
-struct TNRObservable{N,F} <: AbstractObservable
+struct TNRMeasurement{N,F} <: AbstractMeasurement
     normalization::N
     fixed_point::F
 end
 
-TNRObservable() =
-    TNRObservable(InfinityNormNormalization(), nothing)
+TNRMeasurement() =
+    TNRMeasurement(InfinityNormNormalization(), nothing)
 ```
 
 字段名必须是 `fixed_point`，不能写死为 `conformal`。未来可能加入：
@@ -286,28 +285,28 @@ TNRObservable() =
 - ground-state degeneracy；
 - 其他不依赖 conformal interpretation 的量。
 
-### Observation 输出
+### Measurement result 输出
 
 建议输出类型：
 
 ```julia
-struct NormalizationObservation{T<:Real} <: AbstractObservation
+struct NormalizationResult{T<:Real} <: AbstractMeasurementResult
     scale::T
     log_scale::T
 end
 
-struct TNRObservation{N,F} <: AbstractObservation
+struct TNRMeasurementResult{N,F} <: AbstractMeasurementResult
     rg::Int
     normalization::N
     fixed_point::F
 end
 
-mutable struct ObservationHistory
-    values::Vector{TNRObservation}
+mutable struct MeasurementHistory
+    values::Vector{TNRMeasurementResult}
 end
 ```
 
-`TNRObservable` 是不可变算法参数；`TNRObservation` 是某一 RG 的不可重建科学
+`TNRMeasurement` 是不可变算法参数；`TNRMeasurementResult` 是某一 RG 的不可重建科学
 结果。两者不能合并为同一个 mutable 对象。
 
 history invariant：
@@ -318,17 +317,17 @@ values[k + 1].rg == k
 length(values) == completed_rg + 1
 ```
 
-observation 一旦 append 就视为只读。前端 observer 不得修改 event 中共享的
-observation 内容。
+measurement result 一旦 append 就视为只读。前端 observer 不得修改 event 中共享的
+measurement result 内容。
 
 ### Future conformal implementation
 
 conformal transfer matrix 暂不实现。未来应参考维护者原先编写、后来整理过的
-TNRKit `src/utility/cft.jl`，以新的 fixed-point observable subtype 接入：
+TNRKit `src/utility/cft.jl`，以新的 fixed-point measurement subtype 接入：
 
 ```julia
-ConformalObservable <: AbstractFixedPointObservable
-ConformalObservation <: AbstractObservation
+ConformalMeasurement <: AbstractFixedPointMeasurement
+ConformalMeasurementResult <: AbstractMeasurementResult
 ```
 
 加入它时不应修改 `LoopTNRRun` 状态机、`LoopTNRLog` 或 snapshot 的基本结构。
@@ -354,7 +353,7 @@ s = \exp(\log s).
 rmul!(gate, inv(scale))
 ```
 
-并返回 `NormalizationObservation(scale, log_scale)`。
+并返回 `NormalizationResult(scale, log_scale)`。
 
 TensorKit 的 `norm(gate, Inf)` 是 tensor coefficient 最大绝对值，这正是这里所需
 定义，不是矩阵 induced operator norm。
@@ -473,22 +472,18 @@ coarse_grain_time = 0
 如果自定义 split 有零个 site update，final cost 不存在，显示层必须允许
 `nothing`。
 
-### Split site observable
+### Split site measurement
 
-现有 `SiteLog.observable` 保留。当前 `SplitLog` alias 把 observable 固定为
-`Nothing`，未来真正加入 entanglement entropy 时需要单独拓宽 `SplitLog` 和
-`SplitRun` 的 log type。
-
-如果未来 site observable 含 mutable vector，必须同时修复
-`_copy_split_log` 的浅复制问题。当前 `copy(log.site_logs)` 只在 site log payload
-不可变或为 `nothing` 时足够。
+第一版不实现 split/site measurement。未来真正加入 loop entanglement
+entropy 等物理量时，应建立独立的 measurement history，由 `SplitRun`、
+snapshot 和 result 明确持有。`SiteLog` 和 `SplitLog` 仍只保留控制信息。
 
 ### Result
 
 ```julia
 struct LoopTNRResult{C,H,L}
     cell::C
-    observations::H
+    measurement_results::H
     log::L
 end
 ```
@@ -496,12 +491,12 @@ end
 result invariant：
 
 - `cell` 是最终 normalized TensorCell；
-- `observations` 包含 RG 0 到最终 RG 的全部 scientific result；
+- `measurement_results` 包含 RG 0 到最终 RG 的全部 scientific result；
 - `log` 包含同样 RG 范围内的 control records；
 - result 不保存每轮历史 tensor。
 
 不保存 tensor history 是刻意设计。若未来需要逐轮 tensor archive，应建立独立
-artifact/storage policy，而不是让 log 或 observation history 无限膨胀。
+artifact/storage policy，而不是让 log 或 measurement history 无限膨胀。
 
 ## Outer run 状态机
 
@@ -531,7 +526,7 @@ mutable struct LoopTNRRun{A<:LoopTNR} <: AbstractAlgorithmRun
     phase::LoopTNRPhase
     child::Union{Nothing,SplitRun}
     log::LoopTNRLog
-    observations::ObservationHistory
+    measurement_results::MeasurementHistory
 end
 ```
 
@@ -596,7 +591,7 @@ log/history empty
 coarse_grain
 → consistency validation
 → normalization
-→ fixed-point observation
+→ fixed-point measurement
 → RGLog construction
 ```
 
@@ -605,7 +600,7 @@ coarse_grain
 ```text
 run.cell = candidate
 append log
-append observation
+append measurement result
 run.completed_rg += 1
 run.child = nothing
 phase = FINISHED or PREPARE_SPLIT
@@ -619,7 +614,7 @@ phase = FINISHED or PREPARE_SPLIT
 
 ### Transaction rule
 
-coarse graining、normalization、fixed-point observation 或 log construction 任一
+coarse graining、normalization、fixed-point measurement 或 log construction 任一
 失败时：
 
 - 当前 committed `run.cell` 不变；
@@ -652,10 +647,10 @@ LoopTNR RG 4/20
 ### RG event
 
 ```julia
-struct LoopTNRStepCompleted{L,O} <: AlgorithmEvent
+struct LoopTNRStepCompleted{L,R} <: AlgorithmEvent
     rg::Int
     log::L
-    observation::O
+    result::R
 end
 ```
 
@@ -714,7 +709,7 @@ struct LoopTNRSnapshot{C,P,L,H,I} <: AbstractAlgorithmSnapshot
     phase::LoopTNRPhase
     child::P
     log::L
-    observations::H
+    measurement_results::H
     identity::I
 end
 ```
@@ -725,7 +720,7 @@ end
 - phase 与 RG cursor；
 - active 或 complete child 的 `SplitSnapshot`；
 - complete outer logs；
-- complete `ObservationHistory`；
+- complete `MeasurementHistory`；
 - exact immutable `LoopTNR` algorithm identity。
 
 不得保存：
@@ -743,7 +738,7 @@ snapshot 必须与 live run 隔离：
 
 - TensorCell 中每个 gate 深度 copy；
 - outer log vectors copy；
-- observation history 使用 `deepcopy`，因为 future fixed-point observation 可能
+- measurement history 使用 `deepcopy`，因为 future fixed-point measurement result 可能
   含 mutable arrays；
 - child 使用现有 `snapshot(child)`；
 - algorithm identity 使用 `deepcopy(algorithm)`，沿用
@@ -791,22 +786,22 @@ _checkpoint_algorithm(::LoopTNRSnapshot) = :looptnr
 不要提前提高 checkpoint schema version。当前项目策略只承诺同 package/dependency
 环境恢复；加入一种新的 payload type 不等同于改变已有 split payload schema。
 
-checkpoint round-trip 必须验证 observation history，没有 observation 的 checkpoint
+checkpoint round-trip 必须验证 measurement history，没有 measurement result 的 checkpoint
 不能被视为有效 LoopTNR checkpoint。
 
 ## 建议文件布局
 
-保持 generic observable 与 LoopTNR-specific code 分层：
+保持 generic measurement 与 LoopTNR-specific code 分层：
 
 ```text
 src/
-  observable/
-    interface.jl          # AbstractObservable, AbstractObservation, observe
-    history.jl            # ObservationHistory
+  measurement/
+    interface.jl          # AbstractMeasurement, AbstractMeasurementResult, measure
+    history.jl            # MeasurementHistory
   looptnr/
     interface.jl          # LoopTNR config and constructors
     normalization.jl      # InfinityNormNormalization
-    observable.jl         # TNRObservable and TNRObservation
+    measurement.jl        # TNRMeasurement and TNRMeasurementResult
     coarsegrain.jl        # function declaration + maintainer implementation
     logs.jl               # RGLog and LoopTNRLog
     run.jl                # LoopTNRRun, phases, step!, result
@@ -820,7 +815,7 @@ src/
 test/looptnr/
   runtests.jl
   normalization_test.jl
-  observable_test.jl
+  measurement_test.jl
   interface_test.jl
   coarsegrain_test.jl
   run_test.jl
@@ -846,16 +841,20 @@ test/looptnr/
 
 验收：没有源码变化。
 
-### Phase 1：通用 observable 基础类型
+### Phase 1：通用 measurement 基础类型
+
+**实现状态：已完成。** 已加入通用 measurement/measurement result 接口与具有独立
+vector storage、支持深复制隔离的 `MeasurementHistory`；尚未加入任何
+LoopTNR-specific measurement。
 
 **目标：** 建立不依赖 LoopTNR 的最小接口。
 
 实现：
 
-- `AbstractObservable`；
-- `AbstractObservation`；
-- generic `observe` declaration；
-- 最小 `ObservationHistory` container；
+- `AbstractMeasurement`；
+- `AbstractMeasurementResult`；
+- generic `measure` declaration；
+- 最小 `MeasurementHistory` container；
 - history append/access/copy 或 deepcopy 行为。
 
 测试：
@@ -864,7 +863,7 @@ test/looptnr/
 - deep copy 后 mutable payload 不 alias；
 - 不引入 callback 或 tensor ownership。
 
-本阶段不实现 normalization、LoopTNR config 或 conformal observable。
+本阶段不实现 normalization、LoopTNR config 或 conformal measurement。
 
 建议独立 commit。
 
@@ -876,7 +875,7 @@ test/looptnr/
 
 - `AbstractNormalization`；
 - `InfinityNormNormalization`；
-- `NormalizationObservation`；
+- `NormalizationResult`；
 - 三种 TensorCell 的独立 gate enumeration；
 - 事务式 norm validation 和 in-place scaling。
 
@@ -893,14 +892,14 @@ test/looptnr/
 
 本阶段不实现 outer run。
 
-### Phase 3：TNR observable、config、log 与 RG 0
+### Phase 3：TNR measurement、config、log 与 RG 0
 
 **目标：** 在没有 coarse-grain contraction 的情况下交付一个完整可运行的
 `maximal_rg=0` LoopTNR。
 
 实现：
 
-- `TNRObservable` / `TNRObservation`；
+- `TNRMeasurement` / `TNRMeasurementResult`；
 - `LoopTNR` core constructor 和 default `maxrank` constructor；
 - `RGLog` / `LoopTNRLog`；
 - `LoopTNRResult`；
@@ -922,7 +921,7 @@ test/looptnr/
 - fixed-point failure 不提交 normalized candidate；
 - observer 收到 RG 0 event。
 
-完成此阶段后，项目已经有 observation 与 outer result 语义，但尚未有 multi-RG。
+完成此阶段后，项目已经有 measurement result 与 outer result 语义，但尚未有 multi-RG。
 
 ### Phase 4：维护者实现 coarse graining
 
@@ -986,11 +985,11 @@ test/looptnr/
 
 - final TensorCell；
 - complete RG logs；
-- complete observations；
+- complete measurement_results；
 - child split costs；
 - event continuation，不重复已经完成的 event。
 
-另外测试 snapshot 与 live run 隔离，尤其是 mutable observation arrays。
+另外测试 snapshot 与 live run 隔离，尤其是 mutable measurement result arrays。
 
 ### Phase 7：Checkpoint codec
 
@@ -1005,7 +1004,7 @@ test/looptnr/
 
 验收：
 
-- observation history 完整；
+- measurement history 完整；
 - active child restore 后不重复 site；
 - header/payload algorithm mismatch 被拒绝；
 - write failure 不损坏 in-memory run。
@@ -1019,7 +1018,7 @@ test/looptnr/
 - `LoopTNRProgressObserver`；
 - nested site summary；
 - 每个 RG 一条永久 summary line；
-- RG event 中 observation 的前端示例；
+- RG event 中 measurement result 的前端示例；
 - README 从 blocking 到 controllable run 的最小示例。
 
 默认 observer 不应直接依赖具体 conformal result fields；只显示通用 RG、cost、time
@@ -1041,7 +1040,7 @@ payload 绘图。
 | Pause point | middle site / final site / RG boundary |
 | Restore point | every outer phase |
 | Failure | child update / coarse grain / normalization / fixed point / observer |
-| Observation | normalization-only / test fixed-point observable with mutable payload |
+| Measurement | normalization-only / test fixed-point measurement with mutable payload |
 
 完整 suite 前先运行最小 focused tests。不要为了 LoopTNR 修复无关测试或 formatter
 问题。
@@ -1058,10 +1057,10 @@ payload 绘图。
 - history TensorCell archive；
 - job ID、scheduler、remote storage 或 frontend transport；
 - acceleration research plan 中的 Anderson、pairwise perturbation 或 parallel ALS；
-- 修改现有 `SiteLog.observable` 语义。
+- 在 `SiteLog` 或 `SplitLog` 中存储物理 measurement result。
 
-future outer stopping 应在完整 RG observation commit 后检查
-`ObservationHistory`，同时保留 `maximal_rg` hard cap。不要让它在 child sweep 中间停止
+future outer stopping 应在完整 RG measurement result commit 后检查
+`MeasurementHistory`，同时保留 `maximal_rg` hard cap。不要让它在 child sweep 中间停止
 outer RG。
 
 ## 后续 session 操作规范
@@ -1086,10 +1085,10 @@ outer RG。
 - default gauge ansatz 使用已确定的两级 truncation；
 - coarse graining 由维护者确认 convention；
 - 每个 site 和每个 RG 都是可暂停安全边界；
-- RG 0 到最终 RG 的 observation 全部进入 durable history；
-- log 不保存 outer observation 或 tensor history；
+- RG 0 到最终 RG 的 measurement result 全部进入 durable history；
+- log 不保存 outer measurement result 或 tensor history；
 - snapshot/restore 覆盖每个 phase；
-- JLD2 checkpoint round-trip 保留 active child 和 observation history；
+- JLD2 checkpoint round-trip 保留 active child 和 measurement history；
 - observer 能在每轮 RG 后即时收到绘图数据；
 - observer failure 不造成半提交 RG；
 - focused 与 full regression tests 通过，或只剩明确记录的无关环境问题。

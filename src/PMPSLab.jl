@@ -18,6 +18,7 @@ import MPSKit: left_virtualspace, right_virtualspace, physicalspace
 
 # Algorithm configuration and execution
 export AbstractAlgorithmConfig
+export AbstractMeasurement, AbstractMeasurementResult, MeasurementHistory, measure
 export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
 export AlgorithmEvent, LocalRunSession, LocalRunStatus, LocalCheckpointOutcome
 export initialize_run, step!, isfinished, run_result, snapshot, restore_run
@@ -74,6 +75,8 @@ export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 export one_mps, one_mps2, random_cdl, random_cdl_mps, lift
 
 include("algorithm_config.jl")
+include("measurement/interface.jl")
+include("measurement/history.jl")
 include("tensorcell/container.jl")
 include("tensorcell/constructors.jl")
 include("tensorcell/show.jl")

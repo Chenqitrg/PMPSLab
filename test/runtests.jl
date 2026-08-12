@@ -1,4 +1,5 @@
 using Test, PMPSLab
+include("measurement_test.jl")
 include("execution_test.jl")
 include("composition_test.jl")
 include("tensorcell_test.jl")

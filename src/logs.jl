@@ -4,21 +4,15 @@
 
 abstract type ConvergenceLog end
 
-# One immutable convergence snapshot. `state` is algorithm-specific.
-struct SiteLog{S,E}
+# One immutable control/convergence snapshot. Physical measurement results live
+# in a separate MeasurementHistory.
+struct SiteLog{S}
     state::S
     error::Float64
     time::Float64
-    observable::E
 end
 SiteLog(state::S, error::Real, time::Real) where {S} =
-    SiteLog(state, Float64(error), Float64(time), nothing)
-SiteLog(
-    state::S, error::Real, time::Real, observable::E
-) where {S,E} =
-    SiteLog{S,E}(
-        state, Float64(error), Float64(time), observable
-    )
+    SiteLog{S}(state, Float64(error), Float64(time))
 
 # One run's records — element type T is algorithm-specific.
 mutable struct SweepLog{T} <: ConvergenceLog
@@ -30,5 +24,5 @@ SweepLog{T}() where {T} = SweepLog{T}(T[], 0.0, false)
 SweepLog(site_logs::Vector{T}, sweep_time::Real, converged::Bool) where {T} =
     SweepLog{T}(site_logs, Float64(sweep_time), converged)
 
-const SplitSiteLog = SiteLog{S,Nothing} where {S<:SweepState}
+const SplitSiteLog = SiteLog{S} where {S<:SweepState}
 const SplitLog = SweepLog{SplitSiteLog}

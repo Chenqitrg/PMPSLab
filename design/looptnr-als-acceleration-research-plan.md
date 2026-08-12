@@ -455,7 +455,7 @@ environment 对最终精度和收敛点的影响。
 | 达到每个误差阈值的 wall time | 测量最终收益 |
 | 单 sweep 时间 | 区分算法收益和 kernel 收益 |
 | 最终全局 cost | 验证优化质量 |
-| 最终物理 observable | 验证物理一致性 |
+| 最终物理 measurement | 验证物理一致性 |
 | peak memory | 防止用不可接受的内存换时间 |
 | candidate rejection 数 | 判断 accelerator 稳定性 |
 | PP refresh 数与环境误差 | 判断微扰近似有效区间 |
