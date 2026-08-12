@@ -15,6 +15,7 @@ function _checkpoint_algorithm(snapshot::AbstractAlgorithmSnapshot)
 end
 
 _checkpoint_algorithm(::SplitSnapshot) = :split
+_checkpoint_algorithm(::LoopTNRSnapshot) = :looptnr
 
 function _checkpoint_header(snapshot::AbstractAlgorithmSnapshot)
     return CheckpointHeader(

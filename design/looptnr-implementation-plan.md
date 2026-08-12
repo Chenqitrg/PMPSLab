@@ -1012,6 +1012,10 @@ event、multi-RG、safe-boundary pause/resume 和事务式 coarse-grain commit�
 
 ### Phase 7：Checkpoint codec
 
+**实现状态：已完成。** `LoopTNRSnapshot` 已注册为 `:looptnr` payload；JLD2
+round-trip 与 split 中途 `pause_and_checkpoint!` 均可恢复外层 measurement history
+和 active split cursor。
+
 **目标：** JLD2 round-trip 和本地 durable pause。
 
 实现：
