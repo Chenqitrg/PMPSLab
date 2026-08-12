@@ -138,8 +138,12 @@ end
         step!(restored)
     end
 
-    expected_mps, expected_log = run_result(run)
-    restored_mps, restored_log = run_result(restored)
+    expected_result = run_result(run)
+    restored_result = run_result(restored)
+    expected_mps = expected_result.mps
+    expected_log = expected_result.log
+    restored_mps = restored_result.mps
+    restored_log = restored_result.log
     @test expected_log.converged
     @test restored_log.converged
     @test length(restored_log.site_logs) == 8
@@ -148,7 +152,7 @@ end
     completed = snapshot(run)
     completed_restore = restore_run(completed, target, algorithm)
     @test isfinished(completed_restore)
-    @test last(run_result(completed_restore)).converged
+    @test run_result(completed_restore).log.converged
 
     inconsistent_log = SplitLog(
         copy(completed.log.site_logs),

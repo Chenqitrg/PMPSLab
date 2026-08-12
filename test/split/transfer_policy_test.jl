@@ -128,7 +128,9 @@ end
     while !isfinished(run)
         step!(run)
     end
-    mpsB, log = run_result(run)
+    result = run_result(run)
+    mpsB = result.mps
+    log = result.log
     @test length(mpsB) == 4
     @test length(log.site_logs) == 8
     @test all(site_log -> isfinite(site_log.error), log.site_logs)

@@ -10,6 +10,7 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
     run = initialize_run(mpsA, algorithm)
 
     @test run isa SplitRun
+    @test isempty(run.measurement_results)
     @test run.context isa SplitContext
     @test !hasproperty(run, :target)
     @test !isfinished(run)
@@ -30,9 +31,14 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
     while !isfinished(run)
         step!(run)
     end
-    mpsB, log = run_result(run)
-    @test mpsB === run.context.mpsB
-    @test log === run.log
+    result = run_result(run)
+    @test result isa SplitResult
+    @test result.mps === run.context.mpsB
+    @test result.measurement_results === run.measurement_results
+    @test result.log === run.log
+    @test isempty(result.measurement_results)
+    mpsB = result.mps
+    log = result.log
     @test length(log.site_logs) == 4
     @test log.sweep_time == sum(site_log -> site_log.time, log.site_logs)
     @test_throws ArgumentError step!(run)
@@ -55,7 +61,7 @@ end
 
     @test isfinished(run)
     @test isnothing(run.pending_iteration)
-    @test isempty(last(run_result(run)).site_logs)
+    @test isempty(run_result(run).log.site_logs)
 end
 
 @testset "SplitRun — sweep domain must match approximation" begin

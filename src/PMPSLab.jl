@@ -29,8 +29,8 @@ export start_run, start_run!, pause!, resume!, cancel!, run_status
 export checkpoint!, pause_and_checkpoint!, cancel_and_checkpoint!
 
 # Loop tensor-network renormalization
-export LoopTNR
-export RGLog, LoopTNRLog
+export LoopTNR, LoopTNRRun, LoopTNRPhase, LoopTNRResult
+export RGLog, LoopTNRLog, LoopTNRCoarseGrained, renormalize
 
 # Tensor-network unit cells
 export AbstractTensorCell, UniformGates, CheckerboardGates, PlaquetteGates
@@ -52,7 +52,7 @@ export gaugefix!
 # Periodic split
 export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
 export SplitEnvironmentPolicy
-export PeriodicSplit, SplitRun, SplitSnapshot, SplitSiteCompleted
+export PeriodicSplit, SplitRun, SplitResult, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export initial_approximation, split
 
@@ -129,6 +129,7 @@ include("split/run.jl")
 include("split/progress.jl")
 include("looptnr/interface.jl")
 include("looptnr/logs.jl")
+include("looptnr/run.jl")
 include("execution/checkpoint.jl")
 include("execution/local_checkpoint.jl")
 

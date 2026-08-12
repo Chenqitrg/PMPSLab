@@ -1,0 +1,113 @@
+@enum LoopTNRPhase::UInt8 begin
+    TNR_INITIALIZE
+    TNR_PREPARE_SPLIT
+    TNR_OPTIMIZE
+    TNR_COARSE_GRAIN
+    TNR_FINISHED
+end
+
+mutable struct LoopTNRRun{A<:LoopTNR} <: AbstractAlgorithmRun
+    algorithm::A
+    cell::AbstractTensorCell
+    completed_rg::Int
+    phase::LoopTNRPhase
+    active_split::Union{Nothing,SplitRun}
+    log::LoopTNRLog
+    measurement_results::MeasurementHistory
+end
+
+struct LoopTNRResult{
+        C<:AbstractTensorCell,
+        H<:MeasurementHistory,
+    }
+    cell::C
+    measurement_results::H
+    log::LoopTNRLog
+end
+
+struct LoopTNRCoarseGrained{L<:RGLog,R<:TNRMeasurementResult} <: AlgorithmEvent
+    rg::Int
+    log::L
+    result::R
+end
+
+function initialize_run(cell::AbstractTensorCell, algorithm::LoopTNR)
+    algorithm.maximal_rg == 0 || throw(ArgumentError(
+        "LoopTNR execution currently supports maximal_rg=0; positive RG " *
+        "counts require the project-specific coarse-grain contraction"
+    ))
+    return LoopTNRRun(
+        algorithm,
+        copy(cell),
+        -1,
+        TNR_INITIALIZE,
+        nothing,
+        LoopTNRLog(),
+        MeasurementHistory(),
+    )
+end
+
+isfinished(run::LoopTNRRun) = run.phase == TNR_FINISHED
+
+function _initialize_tnr_step(run::LoopTNRRun)
+    candidate = copy(run.cell)
+
+    normalization_result = normalize!(
+        candidate, run.algorithm.measurement.normalization
+    )
+
+    fixed_point_result = _fixed_point_measurement(
+        run.algorithm.measurement.fixed_point, candidate
+    )
+    measurement_result = TNRMeasurementResult(
+        0, normalization_result, fixed_point_result
+    )
+    rg_log = RGLog(0, nothing, 0.0)
+
+    run.cell = candidate
+    push!(run.log.rg_logs, rg_log)
+    push!(run.measurement_results, measurement_result)
+    run.completed_rg = 0
+    run.phase = TNR_FINISHED
+    return LoopTNRCoarseGrained(0, rg_log, measurement_result)
+end
+
+function step!(run::LoopTNRRun)
+    isfinished(run) && throw(ArgumentError("LoopTNR run is already complete"))
+    run.phase == TNR_INITIALIZE || throw(ArgumentError(
+        "LoopTNR phase $(run.phase) is not implemented without coarse graining"
+    ))
+    return _initialize_tnr_step(run)
+end
+
+function run_result(run::LoopTNRRun)
+    isfinished(run) || throw(ArgumentError("LoopTNR run is not complete"))
+    return LoopTNRResult(run.cell, run.measurement_results, run.log)
+end
+
+"""
+    renormalize(cell, algorithm::LoopTNR; observer=_DEFAULT_OBSERVER)
+
+Run LoopTNR to completion through the generic resumable execution interface.
+The caller's tensor cell is not modified.
+"""
+function renormalize(
+        cell::AbstractTensorCell,
+        algorithm::LoopTNR;
+        observer = _DEFAULT_OBSERVER,
+    )
+    run = initialize_run(cell, algorithm)
+    resolved_observer = _resolve_observer(run, observer)
+    try
+        _observer_running!(resolved_observer, run)
+        while !isfinished(run)
+            event = step!(run)
+            _observer_step!(resolved_observer, event, run)
+        end
+        _observer_completed!(resolved_observer, run)
+    catch err
+        _observer_failed!(resolved_observer, run, err)
+        rethrow()
+    end
+    return run_result(run)
+end

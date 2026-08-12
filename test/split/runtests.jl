@@ -42,6 +42,7 @@ using PMPSLab:
     CostConvergence,
     SplitEnvironmentPolicy,
     SplitRun,
+    SplitResult,
     SplitSnapshot,
     SplitSiteCompleted,
     RandomAnsatz,

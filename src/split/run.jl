@@ -15,6 +15,22 @@ mutable struct SplitRun{A<:PeriodicSplit,C<:SplitContext,P} <: AbstractAlgorithm
     context::C
     pending_iteration::Union{Nothing,P}
     log::SplitLog
+    measurement_results::MeasurementHistory
+end
+
+"""
+    SplitResult
+
+Completed output of a [`SplitRun`](@ref). Scientific measurement results remain
+separate from the control-only [`SplitLog`](@ref).
+"""
+struct SplitResult{
+        M<:PeriodicMPS,
+        H<:MeasurementHistory,
+    }
+    mps::M
+    measurement_results::H
+    log::SplitLog
 end
 
 """
@@ -66,6 +82,7 @@ function initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
         context,
         pending_iteration,
         SplitLog(),
+        MeasurementHistory(),
     )
 end
 
@@ -180,6 +197,7 @@ function restore_run(
         context,
         pending_iteration,
         _copy_split_log(saved.log),
+        MeasurementHistory(),
     )
 end
 
@@ -211,7 +229,11 @@ end
 
 function run_result(run::SplitRun)
     isfinished(run) || throw(ArgumentError("split run is not complete"))
-    return run.context.mpsB, run.log
+    return SplitResult(
+        run.context.mpsB,
+        run.measurement_results,
+        run.log,
+    )
 end
 
 """
@@ -249,5 +271,6 @@ function split(
         _observer_failed!(resolved_observer, run, err)
         rethrow()
     end
-    return run_result(run)
+    result = run_result(run)
+    return result.mps, result.log
 end

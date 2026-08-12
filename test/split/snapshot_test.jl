@@ -65,8 +65,12 @@ end
         step!(restored)
     end
 
-    expected_mps, expected_log = run_result(uninterrupted)
-    restored_mps, restored_log = run_result(restored)
+    expected_result = run_result(uninterrupted)
+    restored_result = run_result(restored)
+    expected_mps = expected_result.mps
+    expected_log = expected_result.log
+    restored_mps = restored_result.mps
+    restored_log = restored_result.log
     @test dense(restored_mps) ≈ dense(expected_mps) rtol=1e-12
     @test getfield.(restored_log.site_logs, :error) ≈
           getfield.(expected_log.site_logs, :error)
@@ -95,8 +99,12 @@ end
             end
 
             restored = restore_run(snapshot(uninterrupted), mpsA, algorithm)
-            expected_mps, expected_log = finish_run!(uninterrupted)
-            restored_mps, restored_log = finish_run!(restored)
+            expected_result = finish_run!(uninterrupted)
+            restored_result = finish_run!(restored)
+            expected_mps = expected_result.mps
+            expected_log = expected_result.log
+            restored_mps = restored_result.mps
+            restored_log = restored_result.log
 
             @test dense(restored_mps) ≈ dense(expected_mps) rtol=1e-12
             @test getfield.(restored_log.site_logs, :error) ≈

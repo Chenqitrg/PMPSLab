@@ -51,8 +51,8 @@ end
         while !isfinished(restored)
             step!(restored)
         end
-        @test dense(first(run_result(restored))) ≈
-              dense(first(run_result(run)))
+        @test dense(run_result(restored).mps) ≈
+              dense(run_result(run).mps)
     end
 end
 

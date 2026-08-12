@@ -121,7 +121,7 @@ copy internal input into a local candidate
 → evaluate fixed-point measurement on normalized candidate
 → construct RG-0 measurement result and control log
 → atomically commit candidate, history and log
-→ emit LoopTNRStepCompleted(rg=0)
+→ emit LoopTNRCoarseGrained(rg=0)
 ```
 
 必须用 local candidate。若 fixed-point measurement 抛错，不能让 `run.cell` 已经
@@ -143,7 +143,7 @@ current normalized TensorCell
 → normalize candidate in place
 → evaluate fixed-point measurement
 → atomically commit cell, RGLog and measurement result
-→ emit LoopTNRStepCompleted(rg=k)
+→ emit LoopTNRCoarseGrained(rg=k)
 ```
 
 最后一个 child site 和 coarse graining 必须是两个不同的 outer safe step：
@@ -151,7 +151,7 @@ current normalized TensorCell
 1. final child site 完成后，outer `step!` 返回
    `LoopTNRSplitStepCompleted`，phase 进入 coarse grain；
 2. 下一次 outer `step!` 才执行 coarse grain、normalization、measurement 和 RG
-   commit，并返回 `LoopTNRStepCompleted`。
+   commit，并返回 `LoopTNRCoarseGrained`。
 
 这样用户既能在最后一个 site 后暂停，也能在完整 RG commit 后暂停。
 
@@ -472,17 +472,20 @@ coarse_grain_time = 0
 
 ### Split site measurement
 
-第一版不实现 split/site measurement。未来真正加入 loop entanglement
-entropy 等物理量时，应建立独立的 measurement history，由 `SplitRun`、
-snapshot 和 result 明确持有。`SiteLog` 和 `SplitLog` 仍只保留控制信息。
+第一版不执行 split/site measurement，但 `SplitRun` 和 `SplitResult` 已持有空的
+measurement history。未来真正加入 loop entanglement entropy 等物理量时，
+snapshot 也必须保存这份 history。`SiteLog` 和 `SplitLog` 仍只保留控制信息。
 
 ### Result
 
 ```julia
-struct LoopTNRResult{C,H,L}
+struct LoopTNRResult{
+        C<:AbstractTensorCell,
+        H<:MeasurementHistory,
+    }
     cell::C
     measurement_results::H
-    log::L
+    log::LoopTNRLog
 end
 ```
 
@@ -522,13 +525,13 @@ mutable struct LoopTNRRun{A<:LoopTNR} <: AbstractAlgorithmRun
     cell::AbstractTensorCell
     completed_rg::Int
     phase::LoopTNRPhase
-    child::Union{Nothing,SplitRun}
+    active_split::Union{Nothing,SplitRun}
     log::LoopTNRLog
     measurement_results::MeasurementHistory
 end
 ```
 
-`cell` 和 `child` 有意在 outer orchestration boundary 使用 type-erased field：
+`cell` 和 `active_split` 有意在 outer orchestration boundary 使用 type-erased field：
 coarse graining 和 truncation 会改变具体 virtual spaces 与 concrete TensorMap type，
 不能假设所有 RG 都具有同一个 concrete cell type。
 
@@ -538,13 +541,13 @@ coarse graining 和 truncation 会改变具体 virtual spaces 与 concrete Tenso
 cell = copy(input)
 completed_rg = -1
 phase = TNR_INITIALIZE
-child = nothing
+active_split = nothing
 log/history empty
 ```
 
 ### Phase invariants
 
-| Phase | `completed_rg` | Child | 含义 |
+| Phase | `completed_rg` | `active_split` | 含义 |
 | --- | ---: | --- | --- |
 | `TNR_INITIALIZE` | `-1` | `nothing` | RG 0 尚未提交 |
 | `TNR_PREPARE_SPLIT` | `0:maximal_rg-1` | `nothing` | 下一轮 child 尚未建立 |
@@ -558,7 +561,7 @@ log/history empty
 
 #### `TNR_INITIALIZE`
 
-完成 RG 0 transaction，返回 `LoopTNRStepCompleted`。若
+完成 RG 0 transaction，返回 `LoopTNRCoarseGrained`。若
 `maximal_rg == 0`，进入 `TNR_FINISHED`；否则进入
 `TNR_PREPARE_SPLIT`。
 
@@ -566,24 +569,24 @@ log/history empty
 
 从 `PeriodicMPS(run.cell)` 建立 child `SplitRun`。
 
-- child 未完成：立即委托第一个 child site，返回 nested site event；
-- child 因自定义 zero-length sweep 在初始化时已完成：进入
+- active split 未完成：立即委托第一个 split site，返回 nested site event；
+- active split 因自定义 zero-length sweep 在初始化时已完成：进入
   `TNR_COARSE_GRAIN`，同一次 outer step 可以继续执行 coarse-grain
   transaction 并返回完整 RG event。
 
 #### `TNR_OPTIMIZE`
 
-调用一次 `step!(child)`。
+调用一次 `step!(active_split)`。
 
-- child 仍未完成：保持 phase；
-- child 刚完成：phase 改为 `TNR_COARSE_GRAIN`，但本次 outer step 不执行
+- active split 仍未完成：保持 phase；
+- active split 刚完成：phase 改为 `TNR_COARSE_GRAIN`，但本次 outer step 不执行
   coarse graining。
 
 两种情况都返回 `LoopTNRSplitStepCompleted`。
 
 #### `TNR_COARSE_GRAIN`
 
-从 complete child 读取 optimized PMPS，在 local variables 中完成：
+从 completed active split 读取 optimized PMPS，在 local variables 中完成：
 
 ```text
 coarse_grain
@@ -600,11 +603,11 @@ run.cell = candidate
 append log
 append measurement result
 run.completed_rg += 1
-run.child = nothing
+run.active_split = nothing
 phase = FINISHED or PREPARE_SPLIT
 ```
 
-返回 `LoopTNRStepCompleted`。
+返回 `LoopTNRCoarseGrained`。
 
 #### `TNR_FINISHED`
 
@@ -645,7 +648,7 @@ LoopTNR RG 4/20
 ### RG event
 
 ```julia
-struct LoopTNRStepCompleted{L,R} <: AlgorithmEvent
+struct LoopTNRCoarseGrained{L,R} <: AlgorithmEvent
     rg::Int
     log::L
     result::R
@@ -653,7 +656,7 @@ end
 ```
 
 RG 0 和后续 RG 使用同一个 event type。前端只需过滤
-`LoopTNRStepCompleted` 就能实时追加 normalization 或 future fixed-point 曲线。
+`LoopTNRCoarseGrained` 就能实时追加 normalization 或 future fixed-point 曲线。
 
 event 不保存 TensorCell。observer 对 event payload 只有只读权限。
 
@@ -895,6 +898,10 @@ LoopTNR-specific measurement。
 本阶段不实现 outer run。
 
 ### Phase 3：TNR measurement、config、log 与 RG 0
+
+**实现状态：已完成 RG 0 边界。** `maximal_rg=0` 已可通过 resumable run 与
+blocking `renormalize` 执行。为避免在 coarse-grain contraction 尚未实现时暴露半成品
+multi-RG execution，当前 `initialize_run` 明确拒绝正的 `maximal_rg`。
 
 **目标：** 在没有 coarse-grain contraction 的情况下交付一个完整可运行的
 `maximal_rg=0` LoopTNR。
