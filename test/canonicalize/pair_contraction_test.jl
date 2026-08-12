@@ -25,6 +25,25 @@
         @test paired[1] ≈ manual
     end
 
+    @testset "start site selects the periodic pairing" begin
+        D, d, N = 2, 2, 4
+        mps = rand(PeriodicMPS, ComplexF64, N, d, D)
+        paired = pair_contraction(mps, 2)
+
+        @plansor first_pair[-1 -2 -3; -4] :=
+            mps[2][-1 -2; 1] * mps[3][1 -3; -4]
+        @plansor wrapped_pair[-1 -2 -3; -4] :=
+            mps[4][-1 -2; 1] * mps[1][1 -3; -4]
+
+        @test paired[1] ≈ first_pair
+        @test paired[2] ≈ wrapped_pair
+        @test dense(paired) ≈ dense(circshift(mps, -1))
+        @test all(
+            pair_contraction(mps, N + 2)[site] ≈ paired[site]
+            for site in eachindex(paired)
+        )
+    end
+
     @testset "dense invariant — N ∈ {2, 4, 6}" begin
         D, d = 2, 2
         for N in [2, 4, 6]

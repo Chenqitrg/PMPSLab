@@ -29,6 +29,7 @@ end
 
 Base.size(::UniformGates) = (1, 1)
 Base.getindex(cell::UniformGates, ::Integer, ::Integer) = cell.gate
+Base.copy(cell::UniformGates) = UniformGates(copy(cell.gate))
 
 """
     CheckerboardGates(black, white)
@@ -58,11 +59,16 @@ CheckerboardGates(cell::UniformGates; copy::Bool = true) = CheckerboardGates(
     _copy_gate(cell.gate, copy), _copy_gate(cell.gate, copy)
 )
 
+Base.copy(cell::CheckerboardGates) = CheckerboardGates(
+    copy(cell.black), copy(cell.white)
+)
+
 """
-    PlaquetteGates(gates::AbstractMatrix)
+    PlaquetteGates(gates::AbstractMatrix; copy=true)
     PlaquetteGates(northwest, northeast, southwest, southeast)
     PlaquetteGates(cell::UniformGates; copy=true)
     PlaquetteGates(cell::CheckerboardGates; copy=true)
+    PlaquetteGates(cell::PlaquetteGates; copy=true)
 
 Arbitrary periodic 2×2 gate plaquette. Matrix coordinates follow Julia's
 `[row, column]` convention, matching the 2×2 unit-cell input used by LoopTNR.
@@ -84,12 +90,17 @@ struct PlaquetteGates{G<:GenericGateTensor} <: AbstractTensorCell{G}
     end
 end
 
-function PlaquetteGates(gates::AbstractMatrix{G}) where {G<:GenericGateTensor}
+function PlaquetteGates(
+        gates::AbstractMatrix{G}; copy::Bool = true
+    ) where {G<:GenericGateTensor}
     size(gates) == (2, 2) || throw(DimensionMismatch(
         "a gate plaquette must have size (2, 2), got $(size(gates))"
     ))
     return PlaquetteGates(
-        gates[1, 1], gates[1, 2], gates[2, 1], gates[2, 2]
+        _copy_gate(gates[1, 1], copy),
+        _copy_gate(gates[1, 2], copy),
+        _copy_gate(gates[2, 1], copy),
+        _copy_gate(gates[2, 2], copy),
     )
 end
 
@@ -105,6 +116,16 @@ PlaquetteGates(cell::CheckerboardGates; copy::Bool = true) = PlaquetteGates(
     _copy_gate(cell.white, copy),
     _copy_gate(cell.white, copy),
     _copy_gate(cell.black, copy),
+)
+
+PlaquetteGates(cell::PlaquetteGates; copy::Bool = true) =
+    copy ? Base.copy(cell) : cell
+
+Base.copy(cell::PlaquetteGates) = PlaquetteGates(
+    copy(cell.northwest),
+    copy(cell.northeast),
+    copy(cell.southwest),
+    copy(cell.southeast),
 )
 
 Base.size(::PlaquetteGates) = (2, 2)

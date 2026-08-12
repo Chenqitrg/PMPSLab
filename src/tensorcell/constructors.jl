@@ -56,7 +56,7 @@ function Random.rand(
     gates = map(spaces) do space
         Random.rand(rng, elt, space)
     end
-    return PlaquetteGates(gates)
+    return PlaquetteGates(gates; copy=false)
 end
 
 Random.rand(::Type{PlaquetteGates}, args...) =

@@ -47,26 +47,51 @@ end
     matrix = [northwest northeast; southwest southeast]
 
     from_matrix = PlaquetteGates(matrix)
+    shared_matrix = PlaquetteGates(matrix; copy=false)
     from_entries = PlaquetteGates(
         northwest, northeast, southwest, southeast
     )
 
     @test size(from_matrix) == (2, 2)
-    @test from_matrix.northwest === northwest
-    @test from_matrix.northeast === northeast
-    @test from_matrix.southwest === southwest
-    @test from_matrix.southeast === southeast
+    @test from_matrix.northwest !== northwest
+    @test from_matrix.northeast !== northeast
+    @test from_matrix.southwest !== southwest
+    @test from_matrix.southeast !== southeast
+    @test shared_matrix.northwest === northwest
+    @test shared_matrix.northeast === northeast
+    @test shared_matrix.southwest === southwest
+    @test shared_matrix.southeast === southeast
     @test collect(from_matrix) == matrix
     @test collect(from_entries) == matrix
-    @test from_matrix[1, 1] === northwest
-    @test from_matrix[1, 2] === northeast
-    @test from_matrix[2, 1] === southwest
-    @test from_matrix[2, 2] === southeast
-    @test from_matrix[3, 4] === northeast
-    @test from_matrix[0, -1] === southwest
+    @test shared_matrix[1, 1] === northwest
+    @test shared_matrix[1, 2] === northeast
+    @test shared_matrix[2, 1] === southwest
+    @test shared_matrix[2, 2] === southeast
+    @test shared_matrix[3, 4] === northeast
+    @test shared_matrix[0, -1] === southwest
     @test assertconsistency(from_matrix) === nothing
 
     @test_throws DimensionMismatch PlaquetteGates(fill(northwest, 1, 2))
+end
+
+@testset "gate cells — copy preserves topology without aliases" begin
+    gate = test_gate()
+    uniform = UniformGates(gate)
+    checkerboard = CheckerboardGates(gate, gate)
+    plaquette = PlaquetteGates(fill(gate, 2, 2); copy=false)
+
+    for cell in (uniform, checkerboard, plaquette)
+        copied = copy(cell)
+
+        @test typeof(copied) == typeof(cell)
+        @test collect(copied) == collect(cell)
+        @test all(copied[index] !== cell[index] for index in CartesianIndices(cell))
+        @test all(
+            copied[index].data !== cell[index].data
+            for index in CartesianIndices(cell)
+        )
+        @test length(unique(objectid.(collect(copied)))) == length(copied)
+    end
 end
 
 @testset "gate cells promote to larger unit cells" begin
@@ -110,6 +135,59 @@ end
     @test shared_plaquette.northeast === white
     @test shared_plaquette.southwest === white
     @test shared_plaquette.southeast === black
+
+    @test PlaquetteGates(plaquette; copy=false) === plaquette
+    @test PlaquetteGates(plaquette) !== plaquette
+end
+
+@testset "gate cells convert to U-shaped periodic MPS" begin
+    horizontal_ab = ℂ^2
+    horizontal_ba = ℂ^3
+    horizontal_cd = ℂ^4
+    horizontal_dc = ℂ^5
+    vertical_ac = ℂ^6
+    vertical_ca = ℂ^7
+    vertical_bd = ℂ^8
+    vertical_db = ℂ^9
+
+    northwest = randn(
+        ComplexF64,
+        horizontal_ba ⊗ vertical_ac,
+        vertical_ca ⊗ horizontal_ab,
+    )
+    northeast = randn(
+        ComplexF64,
+        horizontal_ab ⊗ vertical_bd,
+        vertical_db ⊗ horizontal_ba,
+    )
+    southwest = randn(
+        ComplexF64,
+        horizontal_dc ⊗ vertical_ca,
+        vertical_ac ⊗ horizontal_cd,
+    )
+    southeast = randn(
+        ComplexF64,
+        horizontal_cd ⊗ vertical_db,
+        vertical_bd ⊗ horizontal_dc,
+    )
+    plaquette = PlaquetteGates(
+        northwest, northeast, southwest, southeast
+    )
+    mps = PeriodicMPS(plaquette)
+
+    @test length(mps) == 4
+    @test assertconsistency(mps) === nothing
+    @test transpose(mps[1], ((3, 4), (2, 1)); copy=false) ≈ northwest
+    @test transpose(mps[2], ((2, 3), (1, 4)); copy=false) ≈ southwest
+    @test transpose(mps[3], ((1, 2), (4, 3)); copy=false) ≈ southeast
+    @test transpose(mps[4], ((4, 1), (3, 2)); copy=false) ≈ northeast
+
+    uniform = UniformGates(test_gate())
+    checkerboard = CheckerboardGates(uniform)
+    for cell in (uniform, checkerboard)
+        promoted = PeriodicMPS(PlaquetteGates(cell; copy=false))
+        @test all(PeriodicMPS(cell)[site] ≈ promoted[site] for site in 1:4)
+    end
 end
 
 @testset "gate cells reject open periodic bonds" begin
