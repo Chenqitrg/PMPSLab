@@ -20,12 +20,17 @@ import MPSKit: left_virtualspace, right_virtualspace, physicalspace
 export AbstractAlgorithmConfig
 export AbstractMeasurement, AbstractMeasurementResult, MeasurementHistory, measure
 export AbstractNormalization, InfinityNormNormalization, NormalizationResult
+export AbstractFixedPointMeasurement, TNRMeasurement, TNRMeasurementResult
 export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
 export AlgorithmEvent, LocalRunSession, LocalRunStatus, LocalCheckpointOutcome
 export initialize_run, step!, isfinished, run_result, snapshot, restore_run
 export write_checkpoint, read_checkpoint
 export start_run, start_run!, pause!, resume!, cancel!, run_status
 export checkpoint!, pause_and_checkpoint!, cancel_and_checkpoint!
+
+# Loop tensor-network renormalization
+export LoopTNR
+export RGLog, LoopTNRLog
 
 # Tensor-network unit cells
 export AbstractTensorCell, UniformGates, CheckerboardGates, PlaquetteGates
@@ -82,6 +87,7 @@ include("tensorcell/container.jl")
 include("tensorcell/constructors.jl")
 include("tensorcell/show.jl")
 include("looptnr/normalization.jl")
+include("looptnr/measurement.jl")
 include("execution/interface.jl")
 include("execution/observer.jl")
 include("execution/local_session.jl")
@@ -121,6 +127,8 @@ include("split/context.jl")
 include("split/identity.jl")
 include("split/run.jl")
 include("split/progress.jl")
+include("looptnr/interface.jl")
+include("looptnr/logs.jl")
 include("execution/checkpoint.jl")
 include("execution/local_checkpoint.jl")
 

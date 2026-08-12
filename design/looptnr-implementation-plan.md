@@ -450,8 +450,6 @@ struct RGLog{S}
     rg::Int
     split_log::S
     coarse_grain_time::Float64
-    normalization_time::Float64
-    fixed_point_time::Float64
 end
 
 mutable struct LoopTNRLog{L} <: ConvergenceLog
