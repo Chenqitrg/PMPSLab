@@ -1,4 +1,5 @@
 using Test, PMPSLab
+include("ambiguity_test.jl")
 include("measurement_test.jl")
 include("looptnr/runtests.jl")
 include("execution_test.jl")

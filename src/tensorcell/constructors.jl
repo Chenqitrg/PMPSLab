@@ -13,8 +13,13 @@ function Random.rand(
     return UniformGates(Random.rand(rng, elt, space))
 end
 
-Random.rand(::Type{UniformGates}, args...) =
-    Random.rand(Random.default_rng(), UniformGates, args...)
+function Random.rand(
+        ::Type{UniformGates},
+        elt::Type{<:Number},
+        space::TensorMapSpace,
+    )
+    return Random.rand(Random.default_rng(), UniformGates, elt, space)
+end
 
 """
     rand([rng], CheckerboardGates, elt, blackspace::TensorMapSpace)
@@ -35,8 +40,15 @@ function Random.rand(
     )
 end
 
-Random.rand(::Type{CheckerboardGates}, args...) =
-    Random.rand(Random.default_rng(), CheckerboardGates, args...)
+function Random.rand(
+        ::Type{CheckerboardGates},
+        elt::Type{<:Number},
+        blackspace::TensorMapSpace,
+    )
+    return Random.rand(
+        Random.default_rng(), CheckerboardGates, elt, blackspace
+    )
+end
 
 """
     rand([rng], PlaquetteGates, elt, spaces::AbstractMatrix{<:TensorMapSpace})
@@ -59,5 +71,10 @@ function Random.rand(
     return PlaquetteGates(gates; copy=false)
 end
 
-Random.rand(::Type{PlaquetteGates}, args...) =
-    Random.rand(Random.default_rng(), PlaquetteGates, args...)
+function Random.rand(
+        ::Type{PlaquetteGates},
+        elt::Type{<:Number},
+        spaces::AbstractMatrix{<:TensorMapSpace},
+    )
+    return Random.rand(Random.default_rng(), PlaquetteGates, elt, spaces)
+end

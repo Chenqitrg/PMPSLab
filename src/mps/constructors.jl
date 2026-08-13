@@ -71,8 +71,51 @@ function Random.rand(
     return PeriodicMPS(tensors)
 end
 
-Random.rand(::Type{PeriodicMPS}, args...) =
-    Random.rand(Random.default_rng(), PeriodicMPS, args...)
+function Random.rand(
+        ::Type{PeriodicMPS},
+        elt::Type{<:Number},
+        N::Integer,
+        d::Integer,
+        D::Integer,
+    )
+    return Random.rand(Random.default_rng(), PeriodicMPS, elt, N, d, D)
+end
+
+function Random.rand(
+        ::Type{PeriodicMPS},
+        elt::Type{<:Number},
+        N::Integer,
+        physical_dimensions::Tuple{Vararg{Integer}},
+        D::Integer,
+    )
+    return Random.rand(
+        Random.default_rng(),
+        PeriodicMPS,
+        elt,
+        N,
+        physical_dimensions,
+        D,
+    )
+end
+
+function Random.rand(
+        ::Type{PeriodicMPS},
+        elt::Type{<:Number},
+        N::Integer,
+        P::Union{ElementarySpace,ProductSpace},
+        V::ElementarySpace,
+    )
+    return Random.rand(Random.default_rng(), PeriodicMPS, elt, N, P, V)
+end
+
+function Random.rand(
+        ::Type{PeriodicMPS},
+        elt::Type{<:Number},
+        P::PeriodicVector{<:Union{ElementarySpace,ProductSpace}},
+        V::HalfPeriodicVector{<:ElementarySpace},
+    )
+    return Random.rand(Random.default_rng(), PeriodicMPS, elt, P, V)
+end
 
 """
     one_mps(elt, N, d, D) -> PeriodicMPS
