@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "0e3adf1994d3326af552e3b2cd3cca03d1dc9991"
+project_hash = "1e8fb64671e4308d220a7512342f2e06284b914f"
 
 [[deps.Accessors]]
 deps = ["CompositionsBase", "ConstructionBase", "Dates", "InverseFunctions", "MacroTools"]
@@ -686,7 +686,7 @@ version = "5.6.2"
     cuTENSOR = "011b41b2-24ef-40a8-b3eb-fa098493e9e1"
 
 [[deps.TensorRing]]
-deps = ["JLD2", "KrylovKit", "LinearAlgebra", "Logging", "MPSKit", "MatrixAlgebraKit", "ProgressLogging", "TensorKit", "UUIDs"]
+deps = ["JLD2", "KrylovKit", "LinearAlgebra", "Logging", "MPSKit", "MatrixAlgebraKit", "ProgressLogging", "Random", "TensorKit", "UUIDs"]
 path = "."
 uuid = "dd4302de-b7e4-496a-84b6-645ce13c7f0e"
 version = "0.1.0"

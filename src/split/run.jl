@@ -10,12 +10,17 @@ const SplitPendingIteration = Union{
     Tuple{SweepState,Int},
 }
 
-mutable struct SplitRun{A<:PeriodicSplit,C<:SplitContext,P} <: AbstractAlgorithmRun
+mutable struct SplitRun{
+        A<:PeriodicSplit,
+        C<:SplitContext,
+        P<:SplitPendingIteration,
+        H<:MeasurementHistory,
+    } <: AbstractAlgorithmRun
     algorithm::A
     context::C
-    pending_iteration::Union{Nothing,P}
+    pending_iteration::P
     log::SplitLog
-    measurement_results::MeasurementHistory
+    measurement_results::H
 end
 
 """
@@ -41,8 +46,8 @@ boundary. Derived transfer matrices and contraction caches are intentionally
 excluded and will be rebuilt by `restore_run`.
 """
 struct SplitSnapshot{
-        M,
-        P,
+        M<:PeriodicMPS,
+        P<:SplitPendingIteration,
         L<:SplitLog,
         H<:MeasurementHistory,
         I<:SplitProblemIdentity,
@@ -77,14 +82,18 @@ function initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
     _validate_split_sweep(algorithm.sweep, length(approximation))
     context = _build_split_context(mps, approximation, algorithm.environments)
     pending_iteration = iterate(algorithm.sweep)
+    measurement_results = MeasurementHistory()
     return SplitRun{
-        typeof(algorithm),typeof(context),SplitPendingIteration
+        typeof(algorithm),
+        typeof(context),
+        SplitPendingIteration,
+        typeof(measurement_results),
     }(
         algorithm,
         context,
         pending_iteration,
         SplitLog(),
-        MeasurementHistory(),
+        measurement_results,
     )
 end
 
@@ -193,14 +202,18 @@ function restore_run(
     mpsB = PeriodicMPS([copy(tensor) for tensor in saved.mpsB])
     context = _build_split_context(mpsA, mpsB, algorithm.environments)
     pending_iteration = saved.pending_iteration
+    measurement_results = deepcopy(saved.measurement_results)
     return SplitRun{
-        typeof(algorithm),typeof(context),SplitPendingIteration
+        typeof(algorithm),
+        typeof(context),
+        SplitPendingIteration,
+        typeof(measurement_results),
     }(
         algorithm,
         context,
         pending_iteration,
         _copy_split_log(saved.log),
-        deepcopy(saved.measurement_results),
+        measurement_results,
     )
 end
 

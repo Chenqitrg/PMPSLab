@@ -12,10 +12,12 @@ session 应按本文的阶段顺序逐步实现，每次只完成一个可独立
 
 ```text
 TensorCell
+→ canonical PlaquetteGates
 → U-shaped PeriodicMPS target
 → resumable PeriodicSplit child run
 → user-defined LoopTNR coarse graining
-→ CheckerboardGates
+→ temporary CheckerboardGates
+→ canonical PlaquetteGates
 → in-place normalization
 → fixed-point measurement
 → next RG step
@@ -37,14 +39,16 @@ conformal transfer matrix。
 以下决策已经由项目维护者确认，后续实现不应重新发明另一套方案。
 
 1. LoopTNR 输入支持 `UniformGates`、`CheckerboardGates` 和
-   `PlaquetteGates`。
-2. 三种输入都先通过现有 `PeriodicMPS(cell)` 转为四个二物理腿 target
+   `PlaquetteGates`；run 初始化时三者都复制并提升为由 run 独立持有的
+   `PlaquetteGates`，此后 run、result 和 snapshot 中的 cell 始终为 Plaquette。
+2. canonical Plaquette 通过现有 `PeriodicMPS(cell)` 转为四个二物理腿 target
    tensor。
 3. TensorCell 到 PMPS 的顺序是 U-shape：
    `NW → SW → SE → NE → NW`。
 4. target 通过现有 `PeriodicSplit` 优化为八个单物理腿 PMPS tensor。
 5. coarse graining 不是 `pair_contraction`；标准路径将八个 optimized tensor
-   收缩为两个四腿 tensor，输出 `CheckerboardGates`。
+   收缩为两个四腿 tensor，kernel 自然输出临时 `CheckerboardGates`，outer run
+   在 normalization、measurement 和 commit 前立即将其提升为 `PlaquetteGates`。
 6. 具体 coarse-graining contraction 由项目维护者亲自实现。其他 session 不得
    猜测箭头、dual、旋转或 black/white 分组。
 7. 第一版不单独实现 entanglement filtering，也不在 split 前调用 target
@@ -112,7 +116,8 @@ snapshot 和恢复。LoopTNR 应把这个测试模式落到真实 `SplitRun` 上
 
 ### RG 0
 
-`initialize_run` 只复制输入并建立 cursor，不执行 normalization 或 measurement。
+`initialize_run` 将输入复制并 canonicalize 为 `PlaquetteGates`，然后建立 cursor，
+不执行 normalization 或 measurement。
 第一次 outer `step!` 完成 RG 0：
 
 ```text
@@ -133,13 +138,14 @@ copy internal input into a local candidate
 每轮流程为：
 
 ```text
-current normalized TensorCell
+current normalized PlaquetteGates
 → PeriodicMPS(cell)
 → initialize child SplitRun
 → delegate one child site per outer step!
 → child becomes complete
 → coarse_grain(optimized child result)
-→ assertconsistency(candidate CheckerboardGates)
+→ promote temporary CheckerboardGates to candidate PlaquetteGates
+→ assertconsistency(candidate PlaquetteGates)
 → normalize candidate in place
 → evaluate fixed-point measurement
 → atomically commit cell, RGLog and measurement result
@@ -400,13 +406,14 @@ coarse-graining contraction 是 LoopTNR 的内部数值接缝，不作为独立�
 _coarse_grain(mps)
 ```
 
-该方法接受由 LoopTNR active split 产生的八站点单物理腿 `PeriodicMPS`，返回
-`CheckerboardGates`。outer run 与内部方法共同负责结构检查：
+该方法接受由 LoopTNR active split 产生的八站点单物理腿 `PeriodicMPS`，返回临时
+`CheckerboardGates`。outer run 随即复制提升为 canonical `PlaquetteGates`；kernel
+与 outer run 共同负责结构检查：
 
 - 输入长度必须为八；
 - 每个 optimized tensor 必须是单物理腿 MPS tensor；
-- 输出必须是 `CheckerboardGates`；
-- 输出必须通过 `assertconsistency`。
+- kernel 输出必须是 `CheckerboardGates`；
+- committed candidate 必须是 `PlaquetteGates` 并通过 `assertconsistency`。
 
 ### 当前 U-shape 物理腿顺序
 
@@ -521,25 +528,25 @@ end
 概念形状：
 
 ```julia
-mutable struct LoopTNRRun{A<:LoopTNR} <: AbstractAlgorithmRun
+mutable struct LoopTNRRun{A,G,S,H} <: AbstractAlgorithmRun
     algorithm::A
-    cell::AbstractTensorCell
+    cell::PlaquetteGates{G}
     completed_rg::Int
     phase::LoopTNRPhase
-    active_split::Union{Nothing,SplitRun}
+    active_split::Union{Nothing,SplitRun{S}}
     log::LoopTNRLog
-    measurement_results::MeasurementHistory
+    measurement_results::H
 end
 ```
 
-`cell` 和 `active_split` 有意在 outer orchestration boundary 使用 type-erased field：
-coarse graining 和 truncation 会改变具体 virtual spaces 与 concrete TensorMap type，
-不能假设所有 RG 都具有同一个 concrete cell type。
+`cell` 使用唯一 canonical Plaquette 表示，不保留旧的 Uniform/Checkerboard result
+兼容。`active_split` 是延迟初始化的 parent/child 边界；outer 只固定 split config
+类型，具体 child context 通过 function barrier 进入专门编译的方法。
 
 初始化状态：
 
 ```text
-cell = copy(input)
+cell = PlaquetteGates(input)
 completed_rg = -1
 phase = TNR_INITIALIZE
 active_split = nothing
@@ -1033,6 +1040,12 @@ round-trip 与 split 中途 `pause_and_checkpoint!` 均可恢复外层 measureme
 - write failure 不损坏 in-memory run。
 
 ### Phase 8：默认 progress 与 README
+
+**实现状态：已完成。** 交互式默认 observer 现在显示嵌套 RG/split 进度，
+每个 split sweep 和 committed RG 各留一条简洁摘要；`LoopTNRRun`、
+`LocalRunSession{<:LoopTNRRun}`、`LoopTNRSnapshot` 和 `LoopTNRResult` 也提供
+不会展开 tensor storage 的状态化显示。README 已覆盖 blocking、可控执行、custom
+measurement observer 和 checkpoint restore。
 
 **目标：** 最后再加入用户界面，不让显示逻辑干扰数值状态机。
 

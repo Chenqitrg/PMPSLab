@@ -6,21 +6,26 @@
     TNR_FINISHED
 end
 
-mutable struct LoopTNRRun{A<:LoopTNR} <: AbstractAlgorithmRun
+mutable struct LoopTNRRun{
+        A<:LoopTNR,
+        G<:GenericGateTensor,
+        S<:PeriodicSplit,
+        H<:MeasurementHistory,
+    } <: AbstractAlgorithmRun
     algorithm::A
-    cell::AbstractTensorCell
+    cell::PlaquetteGates{G}
     completed_rg::Int
     phase::LoopTNRPhase
-    active_split::Union{Nothing,SplitRun}
+    active_split::Union{Nothing,SplitRun{S}}
     log::LoopTNRLog
-    measurement_results::MeasurementHistory
+    measurement_results::H
 end
 
 struct LoopTNRResult{
-        C<:AbstractTensorCell,
+        G<:GenericGateTensor,
         H<:MeasurementHistory,
     }
-    cell::C
+    cell::PlaquetteGates{G}
     measurement_results::H
     log::LoopTNRLog
 end
@@ -31,20 +36,37 @@ struct LoopTNRCoarseGrained{L<:RGLog,R<:TNRMeasurementResult} <: AlgorithmEvent
     result::R
 end
 
-struct LoopTNRSplitStepCompleted{E<:AlgorithmEvent} <: AlgorithmEvent
+struct LoopTNRSplitStepCompleted{E<:SplitSiteCompleted} <: AlgorithmEvent
     rg::Int
     event::E
 end
 
-function initialize_run(cell::AbstractTensorCell, algorithm::LoopTNR)
-    return LoopTNRRun(
+const LoopTNRInputCell = Union{
+    UniformGates,
+    CheckerboardGates,
+    PlaquetteGates,
+}
+
+function _looptnr_cell(cell::LoopTNRInputCell)
+    return PlaquetteGates(cell)
+end
+
+function initialize_run(cell::LoopTNRInputCell, algorithm::LoopTNR)
+    internal_cell = _looptnr_cell(cell)
+    measurement_results = MeasurementHistory{TNRMeasurementResult}()
+    return LoopTNRRun{
+        typeof(algorithm),
+        eltype(internal_cell),
+        typeof(algorithm.split),
+        typeof(measurement_results),
+    }(
         algorithm,
-        copy(cell),
+        internal_cell,
         -1,
         TNR_INITIALIZE,
         nothing,
         LoopTNRLog(),
-        MeasurementHistory(),
+        measurement_results,
     )
 end
 
@@ -76,6 +98,10 @@ end
 
 function _step_active_split!(run::LoopTNRRun)
     active_split = something(run.active_split)
+    return _step_active_split!(run, active_split)
+end
+
+function _step_active_split!(run::LoopTNRRun, active_split::R) where {R<:SplitRun}
     rg = run.completed_rg + 1
     event = step!(active_split)
     isfinished(active_split) && (run.phase = TNR_COARSE_GRAIN)
@@ -98,13 +124,21 @@ end
 
 function _coarse_grain_tnr_step!(run::LoopTNRRun)
     active_split = something(run.active_split)
+    return _coarse_grain_tnr_step!(run, active_split)
+end
+
+function _coarse_grain_tnr_step!(
+        run::LoopTNRRun,
+        active_split::R,
+    ) where {R<:SplitRun}
     isfinished(active_split) || throw(ArgumentError(
         "LoopTNR cannot coarse grain an unfinished active split"
     ))
 
     split_result = run_result(active_split)
     started_at = time()
-    candidate = _coarse_grain(split_result.mps)
+    coarse = _coarse_grain(split_result.mps)
+    candidate = PlaquetteGates(coarse)
     coarse_grain_time = time() - started_at
     assertconsistency(candidate)
 
@@ -151,7 +185,7 @@ Run LoopTNR to completion through the generic resumable execution interface.
 The caller's tensor cell is not modified.
 """
 function renormalize(
-        cell::AbstractTensorCell,
+        cell::LoopTNRInputCell,
         algorithm::LoopTNR;
         observer = _DEFAULT_OBSERVER,
     )

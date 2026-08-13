@@ -10,12 +10,12 @@ active, `active_split` contains its nested [`SplitSnapshot`](@ref); committed RG
 measurements remain in the outer `measurement_results` history.
 """
 struct LoopTNRSnapshot{
-        C<:AbstractTensorCell,
+        G<:GenericGateTensor,
         P<:Union{Nothing,SplitSnapshot},
         H<:MeasurementHistory,
         I<:LoopTNRProblemIdentity,
     } <: AbstractAlgorithmSnapshot
-    cell::C
+    cell::PlaquetteGates{G}
     completed_rg::Int
     phase::LoopTNRPhase
     active_split::P
@@ -187,14 +187,20 @@ function restore_run(saved::LoopTNRSnapshot, algorithm::LoopTNR)
         target = PeriodicMPS(cell)
         restore_run(saved.active_split, target, algorithm.split)
     end
-    run = LoopTNRRun(
+    measurement_results = deepcopy(saved.measurement_results)
+    run = LoopTNRRun{
+        typeof(algorithm),
+        eltype(cell),
+        typeof(algorithm.split),
+        typeof(measurement_results),
+    }(
         algorithm,
         cell,
         saved.completed_rg,
         saved.phase,
         active_split,
         deepcopy(saved.log),
-        deepcopy(saved.measurement_results),
+        measurement_results,
     )
     _validate_looptnr_state(
         run.completed_rg,

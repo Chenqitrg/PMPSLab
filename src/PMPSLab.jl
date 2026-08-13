@@ -133,6 +133,8 @@ include("looptnr/logs.jl")
 include("looptnr/coarsegrain.jl")
 include("looptnr/run.jl")
 include("looptnr/snapshot.jl")
+include("looptnr/show.jl")
+include("looptnr/progress.jl")
 include("execution/checkpoint.jl")
 include("execution/local_checkpoint.jl")
 

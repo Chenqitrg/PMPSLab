@@ -4,7 +4,7 @@
 Control and timing information for one committed LoopTNR RG boundary. Physical
 measurement results are stored separately in [`MeasurementHistory`](@ref).
 """
-struct RGLog{S}
+struct RGLog{S<:Union{Nothing,SplitLog}}
     rg::Int
     split_log::S
     coarse_grain_time::Float64
@@ -12,7 +12,7 @@ end
 
 function RGLog(
         rg::Integer,
-        split_log,
+        split_log::Union{Nothing,SplitLog},
         coarse_grain_time::Real,
     )
     return RGLog(
@@ -23,7 +23,7 @@ function RGLog(
 end
 
 mutable struct LoopTNRLog <: ConvergenceLog
-    rg_logs::Vector{RGLog}
+    rg_logs::Vector{Union{RGLog{Nothing},RGLog{SplitLog}}}
 end
 
-LoopTNRLog() = LoopTNRLog(RGLog[])
+LoopTNRLog() = LoopTNRLog(Union{RGLog{Nothing},RGLog{SplitLog}}[])

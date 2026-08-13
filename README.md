@@ -399,6 +399,112 @@ operator without densifying it. Direct solvers remain supported, but they
 materialize that local operator before solving. Krylov non-convergence emits a
 warning; the current split implementation continues with the latest iterate.
 
+## 10. Run LoopTNR
+
+`LoopTNR` repeatedly turns a tensor cell into its designed eight-site split
+problem, optimizes that split, coarse-grains it back to a tensor cell, and then
+normalizes and measures the new RG boundary. The blocking API returns a named
+result rather than a tuple. All accepted input cell layouts are copied into a
+canonical `PlaquetteGates`; run, snapshot, and result cells therefore always
+use that representation:
+
+```julia
+tnr = LoopTNR(8; maximal_rg=2)
+result = renormalize(gates, tnr)
+
+@show result.cell
+@show length(result.measurement_results)  # RG 0, 1, and 2
+@show length(result.log.rg_logs)
+```
+
+In an interactive session the default observer uses one replaceable progress
+entry for the current RG split, spanning all of its split sweeps, and leaves
+concise sweep and RG summaries behind:
+
+```text
+[ Info: LoopTNR started · RG 0/2 normalization pending
+[ Info: LoopTNR RG 0/2 initialized · scale <Real>
+[ Info: LoopTNR RG 1/2 · split sweep 1 completed · cost <Float64> · time <Float64> s
+[ Info: LoopTNR RG 1/2 completed · cost <Float64> · split <Float64> s · coarse grain <Float64> s · scale <Real>
+...
+[ Info: LoopTNR completed · RG 2/2 · 3 measurements
+```
+
+Typing a run at the REPL shows its next safe action without expanding tensor
+storage. During an active split it has this shape:
+
+```text
+LoopTNRRun(RG 1/2 · split sweep 3 · next site 5/8)
+  committed cell: 2×2 PlaquetteGates(ComplexF64, ComplexSpace)
+  RG logs: 1
+  measurements: 1
+  active split: 20/320 site updates
+```
+
+LoopTNR uses the same controllable execution interface as a standalone split:
+
+```julia
+run = initialize_run(gates, tnr)
+session_ref = Ref{LocalRunSession}()
+pause_requested = Ref(false)
+observer = event -> begin
+    if !pause_requested[] &&
+            event isa LoopTNRSplitStepCompleted &&
+            event.event.log.state.site == 4
+        pause_requested[] = true
+        pause!(session_ref[])
+    end
+    nothing
+end
+
+session = LocalRunSession(run; observer)
+session_ref[] = session
+start_run!(session)
+
+wait(session)  # stops after the current split site or complete RG action
+run_status(session) == PMPSLab.LOCAL_PAUSED || error("run did not pause")
+display(run)   # reports the exact continuation point
+resume!(session)
+result = fetch(session)
+```
+
+Here the observer requests the pause once, after split site 4 completes. This
+avoids racing an external `pause!` call against a short run. An external pause
+request is still valid, but completion wins if the run finishes first.
+
+A custom observer replaces the display and receives both nested split-site
+events and committed RG events. Physical measurement results are carried by
+the RG event, separately from the control-only logs:
+
+```julia
+observer = event -> begin
+    event isa LoopTNRCoarseGrained || return
+    measurement = event.result
+    println("RG $(event.rg): normalization scale = ",
+            measurement.normalization.scale)
+end
+
+result = renormalize(gates, tnr; observer)
+```
+
+Durable pause stores the committed outer cell, its measurement history, and an
+active split snapshot when the pause lands inside a split. Restoring a LoopTNR
+checkpoint therefore needs the algorithm configuration, but not the original
+input cell:
+
+```julia
+session = start_run(initialize_run(gates, tnr))
+outcome = pause_and_checkpoint!(session, "paused-looptnr.jld2")
+
+if outcome == PMPSLab.LOCAL_CHECKPOINT_WRITTEN
+    saved = read_checkpoint("paused-looptnr.jld2")
+    restored = restore_run(saved, tnr)
+    result = fetch(start_run(restored))
+else
+    result = fetch(session)
+end
+```
+
 ## Cost and progress semantics
 
 With dense environments and an exact local solver, each `SiteLog.error` agrees

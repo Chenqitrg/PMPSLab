@@ -11,13 +11,21 @@ struct FailingFixedPointMeasurement <: AbstractFixedPointMeasurement end
 PMPSLab.measure(::FailingFixedPointMeasurement, ::AbstractTensorCell) =
     error("injected fixed-point failure")
 
-struct FailingCheckerboardMeasurement <: AbstractFixedPointMeasurement end
-PMPSLab.measure(
-    ::FailingCheckerboardMeasurement, cell::AbstractTensorCell
-) = GateCountResult(length(cell))
-PMPSLab.measure(
-    ::FailingCheckerboardMeasurement, ::CheckerboardGates
-) = error("injected coarse-grained fixed-point failure")
+mutable struct FailingCoarseMeasurement <: AbstractFixedPointMeasurement
+    calls::Int
+end
+FailingCoarseMeasurement() = FailingCoarseMeasurement(0)
+
+function PMPSLab.measure(
+        measurement::FailingCoarseMeasurement,
+        cell::PlaquetteGates,
+    )
+    measurement.calls += 1
+    measurement.calls == 1 || error(
+        "injected coarse-grained fixed-point failure"
+    )
+    return GateCountResult(length(cell))
+end
 
 function rg0_cell_variants()
     uniform_gate = normalization_gate()
@@ -39,6 +47,19 @@ end
         run = initialize_run(cell, algorithm)
 
         @test run.cell !== cell
+        @test run.cell isa PlaquetteGates
+        @test fieldtype(typeof(run), :cell) == typeof(run.cell)
+        @test all(
+            stored !== source
+            for stored in collect(run.cell), source in collect(cell)
+        )
+        @test length(unique(objectid, collect(run.cell))) == 4
+        @test fieldtype(typeof(run), :active_split) ==
+            Union{Nothing,SplitRun{typeof(algorithm.split)}}
+        @test run.measurement_results isa
+            MeasurementHistory{TNRMeasurementResult}
+        @test eltype(run.log.rg_logs) ==
+            Union{RGLog{Nothing},RGLog{SplitLog}}
         @test run.completed_rg == -1
         @test run.phase == PMPSLab.TNR_INITIALIZE
         @test isnothing(run.active_split)
@@ -50,7 +71,7 @@ end
 
         @test event isa LoopTNRCoarseGrained
         @test result isa LoopTNRResult
-        @test result.cell isa AbstractTensorCell
+        @test result.cell isa PlaquetteGates
         @test result.measurement_results isa MeasurementHistory
         @test result.log isa LoopTNRLog
         @test event.rg == 0
@@ -101,7 +122,7 @@ end
 
     @test length(events) == 1
     @test only(events) isa LoopTNRCoarseGrained
-    @test only(result.measurement_results).fixed_point == GateCountResult(1)
+    @test only(result.measurement_results).fixed_point == GateCountResult(4)
 end
 
 @testset "LoopTNR RG 0 — failures do not commit" begin
@@ -119,7 +140,7 @@ end
     @test isempty(run.log.rg_logs)
     @test isempty(run.measurement_results)
     @test all(collect(run.cell) .== committed_before)
-    @test norm(run.cell.gate, Inf) ≈ 4
+    @test all(norm(gate, Inf) ≈ 4 for gate in run.cell)
 end
 
 @testset "LoopTNR multi-RG — zero-length split" begin
@@ -140,7 +161,7 @@ end
     @test length(result.log.rg_logs) == 3
     @test isnothing(result.log.rg_logs[1].split_log)
     @test all(isempty(log.split_log.site_logs) for log in result.log.rg_logs[2:3])
-    @test result.cell isa CheckerboardGates
+    @test result.cell isa PlaquetteGates
     @test isnothing(assertconsistency(result.cell))
     @test all(collect(cell) .== input_before)
 end
@@ -150,7 +171,7 @@ end
 
     for cell in rg0_cell_variants()
         result = renormalize(cell, algorithm; observer=nothing)
-        @test result.cell isa CheckerboardGates
+        @test result.cell isa PlaquetteGates
         @test isnothing(assertconsistency(result.cell))
         @test length(result.measurement_results) == 2
         @test length(result.log.rg_logs) == 2
@@ -189,6 +210,7 @@ end
     @test isfinished(run)
     @test isnothing(run.active_split)
     @test run.completed_rg == 1
+    @test typeof(run.cell) == typeof(committed_cell)
     @test length(run.log.rg_logs[2].split_log.site_logs) == 8
     @test length(run.measurement_results) == 2
 end
@@ -196,7 +218,7 @@ end
 @testset "LoopTNR multi-RG — failed commit retains completed split" begin
     cell = UniformGates(normalization_gate())
     measurement = TNRMeasurement(
-        InfinityNormNormalization(), FailingCheckerboardMeasurement()
+        InfinityNormNormalization(), FailingCoarseMeasurement()
     )
     run = initialize_run(
         cell,

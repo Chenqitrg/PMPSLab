@@ -144,12 +144,12 @@ end
     @test saved.active_split.mpsB !== something(run.active_split).context.mpsB
 
     push!(run.measurement_results[1].fixed_point.payload, 99)
-    @test saved.measurement_results[1].fixed_point.payload == [1]
+    @test saved.measurement_results[1].fixed_point.payload == [4]
 
     restored = restore_run(saved, algorithm)
     push!(restored.measurement_results[1].fixed_point.payload, 42)
-    @test saved.measurement_results[1].fixed_point.payload == [1]
-    @test restored.measurement_results[1].fixed_point.payload == [1, 42]
+    @test saved.measurement_results[1].fixed_point.payload == [4]
+    @test restored.measurement_results[1].fixed_point.payload == [4, 42]
 end
 
 @testset "LoopTNRSnapshot — paused root contains active split" begin
