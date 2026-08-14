@@ -34,6 +34,52 @@
     @test hash(algorithm) == hash(deepcopy(algorithm))
 end
 
+@testset "algorithm configurations — recursive plain-text display" begin
+    ansatz = PeriodicGaugeAnsatz()
+    ansatz_text = sprint(show, MIME"text/plain"(), ansatz)
+
+    @test startswith(ansatz_text, "PeriodicGaugeAnsatz:\n")
+    @test occursin(
+        "├─ svd_pre: SVDAnsatz\n│  └─ truncation: ",
+        ansatz_text,
+    )
+    @test occursin(
+        "└─ canonical: ProjectorCanonical\n" *
+            "   ├─ tol: 1.0e-12\n" *
+            "   ├─ maxiter: 100\n" *
+            "   ├─ trscheme: ",
+        ansatz_text,
+    )
+    @test !occursin("svd_pre: SVDAnsatz{", ansatz_text)
+    @test sprint(
+        show,
+        MIME"text/plain"(),
+        ansatz;
+        context = :compact => true,
+    ) == "PeriodicGaugeAnsatz(...)"
+
+    split_algorithm = PeriodicSplit(
+        ansatz,
+        CircularSweep(4; maximal_sweep=1),
+        CholeskySolve(),
+    )
+    split_text = sprint(show, MIME"text/plain"(), split_algorithm)
+    @test occursin(
+        "├─ ansatz: PeriodicGaugeAnsatz\n" *
+            "│  ├─ svd_pre: SVDAnsatz\n" *
+            "│  │  └─ truncation: ",
+        split_text,
+    )
+    @test occursin("├─ solve: CholeskySolve()\n", split_text)
+    @test occursin(
+        "├─ environments: SplitEnvironmentPolicy\n" *
+            "│  ├─ norm: DenseTransferPolicy()\n" *
+            "│  └─ mixed: DenseTransferPolicy()\n" *
+            "└─ stopping: nothing\n",
+        split_text,
+    )
+end
+
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin
     B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
