@@ -11,6 +11,44 @@
     @test E ≈ manual
 end
 
+@testset "DenseTransferMatrix — display" begin
+    tensor = randn(ComplexF64, ℂ^2 ⊗ ℂ^3, ℂ^2)
+    transfer = DenseTransferMatrix(tensor)
+
+    @test summary(transfer) ==
+          "4×4 DenseTransferMatrix(ComplexF64, ComplexSpace)"
+    @test sprint(show, transfer) == summary(transfer)
+
+    shown = sprint(
+        show,
+        MIME"text/plain"(),
+        transfer;
+        context=(:compact => false,),
+    )
+    @test startswith(shown, summary(transfer) * ":\n")
+    @test occursin("ℂ^2 │       │ (ℂ^2)'", shown)
+    @test occursin("├───────┤", shown)
+
+    directed = DenseTransferMatrix(randn(
+        ComplexF64,
+        ℂ^2 ⊗ ℂ^3,
+        ℂ^4 ⊗ ℂ^5,
+    ))
+    directed_shown = sprint(show, MIME"text/plain"(), directed)
+    @test occursin("ℂ^4 │       │ ℂ^5", directed_shown)
+    @test occursin("ℂ^2 │       │ ℂ^3", directed_shown)
+    @test first(findfirst("ℂ^4", directed_shown)) <
+          first(findfirst("ℂ^2", directed_shown))
+
+    compact = sprint(
+        show,
+        MIME"text/plain"(),
+        transfer;
+        context=(:compact => true,),
+    )
+    @test compact == summary(transfer)
+end
+
 @testset "DenseTransferMatrix — MPSKit transfer interface" begin
     D, d = 3, 2
     tensor = randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)

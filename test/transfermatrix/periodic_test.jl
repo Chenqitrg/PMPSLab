@@ -19,6 +19,61 @@
     @test ptm[2] ≈ new
 end
 
+@testset "PeriodicTransferMatrix — display" begin
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
+    transfer = PeriodicTransferMatrix(mps)
+
+    @test summary(transfer) ==
+          "4-site PeriodicTransferMatrix{DenseTransferMatrix}" *
+          "(ComplexF64, ComplexSpace)"
+    @test sprint(show, transfer) == summary(transfer)
+
+    shown = sprint(
+        show,
+        MIME"text/plain"(),
+        transfer;
+        context=(:limit => false,),
+    )
+    @test startswith(shown, summary(transfer) * ":\n")
+    @test occursin("╭─╮       ╭─╮", shown)
+    @test occursin("│ ├──[4]──┤ │", shown)
+    @test occursin("│ ├──[1]──┤ │", shown)
+    @test occursin("ℂ^2 │ │       │ │ (ℂ^2)'", shown)
+    @test !occursin("ℂ^2 ⊗ (ℂ^2)'", shown)
+
+    cache_shown = sprint(
+        show,
+        MIME"text/plain"(),
+        build_cache(transfer);
+        context=(:limit => false,),
+    )
+    @test occursin("ℂ^2 │ │       │ │ (ℂ^2)'", cache_shown)
+
+    compact = sprint(
+        show,
+        MIME"text/plain"(),
+        transfer;
+        context=(:compact => true,),
+    )
+    @test compact == summary(transfer)
+
+    truncated = PeriodicTransferMatrix(mps, truncrank(2))
+    @test occursin(
+        "PeriodicTransferMatrix{TruncatedTransferMatrix}",
+        summary(truncated),
+    )
+
+    long_mps = rand(PeriodicMPS, Float64, 20, 2, 2)
+    limited = sprint(
+        show,
+        MIME"text/plain"(),
+        PeriodicTransferMatrix(long_mps);
+        context=(:limit => true, :displaysize => (24, 40)),
+    )
+    @test occursin("⋮", limited)
+    @test occursin("│ ├──[20]──┤ │", limited)
+end
+
 @testset "PeriodicTransferMatrix — construction from (bra, ket)" begin
     N, d, D = 3, 2, 3
     bra = rand(PeriodicMPS, ComplexF64, N, d, D)

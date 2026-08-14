@@ -113,6 +113,47 @@ end
     end
 end
 
+@testset "PeriodicCache — display" begin
+    cache = build_cache(random_periodic_product(3, 6))
+
+    @test summary(cache) ==
+          "6-site PeriodicCache{TensorMap} (left 6/6, right 6/6 valid)"
+    @test sprint(show, cache) == summary(cache)
+
+    invalidate!(cache, 3)
+    @test summary(cache) ==
+          "6-site PeriodicCache{TensorMap} (left 3/6, right 4/6 valid)"
+    shown = sprint(
+        show,
+        MIME"text/plain"(),
+        cache;
+        context=(:limit => false,),
+    )
+    @test occursin("╭─╮       ╭─╮", shown)
+    @test occursin("│ ○──[6]──⊙ │", shown)
+    @test occursin("│ ●──[3]──● │", shown)
+    @test occursin("│ ⊙──[1]──○ │", shown)
+    @test endswith(shown, "⊙ identity   ● valid   ○ stale")
+
+    compact = sprint(
+        show,
+        MIME"text/plain"(),
+        cache;
+        context=(:compact => true,),
+    )
+    @test compact == summary(cache)
+
+    long_cache = build_cache(random_periodic_product(2, 20))
+    limited = sprint(
+        show,
+        MIME"text/plain"(),
+        long_cache;
+        context=(:limit => true, :displaysize => (24, 40)),
+    )
+    @test occursin("⋮", limited)
+    @test occursin("│ ●──[20]──⊙ │", limited)
+end
+
 @testset "build_cache — direct element generation" begin
     N = 5
     product = random_periodic_product(3, N)
