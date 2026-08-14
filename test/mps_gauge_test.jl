@@ -1,5 +1,6 @@
 using Test
 using CategoryData
+using HalfIntegers: half
 using PMPSLab
 using Random
 using TensorKit
@@ -128,11 +129,11 @@ end
     expected_right = mul_left_virtual(left_matrix, mps[2])
 
     @test insert_gauge!(
-        mps, HalfInt(1), right_matrix, left_matrix
+        mps, half(3), right_matrix, left_matrix
     ) === mps
     @test mps[1] ≈ expected_left
     @test mps[2] ≈ expected_right
-    @test mps[HalfInt(1)] == new_bond
+    @test mps[half(3)] == new_bond
     @test assertconsistency(mps) === nothing
 end
 
@@ -153,18 +154,18 @@ end
     @test standardized !== mps
     @test dense(standardized) ≈ dense(mps)
 
-    bond_position = HalfInt(1)
-    bond = mps[bond_position]
+    position = half(3)
+    bond = mps[position]
     gauge = unitary(rand(ComplexF64, bond ← bond))
     before_gauge = dense(mps)
     @test insert_gauge!(
-        mps, bond_position, gauge, adjoint(gauge)
+        mps, position, gauge, adjoint(gauge)
     ) === mps
-    @test mps[bond_position] == bond
+    @test mps[position] == bond
     @test dense(mps) ≈ before_gauge
     @test assertconsistency(mps) === nothing
 
-    periodic_bond = bond_position + length(mps)
+    periodic_bond = position + length(mps)
     @test mps[periodic_bond] == bond
     before_periodic_gauge = dense(mps)
     @test insert_gauge!(
@@ -175,7 +176,7 @@ end
         insert_gauge!, mps, 1, gauge, adjoint(gauge)
     )
     @test !applicable(
-        insert_gauge!, raw, bond_position, gauge, adjoint(gauge)
+        insert_gauge!, raw, position, gauge, adjoint(gauge)
     )
     @test !applicable(standardize, raw)
 

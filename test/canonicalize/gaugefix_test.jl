@@ -50,14 +50,14 @@ end
     #
     # This must reproduce the projector update performed by gaugefix!.
     mixed = map(eachindex(mps)) do bond
-        pos = HalfInt(bond)
+        pos = half(2bond + 1)
         U, S, Vh, _ = PMPSLab.svd_trunc(L[pos] * R[pos]; trunc=alg.trscheme)
         return (; U, S, Vh)
     end
 
     symmetric_tensors = map(eachindex(mps)) do i
-        left_bond = HalfInt(i - 1)
-        right_bond = HalfInt(i)
+        left_bond = half(2i - 1)
+        right_bond = half(2i + 1)
         left = mixed[mod1(i - 1, length(mps))]
         right = mixed[i]
 

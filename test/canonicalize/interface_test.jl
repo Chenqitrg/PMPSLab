@@ -1,8 +1,8 @@
 @testset "HalfInt" begin
-    h = HalfInt(3)
-    @test h.n == 3
-    @test (h + 2).n == 5
-    @test (h - 1).n == 2
+    h = half(7)
+    @test h == HalfInt(7//2)
+    @test h + 2 == HalfInt(11//2)
+    @test h - 1 == HalfInt(5//2)
 end
 
 @testset "MPSKit gauges — normalized on nonuniform virtual bonds" begin
@@ -16,7 +16,7 @@ end
     @test L isa HalfPeriodicVector
     @test R isa HalfPeriodicVector
     for i in eachindex(mps)
-        pos = HalfInt(i)
+        pos = half(2i + 1)
         bond = right_virtualspace(mps[i])
         @test codomain(L[pos])[1] == bond
         @test domain(L[pos])[1] == bond
@@ -44,7 +44,7 @@ end
     # Input tensors are passed by reference without copying or mutation.
     @test all(mps[i] === tensor_objects[i] for i in 1:length(mps))
     for bond in 1:length(mps)
-        pos = HalfInt(bond)
+        pos = half(2bond + 1)
         @test PR[pos] * PL[pos] ≈ id(domain(PR[pos])) atol=1e-10
     end
 end

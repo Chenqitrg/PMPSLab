@@ -22,46 +22,22 @@ using TensorKit
 using MPSKit:
     PeriodicVector, left_virtualspace, right_virtualspace, physicalspace, InfiniteMPS
 using MPSKit
+import HalfIntegers
+using HalfIntegers: half
 
 # ==============================================================================
 # HalfInt
 # ==============================================================================
 
-@testset "HalfInt — Int constructor and arithmetic" begin
-    h = HalfInt(3)
-    @test h.n == 3
-    @test HalfInt(0).n == 0
-    @test HalfInt(-2).n == -2
-
-    # == and hash follow the wrapped Int
-    @test HalfInt(3) == HalfInt(3)
-    @test HalfInt(3) != HalfInt(4)
-    @test hash(HalfInt(3)) == hash(HalfInt(3))
-
-    # convert from Int
-    @test convert(HalfInt, 7) == HalfInt(7)
-
-    # arithmetic with Int
-    @test (HalfInt(3) + 2) == HalfInt(5)
-    @test (HalfInt(3) - 2) == HalfInt(1)
-end
-
-@testset "HalfInt — Rational constructor (n + 1/2)" begin
-    # exact half-integers: HalfInt(x) with x = n + 1/2
-    @test HalfInt(1//2).n == 0      # 0 + 1/2
-    @test HalfInt(3//2).n == 1      # 1 + 1/2
-    @test HalfInt(5//2).n == 2      # 2 + 1/2
-    @test HalfInt(-1//2).n == -1    # -1 + 1/2
-    @test HalfInt(-3//2).n == -2
-
-    # a pure integer is not of the form n + 1/2 → must be rejected
-    @test_throws ArgumentError HalfInt(2//1)
-    @test_throws ArgumentError HalfInt(0//1)
-    @test_throws ArgumentError HalfInt(-5//1)
-
-    # denominators other than 2 are rejected
-    @test_throws ArgumentError HalfInt(1//3)
-    @test_throws ArgumentError HalfInt(4//7)
+@testset "HalfInt — ecosystem type and arithmetic" begin
+    @test HalfInt === HalfIntegers.HalfInt
+    @test HalfInt(3) == 3
+    @test HalfInt(3//2) == 3//2
+    @test HalfInt(-3//2) == -3//2
+    @test HalfInt(3//2) + 2 == HalfInt(7//2)
+    @test HalfInt(3//2) - 2 == HalfInt(-1//2)
+    @test half(7) == HalfInt(7//2)
+    @test sprint(show, HalfInt(7//2)) == "7/2"
 end
 
 # ==============================================================================
@@ -81,9 +57,9 @@ end
     @test eltype(typeof(v)) == ComplexSpace
 
     # indexing by HalfInt bond label
-    @test v[HalfInt(1)] == ℂ^2
-    @test v[HalfInt(2)] == ℂ^3
-    @test v[HalfInt(3)] == ℂ^4
+    @test v[half(3)] == ℂ^2
+    @test v[half(5)] == ℂ^3
+    @test v[half(7)] == ℂ^4
 
     # indexing by plain Int delegates to the wrapped elements
     @test v[1] == ℂ^2
@@ -91,10 +67,11 @@ end
 
     # half-integer rational positions: v[i - 1//2] is the bond before site i
     @test v[1 - 1//2] == ℂ^4     # bond 0 wraps to bond 3 (PeriodicVector semantics)
-    @test v[2 - 1//2] == ℂ^2     # same as v[HalfInt(1)]
-    @test v[3 - 1//2] == ℂ^3     # same as v[HalfInt(2)]
-    @test v[4 - 1//2] == ℂ^4     # same as v[HalfInt(3)]
-    @test v[2 + 1//2] == ℂ^3     # same as v[HalfInt(2)]
+    @test v[2 - 1//2] == ℂ^2     # bond after site 1
+    @test v[3 - 1//2] == ℂ^3     # bond after site 2
+    @test v[4 - 1//2] == ℂ^4     # bond after site 3
+    @test v[2 + 1//2] == ℂ^3     # bond after site 2
+    @test_throws ArgumentError v[HalfInt(2)]
 
     # iteration
     @test collect(v) == collect(els)
@@ -216,15 +193,17 @@ end
     @test collect(right_virtualspace(mps)) == fill(ℂ^D, N)
 
     # HalfInt getindex: bond label → right virtual space of site n = left of site n+1
-    @test mps[HalfInt(2)] == right_virtualspace(mps[2])
-    @test mps[HalfInt(2)] == left_virtualspace(mps[3])
+    @test mps[half(5)] == right_virtualspace(mps[2])
+    @test mps[half(5)] == left_virtualspace(mps[3])
+    @test_throws ArgumentError mps[HalfInt(2)]
 
     vs = virtualspaces(mps)
     @test vs isa HalfPeriodicVector
     @test length(vs) == N
-    @test vs[HalfInt(1)] == right_virtualspace(mps[1])
-    @test vs[HalfInt(N)] == right_virtualspace(mps[N])
-    @test [vs[HalfInt(i)] for i in 1:N] == [right_virtualspace(mps[i]) for i in 1:N]
+    @test vs[half(3)] == right_virtualspace(mps[1])
+    @test vs[half(2N + 1)] == right_virtualspace(mps[N])
+    @test [vs[half(2i + 1)] for i in 1:N] ==
+          [right_virtualspace(mps[i]) for i in 1:N]
 
     nonuniform = rand(
         PeriodicMPS,
@@ -234,7 +213,7 @@ end
     )
     nonuniform_vs = virtualspaces(nonuniform)
     @test all(
-        nonuniform_vs[HalfInt(i)] == right_virtualspace(nonuniform[i]) ==
+        nonuniform_vs[half(2i + 1)] == right_virtualspace(nonuniform[i]) ==
             left_virtualspace(nonuniform[i + 1])
         for i in 1:N
     )

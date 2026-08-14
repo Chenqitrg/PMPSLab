@@ -1,6 +1,7 @@
 using Test
 using Random
 using Logging
+using HalfIntegers: half
 import ProgressLogging
 import PMPSLab
 using PMPSLab:

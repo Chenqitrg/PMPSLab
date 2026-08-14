@@ -3,6 +3,7 @@ module PMPSLab
 import Base: split
 using TensorKit
 import TensorKit: scalartype
+using HalfIntegers: HalfInt, half, ishalfodd
 import JLD2
 using KrylovKit
 using LinearAlgebra

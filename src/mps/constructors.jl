@@ -65,7 +65,11 @@ function Random.rand(
         V::HalfPeriodicVector{<:ElementarySpace},
     )
     tensors = [
-        Random.rand(rng, elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
+        Random.rand(
+            rng,
+            elt,
+            V[half(2i - 1)] ⊗ P[i] ← V[half(2i + 1)],
+        )
         for i in _check_matching_periods(P, V)
     ]
     return PeriodicMPS(tensors)
@@ -148,7 +152,10 @@ function one_mps(
         V::HalfPeriodicVector{<:ElementarySpace},
     )
     tensors = [
-        ones(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
+        ones(
+            elt,
+            V[half(2i - 1)] ⊗ P[i] ← V[half(2i + 1)],
+        )
         for i in _check_matching_periods(P, V)
     ]
     return PeriodicMPS(tensors)
@@ -185,7 +192,10 @@ function one_mps2(
         V::HalfPeriodicVector{<:ElementarySpace},
     )
     tensors = [
-        ones(elt, V[HalfInt(i - 1)] ⊗ P[i] ← V[HalfInt(i)])
+        ones(
+            elt,
+            V[half(2i - 1)] ⊗ P[i] ← V[half(2i + 1)],
+        )
         for i in _check_matching_periods(P, V)
     ]
     return PeriodicMPS(tensors)

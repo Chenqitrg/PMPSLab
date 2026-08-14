@@ -18,7 +18,7 @@ end
 
     for ansatz in (RandomAnsatz(V, 2N), OneAnsatz(V, 2N))
         @test length(ansatz.virtual_space) == 2N
-        @test ansatz.virtual_space[HalfInt(1)] == V
+        @test ansatz.virtual_space[half(3)] == V
 
         mpsB = initial_approximation(mpsA, ansatz)
         @test length(mpsB) == 2N

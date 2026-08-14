@@ -1,5 +1,6 @@
 using Test
 using Random
+using HalfIntegers: half
 import PMPSLab
 using PMPSLab:
     PeriodicMPS,

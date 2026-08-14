@@ -48,7 +48,7 @@ function _insert_gauge!(
         right_matrix::AbstractTensorMap{E,S,1,1},
         left_matrix::AbstractTensorMap{E,S,1,1},
     ) where {E,S}
-    left_site = bond.n
+    left_site = floor(Int, bond)
     right_site = left_site + 1
     tensors[left_site] =
         mul_right_virtual(tensors[left_site], right_matrix)
@@ -68,7 +68,9 @@ function _standardize(tensors::PeriodicVector{<:GenericMPSTensor})
             bond,
             flip(bond),
         )
-        _insert_gauge!(standardized, HalfInt(site), gauge, adjoint(gauge))
+        _insert_gauge!(
+            standardized, half(2site + 1), gauge, adjoint(gauge)
+        )
     end
     return standardized
 end
@@ -99,7 +101,7 @@ function assertconsistency(mps::PeriodicMPS)
     for i in eachindex(mps)
         bond = right_virtualspace(mps[i])
         isdual(bond) && throw(TensorKit.SpaceMismatch(
-            "virtual space at bond $(HalfInt(i)) ($bond) is not standardized"
+            "virtual space at bond $(half(2i + 1)) ($bond) is not standardized"
         ))
     end
     return nothing
@@ -186,11 +188,11 @@ operation can represent either a gauge transformation or projector absorption.
 """
 function insert_gauge!(
         mps::PeriodicMPS,
-        bond_position::HalfInt,
+        position::HalfInt,
         right_matrix::AbstractTensorMap{E,S,1,1},
         left_matrix::AbstractTensorMap{E,S,1,1},
     ) where {E,S}
-    old_bond = mps[bond_position]
+    old_bond = mps[position]
     new_bond = domain(right_matrix)[1]
     isdual(new_bond) && throw(TensorKit.SpaceMismatch(
         "PeriodicMPS bond matrices require a standardized nondual target " *
@@ -199,12 +201,12 @@ function insert_gauge!(
     codomain(right_matrix)[1] == old_bond ||
         throw(TensorKit.SpaceMismatch(
             "right matrix codomain $(codomain(right_matrix)[1]) does not " *
-            "match bond $old_bond at $bond_position"
+            "match bond $old_bond at $position"
         ))
     domain(left_matrix)[1] == old_bond ||
         throw(TensorKit.SpaceMismatch(
             "left matrix domain $(domain(left_matrix)[1]) does not match " *
-            "bond $old_bond at $bond_position"
+            "bond $old_bond at $position"
         ))
     codomain(left_matrix)[1] == new_bond ||
         throw(TensorKit.SpaceMismatch(
@@ -213,7 +215,7 @@ function insert_gauge!(
         ))
 
     _insert_gauge!(
-        parent(mps), bond_position, right_matrix, left_matrix
+        parent(mps), position, right_matrix, left_matrix
     )
     assertconsistency(mps)
     return mps
@@ -239,8 +241,12 @@ Base.circshift(mps::PeriodicMPS, n) = PeriodicMPS(circshift(mps.tensors, n))
 Base.similar(mps::PeriodicMPS) =
     PeriodicMPS([similar(tensor) for tensor in mps])
 
-Base.getindex(mps::PeriodicMPS, pos::HalfInt) =
-    right_virtualspace(mps[pos.n])
+function Base.getindex(mps::PeriodicMPS, position::HalfInt)
+    ishalfodd(position) || throw(ArgumentError(
+        "expected a half-odd-integer bond position, got $position"
+    ))
+    return right_virtualspace(mps[floor(Int, position)])
+end
 
 left_virtualspace(mps::PeriodicMPS, site::Integer) =
     left_virtualspace(mps[Int(site)])

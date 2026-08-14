@@ -31,7 +31,7 @@ end
     PR, PL = find_projectors(mps, ProjectorCanonical(; tol=1e-12, maxiter=100))
 
     for bond in 1:length(mps)
-        pos = HalfInt(bond)
+        pos = half(2bond + 1)
         support_projector = PR[pos] * PL[pos]
         @test support_projector * support_projector ≈ support_projector atol=1e-10
         @test !(support_projector ≈ id(domain(PR[pos])))

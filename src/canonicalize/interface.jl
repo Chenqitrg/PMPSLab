@@ -10,7 +10,7 @@ function _absorb_projectors!(
         PL_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}}
     ) where {E,S,N}
     for site in eachindex(mps)
-        bond = HalfInt(site)
+        bond = half(2site + 1)
         insert_gauge!(mps, bond, PR_vec[bond], PL_vec[bond])
     end
     return mps

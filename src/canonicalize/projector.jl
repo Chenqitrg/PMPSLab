@@ -112,7 +112,7 @@ function find_projectors(
     L, R = _mpskit_gauges(mps, alg)
 
     projectors = map(eachindex(mps)) do bond
-        pos = HalfInt(bond)
+        pos = half(2bond + 1)
         P_decomp(R[pos], L[pos], alg.trscheme)
     end
     return HalfPeriodicVector(first.(projectors)), HalfPeriodicVector(last.(projectors))
