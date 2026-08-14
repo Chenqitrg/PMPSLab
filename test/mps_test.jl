@@ -172,6 +172,35 @@ end
     @test all(dst[i] === copied[i] for i in eachindex(dst))
 end
 
+@testset "PeriodicMPS — functional tensor mapping" begin
+    mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
+    original_objects = collect(mps)
+    original_values = copy.(mps)
+
+    mapped = map_tensors(tensor -> 2 * tensor, mps)
+
+    @test Base.isexported(PMPSLab, :map_tensors)
+    @test mapped isa PeriodicMPS
+    @test mapped !== mps
+    @test parent(mapped) !== parent(mps)
+    @test all(mapped[site] ≈ 2 * mps[site] for site in eachindex(mps))
+    @test all(mps[site] === original_objects[site] for site in eachindex(mps))
+    @test all(mps[site] == original_values[site] for site in eachindex(mps))
+    @test assertconsistency(mapped) === nothing
+
+    identity_mapped = map_tensors(identity, mps)
+    @test parent(identity_mapped) !== parent(mps)
+    @test all(identity_mapped[site] === mps[site] for site in eachindex(mps))
+
+    @test_throws TensorKit.SpaceMismatch map_tensors(mps) do tensor
+        randn(
+            scalartype(tensor),
+            left_virtualspace(tensor) ⊗ physicalspace(tensor),
+            ℂ^4,
+        )
+    end
+end
+
 @testset "PeriodicMPS — rejects an empty period" begin
     @test_throws ArgumentError rand(PeriodicMPS, ComplexF64, 0, 2, 3)
     @test_throws ArgumentError one_mps(ComplexF64, 0, 2, 3)

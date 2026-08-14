@@ -168,6 +168,27 @@ Base.parent(mps::PeriodicMPS) = mps.tensors
 Base.copy(mps::PeriodicMPS) = PeriodicMPS(copy(parent(mps)))
 
 """
+    map_tensors(f, mps::PeriodicMPS) -> PeriodicMPS
+
+Apply `f` independently to every site tensor and return a new periodic MPS.
+The original MPS and its tensor container are not modified. The transformed
+tensors must still form a consistent closed chain; the [`PeriodicMPS`](@ref)
+constructor validates and standardizes the result.
+
+As with [`map`](@ref), tensor aliasing is determined by `f`: for example,
+`map_tensors(identity, mps)` has a fresh container but retains the original
+tensor objects, while `map_tensors(copy, mps)` also copies every tensor.
+
+Mapping the underlying `PeriodicVector` directly preserves its periodic
+container type. Besides retaining periodic indexing, this keeps the transform
+as a functional tensor operation without first materializing an ordinary
+`Vector`.
+"""
+function map_tensors(f, mps::PeriodicMPS)
+    return PeriodicMPS(map(f, parent(mps)))
+end
+
+"""
     standardize(mps::PeriodicMPS)
 
 Return a standardized copy of `mps`. Construction already standardizes every

@@ -108,7 +108,8 @@ global normalization is computed with logarithmic scale accumulation and
 distributed evenly over all site tensors.
 """
 function LinearAlgebra.normalize(mps::PeriodicMPS)
-    return normalize!(PeriodicMPS(copy.(mps)))
+    inverse_site_scale = _inverse_normalization_site_scale(mps)
+    return map_tensors(tensor -> tensor * inverse_site_scale, mps)
 end
 
 """
@@ -118,6 +119,12 @@ Normalize `mps` in place and return it. The underlying tensor data is scaled
 directly, preserving both the MPS and site-tensor object identities.
 """
 function LinearAlgebra.normalize!(mps::PeriodicMPS)
+    inverse_site_scale = _inverse_normalization_site_scale(mps)
+    foreach(tensor -> rmul!(tensor, inverse_site_scale), mps)
+    return mps
+end
+
+function _inverse_normalization_site_scale(mps::PeriodicMPS)
     log_squared_norm = _log_squared_norm(mps)
     log_squared_norm == -Inf && throw(ArgumentError(
         "cannot normalize a zero periodic MPS"
@@ -127,7 +134,5 @@ function LinearAlgebra.normalize!(mps::PeriodicMPS)
     ))
 
     site_scale = exp(log_squared_norm / (2 * length(mps)))
-    inverse_site_scale = inv(site_scale)
-    foreach(tensor -> rmul!(tensor, inverse_site_scale), mps)
-    return mps
+    return inv(site_scale)
 end

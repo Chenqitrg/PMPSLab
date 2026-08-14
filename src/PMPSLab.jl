@@ -45,7 +45,7 @@ export AbstractStoppingCriterion, CostConvergence, should_stop
 # Periodic MPS containers and operations
 export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
 export assertconsistency, dense, pair_contraction
-export mul_left_virtual, mul_right_virtual, insert_gauge!, standardize
+export map_tensors, mul_left_virtual, mul_right_virtual, insert_gauge!, standardize
 export squared_norm, squared_distance, diff_norm, expectation
 export normalize, normalize!
 
