@@ -35,6 +35,7 @@ export LoopTNRSplitStepCompleted, renormalize
 
 # Tensor-network unit cells
 export AbstractTensorCell, UniformGates, CheckerboardGates, PlaquetteGates
+export mul_west, mul_south, mul_north, mul_east
 
 # Progress reporting and stopping
 export ConvergenceLog, SiteLog, SweepLog, SplitLog

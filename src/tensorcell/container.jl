@@ -4,7 +4,8 @@ const GenericGateTensor = AbstractTensorMap{E,S,2,2} where {E,S}
     AbstractTensorCell{G} <: AbstractMatrix{G}
 
 Periodic matrix unit cell of square four-leg gate tensors. Integer row and
-column indices wrap around the stored unit cell.
+column indices wrap around the stored unit cell. Construction standardizes
+every periodic bond to a nondual space through paired gauge transformations.
 """
 abstract type AbstractTensorCell{G<:GenericGateTensor} <: AbstractMatrix{G} end
 
@@ -21,7 +22,10 @@ One-gate periodic 1×1 unit cell. Every lattice coordinate returns `gate`.
 struct UniformGates{G<:GenericGateTensor} <: AbstractTensorCell{G}
     gate::G
     function UniformGates(gate::G) where {G<:GenericGateTensor}
-        cell = new{G}(gate)
+        raw = new{G}(gate)
+        _assert_closed_cell_bonds(raw)
+        gates = _standardize_cell_gates(raw)
+        cell = new{G}(gates[1, 1])
         assertconsistency(cell)
         return cell
     end
@@ -42,7 +46,10 @@ struct CheckerboardGates{G<:GenericGateTensor} <: AbstractTensorCell{G}
     black::G
     white::G
     function CheckerboardGates(black::G, white::G) where {G<:GenericGateTensor}
-        cell = new{G}(black, white)
+        raw = new{G}(black, white)
+        _assert_closed_cell_bonds(raw)
+        gates = _standardize_cell_gates(raw)
+        cell = new{G}(gates[1, 1], gates[1, 2])
         assertconsistency(cell)
         return cell
     end
@@ -84,7 +91,10 @@ struct PlaquetteGates{G<:GenericGateTensor} <: AbstractTensorCell{G}
             southwest::G,
             southeast::G,
         ) where {G<:GenericGateTensor}
-        cell = new{G}(northwest, northeast, southwest, southeast)
+        raw = new{G}(northwest, northeast, southwest, southeast)
+        _assert_closed_cell_bonds(raw)
+        gates = _standardize_cell_gates(raw)
+        cell = new{G}(gates[1, 1], gates[1, 2], gates[2, 1], gates[2, 2])
         assertconsistency(cell)
         return cell
     end
@@ -138,13 +148,117 @@ function Base.getindex(cell::PlaquetteGates, row::Integer, column::Integer)
     return wrapped_column == 1 ? cell.southwest : cell.southeast
 end
 
+_stored_index(::UniformGates, ::Integer, ::Integer) = CartesianIndex(1, 1)
+function _stored_index(::CheckerboardGates, row::Integer, column::Integer)
+    return CartesianIndex(1, iseven(row + column) ? 1 : 2)
+end
+function _stored_index(::PlaquetteGates, row::Integer, column::Integer)
+    return CartesianIndex(mod1(row, 2), mod1(column, 2))
+end
+
+"""
+    mul_west(matrix, gate)
+
+Absorb `matrix` into the west (first codomain) leg of `gate`. If the old west
+space is `V` and the new space is `W`, `matrix` must have the form `W ← V`.
+"""
+function mul_west(
+        matrix::AbstractTensorMap{E,S,1,1}, gate::GenericGateTensor
+    ) where {E,S}
+    @plansor result[-1 -2; -3 -4] :=
+        matrix[-1; 1] * gate[1 -2; -3 -4]
+    return result
+end
+
+"""
+    mul_south(matrix, gate)
+
+Absorb `matrix` into the south (second codomain) leg of `gate`. If the old
+south space is `V` and the new space is `W`, `matrix` must have the form
+`W ← V`.
+"""
+function mul_south(
+        matrix::AbstractTensorMap{E,S,1,1}, gate::GenericGateTensor
+    ) where {E,S}
+    @plansor result[-1 -2; -3 -4] :=
+        gate[-1 1; -3 -4] * matrix[-2; 1]
+    return result
+end
+
+"""
+    mul_north(gate, matrix)
+
+Absorb `matrix` into the north (first domain) leg of `gate`. If the old north
+space is `V` and the new space is `W`, `matrix` must have the form `V ← W`.
+"""
+function mul_north(
+        gate::GenericGateTensor, matrix::AbstractTensorMap{E,S,1,1}
+    ) where {E,S}
+    @plansor result[-1 -2; -3 -4] :=
+        gate[-1 -2; 1 -4] * matrix[1; -3]
+    return result
+end
+
+"""
+    mul_east(gate, matrix)
+
+Absorb `matrix` into the east (second domain) leg of `gate`. If the old east
+space is `V` and the new space is `W`, `matrix` must have the form `V ← W`.
+"""
+function mul_east(
+        gate::GenericGateTensor, matrix::AbstractTensorMap{E,S,1,1}
+    ) where {E,S}
+    @plansor result[-1 -2; -3 -4] :=
+        gate[-1 -2; -3 1] * matrix[1; -4]
+    return result
+end
+
+function _standardize_horizontal_bond!(
+        gates::AbstractMatrix{<:GenericGateTensor},
+        source::CartesianIndex{2},
+        target::CartesianIndex{2},
+    )
+    bond = domain(gates[source])[2]
+    isdual(bond) || return gates
+    gauge = unitary(scalartype(gates[source]), bond, flip(bond))
+    gates[source] = mul_east(gates[source], gauge)
+    gates[target] = mul_west(adjoint(gauge), gates[target])
+    return gates
+end
+
+function _standardize_vertical_bond!(
+        gates::AbstractMatrix{<:GenericGateTensor},
+        source::CartesianIndex{2},
+        target::CartesianIndex{2},
+    )
+    bond = codomain(gates[source])[2]
+    isdual(bond) || return gates
+    gauge = unitary(scalartype(gates[source]), bond, flip(bond))
+    gates[source] = mul_south(adjoint(gauge), gates[source])
+    gates[target] = mul_north(gates[target], gauge)
+    return gates
+end
+
+function _standardize_cell_gates(cell::AbstractTensorCell)
+    gates = collect(cell)
+    for column in axes(cell, 2), row in axes(cell, 1)
+        source = _stored_index(cell, row, column)
+        east = _stored_index(cell, row, column + 1)
+        south = _stored_index(cell, row + 1, column)
+        _standardize_horizontal_bond!(gates, source, east)
+        _standardize_vertical_bond!(gates, source, south)
+    end
+    return gates
+end
+
 """
     assertconsistency(cell::AbstractTensorCell)
 
-Check periodic nearest-neighbor spaces using the square-lattice leg convention
-`(West, South; North, East)`. Uniform gates require `reverse(domain(gate)) ==
-codomain(gate)`, while checkerboard gates require this relation across opposite
-colors. Throws `TensorKit.SpaceMismatch` when a periodic bond does not close.
+Check standardized periodic nearest-neighbor spaces using the square-lattice
+leg convention `(West, South; North, East)`. Uniform gates require
+`reverse(domain(gate)) == codomain(gate)`, while checkerboard gates require
+this relation across opposite colors. Throws `TensorKit.SpaceMismatch` when a
+periodic bond does not close or a leg retains a dual space.
 """
 function _assert_reverse_match(source, target, source_name, target_name)
     source_space = reverse(domain(source))
@@ -156,19 +270,19 @@ function _assert_reverse_match(source, target, source_name, target_name)
     return nothing
 end
 
-function assertconsistency(cell::UniformGates)
+function _assert_closed_cell_bonds(cell::UniformGates)
     return _assert_reverse_match(
         cell.gate, cell.gate, "uniform", "uniform"
     )
 end
 
-function assertconsistency(cell::CheckerboardGates)
+function _assert_closed_cell_bonds(cell::CheckerboardGates)
     _assert_reverse_match(cell.black, cell.white, "black", "white")
     _assert_reverse_match(cell.white, cell.black, "white", "black")
     return nothing
 end
 
-function assertconsistency(cell::AbstractTensorCell)
+function _assert_closed_cell_bonds(cell::AbstractTensorCell)
     for column in axes(cell, 2), row in axes(cell, 1)
         gate = cell[row, column]
         east = domain(gate)[2]
@@ -187,3 +301,27 @@ function assertconsistency(cell::AbstractTensorCell)
     end
     return nothing
 end
+
+function assertconsistency(cell::AbstractTensorCell)
+    _assert_closed_cell_bonds(cell)
+    leg_names = ("west", "south", "north", "east")
+    for column in axes(cell, 2), row in axes(cell, 1)
+        gate = cell[row, column]
+        spaces = (codomain(gate)..., domain(gate)...)
+        for (name, bond) in zip(leg_names, spaces)
+            isdual(bond) || continue
+            throw(TensorKit.SpaceMismatch(
+                "$name space at ($row, $column) ($bond) is not standardized"
+            ))
+        end
+    end
+    return nothing
+end
+
+"""
+    standardize(cell::AbstractTensorCell)
+
+Return a standardized copy of `cell`. Construction already standardizes every
+horizontal and vertical periodic bond, so this operation is idempotent.
+"""
+standardize(cell::AbstractTensorCell) = copy(cell)

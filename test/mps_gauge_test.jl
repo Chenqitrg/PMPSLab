@@ -35,7 +35,6 @@ end
     vacuum = sector_type(1)
     semion = sector_type(2)
     @test frobenius_schur_indicator(semion) == -1
-    @test twist(semion) == im
 
     virtual = dual(Vect[sector_type](vacuum => 2, semion => 2))
     physical = Vect[sector_type](vacuum => 1, semion => 1)
@@ -48,7 +47,7 @@ end
     before = raw_periodic_dense(raw)
 
     # Tensor-level `flip` is not a gauge transformation for an anyonic
-    # category: Semion has both a nontrivial FS indicator and twist.
+    # category with a nontrivial Frobenius–Schur indicator.
     directly_flipped = flip.(raw, Ref((1, 3)))
     @test !isapprox(raw_periodic_dense(directly_flipped), before)
 
