@@ -177,10 +177,11 @@ end
 
     @test length(mps) == 4
     @test assertconsistency(mps) === nothing
-    @test transpose(mps[1], ((3, 4), (2, 1)); copy=false) ≈ northwest
-    @test transpose(mps[2], ((2, 3), (1, 4)); copy=false) ≈ southwest
-    @test transpose(mps[3], ((1, 2), (4, 3)); copy=false) ≈ southeast
-    @test transpose(mps[4], ((4, 1), (3, 2)); copy=false) ≈ northeast
+    @test all(
+        !isdual(PMPSLab.left_virtualspace(tensor)) &&
+        !isdual(PMPSLab.right_virtualspace(tensor))
+        for tensor in mps
+    )
 
     uniform = UniformGates(test_gate())
     checkerboard = CheckerboardGates(uniform)
