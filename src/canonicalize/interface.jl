@@ -6,16 +6,13 @@
 # physical legs: T_i <- PL_i * T_i * PR_i.
 function _absorb_projectors!(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}},
-        PL_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}},
-        PR_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}}
+        PR_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}},
+        PL_vec::HalfPeriodicVector{<:AbstractTensorMap{E,S,1,1}}
     ) where {E,S,N}
-    tensors = map(eachindex(mps)) do i
-        left_bond = HalfInt(i - 1)
-        right_bond = HalfInt(i)
-        return _projector_mul_front(PL_vec[left_bond], mps[i]) *
-               PR_vec[right_bond]
+    for site in eachindex(mps)
+        bond = HalfInt(site)
+        insert_gauge!(mps, bond, PR_vec[bond], PL_vec[bond])
     end
-    copyto!(mps, PeriodicMPS(tensors))
     return mps
 end
 
@@ -34,5 +31,5 @@ function gaugefix!(
     MPSKit.makefullrank!(mps.tensors; alg_orth = alg.alg_orth)
     assertconsistency(mps)
     PR_vec, PL_vec = find_projectors(mps, alg)
-    return _absorb_projectors!(mps, PL_vec, PR_vec)
+    return _absorb_projectors!(mps, PR_vec, PL_vec)
 end
