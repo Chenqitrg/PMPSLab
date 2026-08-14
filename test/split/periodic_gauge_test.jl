@@ -1,8 +1,8 @@
 function run_end_to_end_split(mpsA, ansatz; nsweeps::Int=4)
-    alg = PeriodicSplit(
+    alg = ALSSplit(;
         ansatz,
-        CircularSweep(2 * length(mpsA); maximal_sweep=nsweeps),
-        LUSolve(),
+        sweep=CircularSweep(; N=2 * length(mpsA), maximal_sweep=nsweeps),
+        solve=LUSolve(),
     )
     mpsB, log = split(mpsA, alg)
     sites_per_sweep = 2 * length(mpsA)
@@ -29,17 +29,17 @@ end
 @testset "split — PeriodicGaugeAnsatz end-to-end cost monitoring" begin
     Random.seed!(20260809)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 3)
-    ansatz = PeriodicGaugeAnsatz(
-        SVDAnsatz(TruncationStrategy(maxrank=2)),
-        ProjectorCanonical(; tol=1e-12, maxiter=100),
+    ansatz = PeriodicGaugeAnsatz(;
+        svd_pre=SVDAnsatz(; truncation=TruncationStrategy(maxrank=2)),
+        canonical=ProjectorCanonical(; tol=1e-12, maxiter=100),
     )
     test_end_to_end_cost(mpsA, ansatz)
 
     Random.seed!(20260810)
     mpsA_truncated = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 3)
-    truncated_ansatz = PeriodicGaugeAnsatz(
-        SVDAnsatz(TruncationStrategy(maxrank=2)),
-        ProjectorCanonical(
+    truncated_ansatz = PeriodicGaugeAnsatz(;
+        svd_pre=SVDAnsatz(; truncation=TruncationStrategy(maxrank=2)),
+        canonical=ProjectorCanonical(
             ; tol=1e-12, maxiter=100,
             trscheme=TruncationStrategy(maxrank=2),
         ),
@@ -57,12 +57,12 @@ end
     Random.seed!(20260812)
     χ = 2
     mpsA = random_cdl_mps(ComplexF64, 2, χ)
-    svd_ansatz = SVDAnsatz(TruncationStrategy())
+    svd_ansatz = SVDAnsatz(; truncation=TruncationStrategy())
     canonical = ProjectorCanonical(
         ; tol=1e-12, maxiter=100,
         trscheme=TruncationStrategy(atol=1e-10),
     )
-    periodic_ansatz = PeriodicGaugeAnsatz(svd_ansatz, canonical)
+    periodic_ansatz = PeriodicGaugeAnsatz(; svd_pre=svd_ansatz, canonical)
 
     before_filtering = initial_approximation(mpsA, svd_ansatz)
     after_filtering = initial_approximation(mpsA, periodic_ansatz)
@@ -91,7 +91,10 @@ end
     D, d = 2, 2
     B0 = rand(PeriodicMPS, ComplexF64, 4, d, D)
     A = pair_contraction(B0)
-    ansatz = PeriodicGaugeAnsatz(SVDAnsatz(TruncationStrategy()), ProjectorCanonical())
+    ansatz = PeriodicGaugeAnsatz(;
+        svd_pre=SVDAnsatz(; truncation=TruncationStrategy()),
+        canonical=ProjectorCanonical(),
+    )
     mpsB = initial_approximation(A, ansatz)
 
     @test length(mpsB) == 4
@@ -104,7 +107,10 @@ end
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, P ⊗ P, V)
-    ansatz = PeriodicGaugeAnsatz(SVDAnsatz(TruncationStrategy()), ProjectorCanonical())
+    ansatz = PeriodicGaugeAnsatz(;
+        svd_pre=SVDAnsatz(; truncation=TruncationStrategy()),
+        canonical=ProjectorCanonical(),
+    )
     mpsB = initial_approximation(mpsA, ansatz)
 
     @test length(mpsB) == 4

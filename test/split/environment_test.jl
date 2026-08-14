@@ -55,7 +55,7 @@ end
     W = PMPSLab._split_rhs(
         truncated_AB, this_A(ctx, site), other_B(ctx, site)', site
     )
-    solve = KrylovSolve(GMRES(; maxiter=100, tol=1e-12))
+    solve = KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12))
 
     expected = PMPSLab._solve_split_norm(solve, x0, dense_BB, W)
     actual = PMPSLab._solve_split_norm(solve, x0, truncated_BB, W)

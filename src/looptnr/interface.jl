@@ -1,23 +1,21 @@
 """
-    LoopTNR(split; maximal_rg, measurement=TNRMeasurement())
-    LoopTNR(maxrank; maximal_rg, measurement=TNRMeasurement())
+    LoopTNR(; split, maximal_rg, measurement=TNRMeasurement())
 
-Configuration for Loop tensor-network renormalization. The convenience
-constructor builds the standard eight-site periodic gauge split.
+Configuration for Loop tensor-network renormalization.
 """
-struct LoopTNR{
-        S<:PeriodicSplit,
+@kwdef struct LoopTNR{
+        S<:ALSSplit,
         M<:TNRMeasurement,
     } <: AbstractAlgorithmConfig
     split::S
     maximal_rg::Int
-    measurement::M
+    measurement::M = TNRMeasurement()
 
     function LoopTNR(
             split::S,
             maximal_rg::Integer,
             measurement::M,
-        ) where {S<:PeriodicSplit,M<:TNRMeasurement}
+        ) where {S<:ALSSplit,M<:TNRMeasurement}
         rg_count = Int(maximal_rg)
         rg_count >= 0 || throw(ArgumentError(
             "maximal_rg must be non-negative, got $maximal_rg"
@@ -31,39 +29,45 @@ struct LoopTNR{
     end
 end
 
-function LoopTNR(
-        split::PeriodicSplit;
-        maximal_rg::Integer,
-        measurement::TNRMeasurement = TNRMeasurement(),
-    )
-    return LoopTNR(split, maximal_rg, measurement)
-end
+"""
+    default_looptnr(; maximal_rg, dcut)
 
-function LoopTNR(
-        maxrank::Integer;
-        maximal_rg::Integer,
-        measurement::TNRMeasurement = TNRMeasurement(),
-    )
-    maxrank > 0 || throw(ArgumentError(
-        "maxrank must be positive, got $maxrank"
+Build the standard dense-environment [`LoopTNR`](@ref) configuration. The
+preliminary SVD retains at most `2dcut` states and periodic canonicalization
+then reduces the universal bond dimension to `dcut`.
+"""
+function default_looptnr(; maximal_rg::Integer, dcut::Integer)
+    dcut > 0 || throw(ArgumentError(
+        "dcut must be positive, got $dcut"
     ))
-    svd_truncation = truncerror(; rtol=1.0e-13)
-    projector_truncation =
-        truncrank(maxrank) & truncerror(; rtol=1.0e-13)
-    ansatz = PeriodicGaugeAnsatz(
-        SVDAnsatz(svd_truncation),
-        ProjectorCanonical(; trscheme=projector_truncation),
-    )
-    split = PeriodicSplit(
-        ansatz,
-        CircularSweep(8; maximal_sweep=40),
-        CholeskySolve();
-        stopping=CostConvergence(
-            ; atol=0,
-            rtol=1.0e-10,
+    preliminary_rank = Base.checked_mul(2, Int(dcut))
+    numerical_truncation = truncerror(; rtol=1.0e-13)
+    split = ALSSplit(;
+        ansatz=PeriodicGaugeAnsatz(;
+            svd_pre=SVDAnsatz(;
+                truncation=truncrank(preliminary_rank) & numerical_truncation,
+            ),
+            canonical=ProjectorCanonical(;
+                tol=1.0e-13,
+                maxiter=100,
+                trscheme=truncrank(dcut) & numerical_truncation,
+            ),
+        ),
+        sweep=CircularSweep(; N=8, maximal_sweep=40),
+        solve=LDLTSolve(),
+        environments=SplitEnvironmentPolicy(;
+            norm=DenseTransferPolicy(),
+            mixed=DenseTransferPolicy(),
+        ),
+        stopping=CostTolerance(;
+            atol=1.0e-9,
+            rtol=1.0e-2,
             min_sweeps=5,
-            consecutive_sweeps=2,
         ),
     )
-    return LoopTNR(split, maximal_rg, measurement)
+    measurement = TNRMeasurement(;
+        normalization=InfinityNormNormalization(),
+        fixed_point=NoFixedPointMeasurement(),
+    )
+    return LoopTNR(; split, maximal_rg, measurement)
 end

@@ -1,7 +1,7 @@
 @testset "public split API" begin
     @test PMPSLab.split === Base.split
     @test all(name -> name in names(PMPSLab), (
-        :PeriodicSplit, :RandomAnsatz, :OneAnsatz, :SVDAnsatz,
+        :ALSSplit, :RandomAnsatz, :OneAnsatz, :SVDAnsatz,
         :PeriodicGaugeAnsatz, :AbstractTransferPolicy,
         :DenseTransferPolicy, :TruncatedTransferPolicy,
         :SplitEnvironmentPolicy,
@@ -16,7 +16,10 @@ end
     P = Z2Space(0 => 2)
     mpsA = rand(PeriodicMPS, ComplexF64, N, P ⊗ P, V)
 
-    for ansatz in (RandomAnsatz(V, 2N), OneAnsatz(V, 2N))
+    for ansatz in (
+            RandomAnsatz(; virtual_space=fill(V, 2N)),
+            OneAnsatz(; virtual_space=fill(V, 2N)),
+        )
         @test length(ansatz.virtual_space) == 2N
         @test ansatz.virtual_space[half(3)] == V
 
@@ -31,7 +34,10 @@ end
         @test physicalspace(mpsB[2]) == P
     end
 
-    @test_throws DimensionMismatch initial_approximation(mpsA, RandomAnsatz(V, 2N + 1))
+    @test_throws DimensionMismatch initial_approximation(
+        mpsA,
+        RandomAnsatz(; virtual_space=fill(V, 2N + 1)),
+    )
 end
 
 @testset "split_site — SVD split of one 2-site tensor" begin
@@ -56,7 +62,7 @@ end
 @testset "SVDAnsatz — initial approximation preserves periodic density" begin
     B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
-    mpsB = initial_approximation(A, SVDAnsatz(TruncationStrategy()))
+    mpsB = initial_approximation(A, SVDAnsatz(; truncation=TruncationStrategy()))
 
     @test length(mpsB) == 4
     @test assertconsistency(mpsB) === nothing

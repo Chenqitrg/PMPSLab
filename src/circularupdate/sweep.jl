@@ -30,13 +30,13 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    ZigzagSweep(N; maximal_sweep)
+    ZigzagSweep(; N, maximal_sweep)
 
 Yields sites `1, 2, …, N, N-1, …, 2` per round trip, repeating up to
 `maximal_sweep` trips. At least two sites are required; a one-site system has
 no zigzag direction and should use [`CircularSweep`](@ref).
 """
-struct ZigzagSweep <: AbstractSweep
+@kwdef struct ZigzagSweep <: AbstractSweep
     N::Int
     maximal_sweep::Int
     function ZigzagSweep(N::Int, maximal_sweep::Int)
@@ -51,7 +51,6 @@ struct ZigzagSweep <: AbstractSweep
     end
 end
 
-ZigzagSweep(N::Int; maximal_sweep::Int) = ZigzagSweep(N, maximal_sweep)
 sweep_domain(z::ZigzagSweep) = Base.OneTo(z.N)
 
 Base.IteratorSize(::Type{<:ZigzagSweep}) = Base.HasLength()
@@ -77,12 +76,12 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    CircularSweep(N; maximal_sweep)
+    CircularSweep(; N, maximal_sweep)
 
 Yields sites `1, 2, …, N` repeatedly, `maximal_sweep` laps in total.
 `dir` is always +1.
 """
-struct CircularSweep <: AbstractSweep
+@kwdef struct CircularSweep <: AbstractSweep
     N::Int
     maximal_sweep::Int
     function CircularSweep(N::Int, maximal_sweep::Int)
@@ -94,7 +93,6 @@ struct CircularSweep <: AbstractSweep
     end
 end
 
-CircularSweep(N::Int; maximal_sweep::Int) = CircularSweep(N, maximal_sweep)
 sweep_domain(cs::CircularSweep) = Base.OneTo(cs.N)
 
 Base.IteratorSize(::Type{<:CircularSweep}) = Base.HasLength()

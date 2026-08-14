@@ -200,10 +200,10 @@ target tensor values.
 The split run is initialized directly through multiple dispatch:
 
 ```julia
-initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
+initialize_run(mps::PeriodicMPS, algorithm::ALSSplit)
 ```
 
-The target MPS and complete `PeriodicSplit` configuration are immutable for the
+The target MPS and complete `ALSSplit` configuration are immutable for the
 lifetime of the run. They do not require a common problem wrapper.
 
 ### Run

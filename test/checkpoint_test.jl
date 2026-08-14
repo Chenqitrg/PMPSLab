@@ -21,22 +21,22 @@ end
 
 function checkpoint_loop_fixture()
     gate = ones(ComplexF64, ℂ^1 ⊗ ℂ^1, ℂ^1 ⊗ ℂ^1)
-    split_algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(8; maximal_sweep=1),
-        CholeskySolve(),
+    split_algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=8, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
-    algorithm = LoopTNR(split_algorithm; maximal_rg=1)
+    algorithm = LoopTNR(; split=split_algorithm, maximal_rg=1)
     return initialize_run(UniformGates(gate), algorithm), algorithm
 end
 
 @testset "SplitSnapshot checkpoint — JLD2 file round trip" begin
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve();
-        stopping=CostConvergence(min_sweeps=2),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
+        stopping=CostConvergence(; min_sweeps=2),
     )
     run = initialize_run(mpsA, algorithm)
     step!(run)
@@ -155,10 +155,10 @@ end
 
 @testset "Checkpoint metadata validation" begin
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
     saved = snapshot(initialize_run(mpsA, algorithm))
 

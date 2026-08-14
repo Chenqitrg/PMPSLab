@@ -14,7 +14,7 @@
 TensorCell
 → canonical PlaquetteGates
 → U-shaped PeriodicMPS target
-→ resumable PeriodicSplit child run
+→ resumable ALSSplit child run
 → user-defined LoopTNR coarse graining
 → temporary CheckerboardGates
 → canonical PlaquetteGates
@@ -45,7 +45,7 @@ conformal transfer matrix。
    tensor。
 3. TensorCell 到 PMPS 的顺序是 U-shape：
    `NW → SW → SE → NE → NW`。
-4. target 通过现有 `PeriodicSplit` 优化为八个单物理腿 PMPS tensor。
+4. target 通过现有 `ALSSplit` 优化为八个单物理腿 PMPS tensor。
 5. coarse graining 不是 `pair_contraction`；标准路径将八个 optimized tensor
    收缩为两个四腿 tensor，kernel 自然输出临时 `CheckerboardGates`，outer run
    在 normalization、measurement 和 commit 前立即将其提升为 `PlaquetteGates`。
@@ -60,7 +60,7 @@ conformal transfer matrix。
    - 普通 SVD 不限制 rank，low-rank 限制发生在 periodic projector gauge 中。
 9. `PeriodicGaugeAnsatz` 只是默认值。核心 `LoopTNR` 构造器允许调用者传入使用
    其他 ansatz、solver、environment policy 或 stopping criterion 的完整
-   `PeriodicSplit`。
+   `ALSSplit`。
 10. 默认 sweep 是 `CircularSweep(8; maximal_sweep=40)`。
 11. `maximal_rg` 必须显式提供，表示最多执行多少次 coarse-graining RG
     transformation。
@@ -169,7 +169,7 @@ current normalized PlaquetteGates
 
 ```julia
 struct LoopTNR{
-        S<:PeriodicSplit,
+        S<:ALSSplit,
         O<:AbstractMeasurement,
     } <: AbstractAlgorithmConfig
     split::S
@@ -189,8 +189,8 @@ inner constructor 至少验证：
 ### 完整自定义构造器
 
 ```julia
-LoopTNR(
-    split::PeriodicSplit;
+LoopTNR(;
+    split::ALSSplit,
     maximal_rg::Integer,
     measurement::AbstractMeasurement=TNRMeasurement(),
 )
@@ -199,40 +199,47 @@ LoopTNR(
 ### 默认便利构造器
 
 ```julia
-LoopTNR(
-    maxrank::Integer;
-    maximal_rg::Integer,
-    measurement::AbstractMeasurement=TNRMeasurement(),
-)
+default_looptnr(; maximal_rg::Integer, dcut::Integer)
 ```
 
-它应生成等价于以下配置的 `PeriodicSplit`：
+它应生成等价于以下配置的 `ALSSplit`：
 
 ```julia
-svd_truncation = truncerror(rtol=1e-13)
-projector_truncation =
-    truncrank(maxrank) & truncerror(rtol=1e-13)
+numerical_truncation = truncerror(rtol=1e-13)
+svd_truncation = truncrank(2dcut) & numerical_truncation
+projector_truncation = truncrank(dcut) & numerical_truncation
 
-ansatz = PeriodicGaugeAnsatz(
-    SVDAnsatz(svd_truncation),
-    ProjectorCanonical(; trscheme=projector_truncation),
+ansatz = PeriodicGaugeAnsatz(;
+    svd_pre=SVDAnsatz(; truncation=svd_truncation),
+    canonical=ProjectorCanonical(;
+        tol=1e-13,
+        maxiter=100,
+        trscheme=projector_truncation,
+    ),
 )
 
-split = PeriodicSplit(
+split = ALSSplit(;
     ansatz,
-    CircularSweep(8; maximal_sweep=40),
-    CholeskySolve();
-    stopping=CostConvergence(
-        atol=0,
-        rtol=1e-10,
+    sweep=CircularSweep(; N=8, maximal_sweep=40),
+    solve=LDLTSolve(),
+    environments=SplitEnvironmentPolicy(),
+    stopping=CostTolerance(;
+        atol=1e-9,
+        rtol=1e-2,
         min_sweeps=5,
-        consecutive_sweeps=2,
     ),
+)
+
+algorithm = LoopTNR(;
+    split,
+    maximal_rg,
+    measurement=TNRMeasurement(),
 )
 ```
 
-`maxrank` 必须为正整数。需要不同 solver、environment、sweep 或 stopping 的调用者
-应先构造 `PeriodicSplit`，再调用核心构造器；便利构造器不要不断增加透传 keyword。
+`dcut` 必须为正整数，`maximal_rg` 表示最终 RG 标签。需要不同 solver、
+environment、sweep 或 stopping 的调用者应先构造 `ALSSplit`，再调用核心
+`LoopTNR` 构造器；默认工厂只暴露 `maximal_rg` 和 `dcut`。
 
 ## Measurement 体系
 
@@ -932,7 +939,7 @@ blocking `renormalize` 执行；后续 Phase 5 已在此基础上接通 positive
 - `maximal_rg=0` 在一次 `step!` 后完成；
 - history/log 都只含 RG 0；
 - default constructor 精确包含两级 truncation 和 circular 40 sweeps；
-- custom non-gauge `PeriodicSplit` 被允许；
+- custom non-gauge `ALSSplit` 被允许；
 - wrong sweep domain 和负 `maximal_rg` 被拒绝；
 - fixed-point failure 不提交 normalized candidate；
 - observer 收到 RG 0 event。

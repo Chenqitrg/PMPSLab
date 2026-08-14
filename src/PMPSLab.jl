@@ -21,7 +21,8 @@ import MPSKit: left_virtualspace, right_virtualspace, physicalspace
 export AbstractAlgorithmConfig
 export AbstractMeasurement, AbstractMeasurementResult, MeasurementHistory, measure
 export AbstractNormalization, InfinityNormNormalization, NormalizationResult
-export AbstractFixedPointMeasurement, TNRMeasurement, TNRMeasurementResult
+export AbstractFixedPointMeasurement, NoFixedPointMeasurement
+export TNRMeasurement, TNRMeasurementResult
 export AbstractAlgorithmRun, AbstractAlgorithmSnapshot
 export AlgorithmEvent, LocalRunSession, LocalRunStatus, LocalCheckpointOutcome
 export initialize_run, step!, isfinished, run_result, snapshot, restore_run
@@ -32,7 +33,7 @@ export checkpoint!, pause_and_checkpoint!, cancel_and_checkpoint!
 # Loop tensor-network renormalization
 export LoopTNR, LoopTNRRun, LoopTNRSnapshot, LoopTNRPhase, LoopTNRResult
 export RGLog, LoopTNRLog, LoopTNRCoarseGrained
-export LoopTNRSplitStepCompleted, renormalize
+export LoopTNRSplitStepCompleted, default_looptnr, renormalize
 
 # Tensor-network unit cells
 export AbstractTensorCell, UniformGates, CheckerboardGates, PlaquetteGates
@@ -40,7 +41,8 @@ export mul_west, mul_south, mul_north, mul_east
 
 # Progress reporting and stopping
 export ConvergenceLog, SiteLog, SweepLog, SplitLog
-export AbstractStoppingCriterion, CostConvergence, should_stop
+export AbstractStoppingCriterion, NoStopping, CostTolerance, CostConvergence
+export should_stop
 
 # Periodic MPS containers and operations
 export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
@@ -53,10 +55,10 @@ export normalize, normalize!
 export AbstractPeriodicCanonical, ProjectorCanonical
 export gaugefix!
 
-# Periodic split
-export AbstractAnsatz, AbstractSolve, AbstractPeriodicSplit
+# ALS split
+export AbstractAnsatz, AbstractSolve, AbstractALSSplit
 export SplitEnvironmentPolicy
-export PeriodicSplit, SplitRun, SplitResult, SplitSnapshot, SplitSiteCompleted
+export ALSSplit, SplitRun, SplitResult, SplitSnapshot, SplitSiteCompleted
 export RandomAnsatz, OneAnsatz, SVDAnsatz, PeriodicGaugeAnsatz
 export initial_approximation, split
 

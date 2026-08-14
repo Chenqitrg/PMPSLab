@@ -7,8 +7,49 @@ function PMPSLab.should_stop(
     error("stopping criterion failed")
 end
 
+function tolerance_logs(costs)
+    return [
+        PMPSLab.SiteLog(SweepState{Forward}(1, sweep - 1), cost, 0.0)
+        for (sweep, cost) in enumerate(costs)
+    ]
+end
+
+@testset "CostTolerance — absolute cost and relative change" begin
+    criterion = CostTolerance(; atol=1e-9, rtol=1e-2, min_sweeps=5)
+
+    @test criterion == deepcopy(criterion)
+    @test !PMPSLab.should_stop(
+        criterion,
+        tolerance_logs([2e-9, 1.5e-9, 1.1e-9, 5.04e-10]),
+    )
+    @test PMPSLab.should_stop(
+        criterion,
+        tolerance_logs([2e-9, 1.5e-9, 1.1e-9, 5.04e-10, 5e-10]),
+    )
+    @test !PMPSLab.should_stop(
+        criterion,
+        tolerance_logs([2e-9, 1.5e-9, 1.1e-9, 1.015e-9, 1.01e-9]),
+    )
+    @test !PMPSLab.should_stop(
+        criterion,
+        tolerance_logs([2e-9, 1.5e-9, 1.1e-9, 5e-10, 4.9e-10]),
+    )
+    @test PMPSLab.should_stop(
+        criterion,
+        tolerance_logs([2e-9, 1.5e-9, 1.1e-9, 0.0, 0.0]),
+    )
+
+    @test_throws ArgumentError CostTolerance(; atol=0, rtol=1e-2)
+    @test_throws ArgumentError CostTolerance(; atol=1e-9, rtol=0)
+    @test_throws ArgumentError CostTolerance(;
+        atol=1e-9,
+        rtol=1e-2,
+        min_sweeps=1,
+    )
+end
+
 @testset "CostConvergence — validates configuration" begin
-    criterion = CostConvergence(
+    criterion = CostConvergence(;
         atol=1e-10,
         rtol=1e-6,
         min_sweeps=3,
@@ -17,19 +58,19 @@ end
 
     @test criterion == deepcopy(criterion)
     @test hash(criterion) == hash(deepcopy(criterion))
-    @test_throws ArgumentError CostConvergence(atol=-1)
-    @test_throws ArgumentError CostConvergence(rtol=Inf)
-    @test_throws ArgumentError CostConvergence(min_sweeps=1)
-    @test_throws ArgumentError CostConvergence(consecutive_sweeps=0)
+    @test_throws ArgumentError CostConvergence(; atol=-1)
+    @test_throws ArgumentError CostConvergence(; rtol=Inf)
+    @test_throws ArgumentError CostConvergence(; min_sweeps=1)
+    @test_throws ArgumentError CostConvergence(; consecutive_sweeps=0)
 end
 
-@testset "PeriodicSplit — stopping failures preserve the next cursor" begin
+@testset "ALSSplit — stopping failures preserve the next cursor" begin
     Random.seed!(20260814)
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=2),
-        CholeskySolve();
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=2),
+        solve=CholeskySolve(),
         stopping=ThrowingStoppingCriterion(),
     )
     run = initialize_run(target, algorithm)
@@ -48,20 +89,20 @@ end
     )
 end
 
-@testset "PeriodicSplit — cost convergence stops at complete sweeps" begin
+@testset "ALSSplit — cost convergence stops at complete sweeps" begin
     Random.seed!(20260811)
     initial = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     target = pair_contraction(initial)
 
     for (sweep, steps_per_sweep) in (
-            (CircularSweep(4; maximal_sweep=10), 4),
-            (ZigzagSweep(4; maximal_sweep=10), 6),
+            (CircularSweep(; N=4, maximal_sweep=10), 4),
+            (ZigzagSweep(; N=4, maximal_sweep=10), 6),
         )
-        algorithm = PeriodicSplit(
-            SVDAnsatz(),
+        algorithm = ALSSplit(;
+            ansatz=SVDAnsatz(),
             sweep,
-            CholeskySolve();
-            stopping=CostConvergence(
+            solve=CholeskySolve(),
+            stopping=CostConvergence(;
                 atol=1e-10,
                 rtol=0,
                 min_sweeps=2,
@@ -76,14 +117,14 @@ end
     end
 end
 
-@testset "PeriodicSplit — convergence patience and minimum sweeps" begin
+@testset "ALSSplit — convergence patience and minimum sweeps" begin
     Random.seed!(20260812)
     target = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=10),
-        CholeskySolve();
-        stopping=CostConvergence(
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=10),
+        solve=CholeskySolve(),
+        stopping=CostConvergence(;
             atol=1e-10,
             rtol=0,
             min_sweeps=4,
@@ -95,11 +136,11 @@ end
     @test log.converged
     @test length(log.site_logs) == 16
 
-    capped = PeriodicSplit(
-        algorithm.ansatz,
-        CircularSweep(4; maximal_sweep=2),
-        algorithm.solve;
-        stopping=CostConvergence(
+    capped = ALSSplit(;
+        ansatz=algorithm.ansatz,
+        sweep=CircularSweep(; N=4, maximal_sweep=2),
+        solve=algorithm.solve,
+        stopping=CostConvergence(;
             atol=1e-10,
             rtol=0,
             min_sweeps=3,
@@ -114,11 +155,11 @@ end
 @testset "SplitSnapshot — restores cost convergence state" begin
     Random.seed!(20260813)
     target = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=10),
-        CholeskySolve();
-        stopping=CostConvergence(
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=10),
+        solve=CholeskySolve(),
+        stopping=CostConvergence(;
             atol=1e-10,
             rtol=0,
             min_sweeps=2,

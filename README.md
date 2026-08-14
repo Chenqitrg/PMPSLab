@@ -3,6 +3,21 @@
 Experimental tools for finite periodic matrix-product states, projector-based
 periodic gauge fixing, 2-to-1 splitting, and resumable local execution.
 
+## Credits and upstream foundations
+
+PMPSLab is downstream research software built on the work of
+[TensorKit.jl](https://github.com/QuantumKitHub/TensorKit.jl),
+[MPSKit.jl](https://github.com/QuantumKitHub/MPSKit.jl), and
+[TNRKit.jl](https://github.com/QuantumKitHub/TNRKit.jl), and on the work of
+their authors and contributors. TensorKit provides the symmetry-aware tensor,
+space, contraction, and factorization foundations used throughout PMPSLab.
+MPSKit provides core MPS and algorithm interfaces, periodic indexing, and the
+canonicalization machinery on which PMPSLab builds. Although TNRKit is not a
+runtime package dependency, PMPSLab's Loop-TNR design and parts of its
+numerical implementation draw on the algorithms and earlier implementation
+work in TNRKit. PMPSLab should therefore be understood as building on these
+projects, not as an independent replacement for them.
+
 ## Scope
 
 PMPSLab is a tensor-network research toolbox rather than a prescribed
@@ -95,15 +110,16 @@ introduce a separate canonical periodic-MPS storage type.
 
 ## 3. Run a basic 2-to-1 split
 
-`PeriodicSplit` approximates every two-physical-leg tensor in `A` by two
-one-physical-leg tensors. The approximation therefore contains
+`ALSSplit` performs an alternating least-squares split, approximating every
+two-physical-leg tensor in `A` by two one-physical-leg tensors. The
+approximation therefore contains
 `2 * length(A)` sites:
 
 ```julia
-algorithm = PeriodicSplit(
-    SVDAnsatz(),
-    CircularSweep(2 * length(A); maximal_sweep=4),
-    CholeskySolve(),
+algorithm = ALSSplit(;
+    ansatz=SVDAnsatz(),
+    sweep=CircularSweep(; N=2 * length(A), maximal_sweep=4),
+    solve=CholeskySolve(),
 )
 
 B, log = split(A, algorithm)
@@ -138,10 +154,10 @@ Pass a `TruncationStrategy` to `SVDAnsatz` to limit the virtual spaces generated
 by the initial two-to-one tensor decompositions:
 
 ```julia
-algorithm = PeriodicSplit(
-    SVDAnsatz(TruncationStrategy(maxrank=3)),
-    CircularSweep(2 * length(A); maximal_sweep=20),
-    CholeskySolve(),
+algorithm = ALSSplit(;
+    ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=3)),
+    sweep=CircularSweep(; N=2 * length(A), maximal_sweep=20),
+    solve=CholeskySolve(),
 )
 
 B, log = split(A, algorithm)
@@ -167,11 +183,11 @@ complete circular lap or zigzag round trip when consecutive sweep-end costs are
 approximately equal:
 
 ```julia
-algorithm = PeriodicSplit(
-    SVDAnsatz(TruncationStrategy(maxrank=3)),
-    CircularSweep(2 * length(A); maximal_sweep=500),
-    CholeskySolve();
-    stopping=CostConvergence(
+algorithm = ALSSplit(;
+    ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=3)),
+    sweep=CircularSweep(; N=2 * length(A), maximal_sweep=500),
+    solve=CholeskySolve(),
+    stopping=CostConvergence(;
         rtol=1e-8,
         atol=1e-12,
         min_sweeps=5,
@@ -214,11 +230,11 @@ B, log = split(A, algorithm)
 While the blocking split runs, the REPL reports sweep summaries such as:
 
 ```text
-[ Info: Periodic split started
-[ Info: Periodic split sweep 1 completed: cost=<Float64>, time=<Float64>s
-[ Info: Periodic split sweep 2 completed: cost=<Float64>, time=<Float64>s
+[ Info: ALS split started
+[ Info: ALS split sweep 1 completed: cost=<Float64>, time=<Float64>s
+[ Info: ALS split sweep 2 completed: cost=<Float64>, time=<Float64>s
 ...
-[ Info: Periodic split completed after <integer> site updates
+[ Info: ALS split completed after <integer> site updates
 ```
 
 For asynchronous execution, initialize a run and place it inside a
@@ -362,20 +378,20 @@ Dense transfer environments are the default. For larger systems, normal and
 mixed environments can independently use truncated factored products:
 
 ```julia
-truncated = TruncatedTransferPolicy(
-    TruncationStrategy(maxrank=8),
+truncated = TruncatedTransferPolicy(;
+    truncation=TruncationStrategy(maxrank=8),
 )
-environments = SplitEnvironmentPolicy(
+environments = SplitEnvironmentPolicy(;
     norm=truncated,
     mixed=truncated,
 )
 
-algorithm = PeriodicSplit(
-    SVDAnsatz(TruncationStrategy(maxrank=3)),
-    CircularSweep(2 * length(A); maximal_sweep=500),
-    KrylovSolve(GMRES(; maxiter=100, tol=1e-10));
+algorithm = ALSSplit(;
+    ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=3)),
+    sweep=CircularSweep(; N=2 * length(A), maximal_sweep=500),
+    solve=KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-10)),
     environments,
-    stopping=CostConvergence(
+    stopping=CostConvergence(;
         rtol=1e-8,
         atol=1e-12,
         min_sweeps=5,
@@ -409,13 +425,22 @@ canonical `PlaquetteGates`; run, snapshot, and result cells therefore always
 use that representation:
 
 ```julia
-tnr = LoopTNR(8; maximal_rg=2)
+tnr = default_looptnr(; maximal_rg=2, dcut=8)
 result = renormalize(gates, tnr)
 
 @show result.cell
 @show length(result.measurement_results)  # RG 0, 1, and 2
 @show length(result.log.rg_logs)
 ```
+
+The default uses an eight-site circular ALS split with at most 40 sweeps,
+dense normal and mixed environments, an LDLT local solve, and a periodic-gauge
+ansatz. Its preliminary SVD retains at most `2dcut` states before projector
+canonicalization reduces the universal bond dimension to `dcut`. After five
+complete sweeps it stops when both `abs(cost) < 1e-9` and the relative
+sweep-to-sweep cost change is below `1e-2`. Every RG boundary is normalized by
+the coefficient infinity norm; fixed-point transfer measurements remain
+disabled until their eigensolver is available.
 
 In an interactive session the default observer uses one replaceable progress
 entry for the current RG split, spanning all of its split sweeps, and leaves

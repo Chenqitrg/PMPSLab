@@ -3,7 +3,7 @@
 ## Status and Scope
 
 **Implemented.** This document records the local durable-execution design around
-`PeriodicSplit`. It is deliberately narrower than a job platform.
+`ALSSplit`. It is deliberately narrower than a job platform.
 
 The completed implementation provides:
 
@@ -12,7 +12,7 @@ The completed implementation provides:
 - `snapshot`, `write_checkpoint`, `read_checkpoint`, and `restore_run` exist;
 - checkpoints are atomically published by rename;
 - a restored split run rebuilds derived transfer matrices and caches;
-- snapshot identity records target spaces and the complete `PeriodicSplit`
+- snapshot identity records target spaces and the complete `ALSSplit`
   configuration;
 - local helpers provide durable pause and durable cancellation;
 - focused tests and README examples cover the resulting lifecycle.
@@ -218,7 +218,7 @@ these requirements:
 1. It records the target tensor codomains and domains explicitly.
 2. It does not inspect or hash target tensor values; supplying the original
    immutable target remains the caller's responsibility.
-3. It stores a detached copy of the complete `PeriodicSplit` configuration and
+3. It stores a detached copy of the complete `ALSSplit` configuration and
    compares it with the standard `==` value semantics supplied by
    `AbstractAlgorithmConfig`.
 4. It does not depend on Julia `Serialization`, hashing, `objectid`, or pointer

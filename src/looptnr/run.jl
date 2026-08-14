@@ -9,7 +9,7 @@ end
 mutable struct LoopTNRRun{
         A<:LoopTNR,
         G<:GenericGateTensor,
-        S<:PeriodicSplit,
+        S<:ALSSplit,
         H<:MeasurementHistory,
     } <: AbstractAlgorithmRun
     algorithm::A

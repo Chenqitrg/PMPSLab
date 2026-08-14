@@ -46,7 +46,7 @@ end
     x0 = zero(b)
 
     x_lu = A \ b
-    x_kry = ldiv(KrylovSolve(GMRES(; maxiter=100, tol=1e-12)), x0, A, b)
+    x_kry = ldiv(KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12)), x0, A, b)
     @test x_kry ≈ x_lu rtol=1e-10
 end
 
@@ -61,7 +61,7 @@ end
         @test rdiv(solver, x0, A, b) ≈ expected rtol=1e-10
     end
 
-    krylov = KrylovSolve(GMRES(; maxiter=100, tol=1e-12))
+    krylov = KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12))
     @test rdiv(krylov, x0, A, b) ≈ expected rtol=1e-10
     @test rdiv(krylov, x0, x -> x * A, b) ≈ expected rtol=1e-10
 end

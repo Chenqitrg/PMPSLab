@@ -24,7 +24,12 @@ struct LUSolve <: DenseSolve end
 struct LDLTSolve <: DenseSolve end
 struct CholeskySolve <: DenseSolve end
 
-struct KrylovSolve{A} <: AbstractSolve
+"""
+    KrylovSolve(; alg)
+
+Use the supplied KrylovKit linear-solve algorithm for local split updates.
+"""
+@kwdef struct KrylovSolve{A} <: AbstractSolve
     alg::A   # e.g. GMRES(; maxiter=250, krylovdim=128, tol=1.0e-10)
 end
 

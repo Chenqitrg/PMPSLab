@@ -1,10 +1,15 @@
-struct RandomAnsatz{V<:GradedSpace} <: AbstractAnsatz
+"""
+    RandomAnsatz(; virtual_space)
+
+Initialize the split approximation with random tensors on the supplied
+site-aligned virtual spaces.
+"""
+@kwdef struct RandomAnsatz{V<:GradedSpace} <: AbstractAnsatz
     virtual_space::HalfPeriodicVector{V}
 end
 
 RandomAnsatz(Vs::AbstractVector{V}) where {V<:GradedSpace} =
     RandomAnsatz(HalfPeriodicVector(Vs))
-RandomAnsatz(V::GradedSpace, N::Int) = RandomAnsatz(fill(V, N))
 
 function _ansatz_physicalspaces(mps::PeriodicMPS, virtual_space::HalfPeriodicVector)
     expected_length = 2 * length(mps)
@@ -21,13 +26,18 @@ function initial_approximation(
     return Random.rand(PeriodicMPS, E, P, ansatz.virtual_space)
 end
 
-struct OneAnsatz{V<:GradedSpace} <: AbstractAnsatz
+"""
+    OneAnsatz(; virtual_space)
+
+Initialize the split approximation with identity-like tensors on the supplied
+site-aligned virtual spaces.
+"""
+@kwdef struct OneAnsatz{V<:GradedSpace} <: AbstractAnsatz
     virtual_space::HalfPeriodicVector{V}
 end
 
 OneAnsatz(Vs::AbstractVector{V}) where {V<:GradedSpace} =
     OneAnsatz(HalfPeriodicVector(Vs))
-OneAnsatz(V::GradedSpace, N::Int) = OneAnsatz(fill(V, N))
 
 function initial_approximation(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}}, ansatz::OneAnsatz
@@ -36,11 +46,15 @@ function initial_approximation(
     return one_mps(E, P, ansatz.virtual_space)
 end
 
-struct SVDAnsatz{T<:TruncationStrategy} <: AbstractAnsatz
-    truncation::T
-end
+"""
+    SVDAnsatz(; truncation=TruncationStrategy())
 
-SVDAnsatz() = SVDAnsatz(TruncationStrategy())
+Initialize each pair of split tensors from a local singular-value
+decomposition using `truncation`.
+"""
+@kwdef struct SVDAnsatz{T<:TruncationStrategy} <: AbstractAnsatz
+    truncation::T = TruncationStrategy()
+end
 
 function split_site(T::AbstractTensorMap{E, S, 3, 1}, trunc::TruncationStrategy) where {E, S}
     # T: L ⊗ P₁ ⊗ P₂ ← R  →  repartition as (L ⊗ P₁) ← (R ⊗ P₂)  → SVD
@@ -54,12 +68,21 @@ function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}
     return PeriodicMPS(tensors)
 end
 
-struct PeriodicGaugeAnsatz{S<:SVDAnsatz,C<:AbstractPeriodicCanonical} <: AbstractAnsatz
-    svd_pre::S
-    canonical::C
-end
+"""
+    PeriodicGaugeAnsatz(;
+        svd_pre=SVDAnsatz(),
+        canonical=ProjectorCanonical(),
+    )
 
-PeriodicGaugeAnsatz() = PeriodicGaugeAnsatz(SVDAnsatz(), ProjectorCanonical())
+Apply an SVD initialization followed by periodic projector gauge fixing.
+"""
+@kwdef struct PeriodicGaugeAnsatz{
+        S<:SVDAnsatz,
+        C<:AbstractPeriodicCanonical,
+    } <: AbstractAnsatz
+    svd_pre::S = SVDAnsatz()
+    canonical::C = ProjectorCanonical()
+end
 
 function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::PeriodicGaugeAnsatz) where {E, S}
     mps_approx = initial_approximation(mps, ansatz.svd_pre)

@@ -5,7 +5,7 @@ end
 """
     LoopTNRSnapshot
 
-Durable safe-boundary state of a [`LoopTNRRun`](@ref). When a periodic split is
+Durable safe-boundary state of a [`LoopTNRRun`](@ref). When a ALS split is
 active, `active_split` contains its nested [`SplitSnapshot`](@ref); committed RG
 measurements remain in the outer `measurement_results` history.
 """

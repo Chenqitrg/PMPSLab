@@ -12,12 +12,12 @@ function snapshot_loop_algorithm(
         maximal_sweep::Int = 1,
         measurement::TNRMeasurement = TNRMeasurement(),
     )
-    split_algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(8; maximal_sweep),
-        CholeskySolve(),
+    split_algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=8, maximal_sweep),
+        solve=CholeskySolve(),
     )
-    return LoopTNR(split_algorithm; maximal_rg, measurement)
+    return LoopTNR(; split=split_algorithm, maximal_rg, measurement)
 end
 
 snapshot_loop_cell() = UniformGates(
@@ -119,8 +119,9 @@ end
 end
 
 @testset "LoopTNRSnapshot — isolates cell, logs, and measurements" begin
-    measurement = TNRMeasurement(
-        InfinityNormNormalization(), SnapshotPayloadMeasurement()
+    measurement = TNRMeasurement(;
+        normalization=InfinityNormNormalization(),
+        fixed_point=SnapshotPayloadMeasurement(),
     )
     algorithm = snapshot_loop_algorithm(1; measurement)
     run = initialize_run(snapshot_loop_cell(), algorithm)

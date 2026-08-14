@@ -1,19 +1,28 @@
 @testset "algorithm configurations have value semantics" begin
     virtual_space = Z2Space(0 => 2, 1 => 1)
     configurations = (
-        RandomAnsatz(virtual_space, 4),
-        OneAnsatz(virtual_space, 4),
-        SVDAnsatz(),
-        PeriodicGaugeAnsatz(),
-        CircularSweep(4; maximal_sweep=2),
-        ZigzagSweep(4; maximal_sweep=2),
+        RandomAnsatz(; virtual_space=fill(virtual_space, 4)),
+        OneAnsatz(; virtual_space=fill(virtual_space, 4)),
+        SVDAnsatz(; truncation=TruncationStrategy()),
+        PeriodicGaugeAnsatz(;
+            svd_pre=SVDAnsatz(; truncation=TruncationStrategy()),
+            canonical=ProjectorCanonical(),
+        ),
+        CircularSweep(; N=4, maximal_sweep=2),
+        ZigzagSweep(; N=4, maximal_sweep=2),
         LUSolve(),
         CholeskySolve(),
-        KrylovSolve(GMRES(; maxiter=10)),
+        KrylovSolve(; alg=GMRES(; maxiter=10)),
+        CostTolerance(; atol=1e-9, rtol=1e-2, min_sweeps=5),
         CostConvergence(),
         SplitEnvironmentPolicy(),
-        SplitEnvironmentPolicy(
-            TruncatedTransferPolicy(TruncationStrategy())
+        SplitEnvironmentPolicy(;
+            norm=TruncatedTransferPolicy(;
+                truncation=TruncationStrategy()
+            ),
+            mixed=TruncatedTransferPolicy(;
+                truncation=TruncationStrategy()
+            ),
         ),
     )
 
@@ -25,10 +34,10 @@
         @test hash(configuration) == hash(copied)
     end
 
-    algorithm = PeriodicSplit(
-        first(configurations),
-        CircularSweep(4; maximal_sweep=1),
-        LUSolve(),
+    algorithm = ALSSplit(;
+        ansatz=first(configurations),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=LUSolve(),
     )
     @test algorithm == deepcopy(algorithm)
     @test hash(algorithm) == hash(deepcopy(algorithm))
@@ -50,6 +59,10 @@ end
             "   ├─ trscheme: ",
         ansatz_text,
     )
+    @test occursin("└─ truncation: notrunc()", ansatz_text)
+    @test occursin("├─ trscheme: notrunc()", ansatz_text)
+    @test occursin("└─ alg_orth: Householder", ansatz_text)
+    @test !occursin("DefaultDriver", ansatz_text)
     @test !occursin("svd_pre: SVDAnsatz{", ansatz_text)
     @test sprint(
         show,
@@ -58,10 +71,10 @@ end
         context = :compact => true,
     ) == "PeriodicGaugeAnsatz(...)"
 
-    split_algorithm = PeriodicSplit(
+    split_algorithm = ALSSplit(;
         ansatz,
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
     split_text = sprint(show, MIME"text/plain"(), split_algorithm)
     @test occursin(
@@ -75,18 +88,35 @@ end
         "├─ environments: SplitEnvironmentPolicy\n" *
             "│  ├─ norm: DenseTransferPolicy()\n" *
             "│  └─ mixed: DenseTransferPolicy()\n" *
-            "└─ stopping: nothing\n",
+            "└─ stopping: NoStopping()\n",
         split_text,
     )
+
+    looptnr_text = sprint(
+        show,
+        MIME"text/plain"(),
+        default_looptnr(; maximal_rg=4, dcut=16),
+    )
+    @test occursin(
+        "truncation: truncrank(32) & truncerror(rtol=1.0e-13)",
+        looptnr_text,
+    )
+    @test occursin(
+        "trscheme: truncrank(16) & truncerror(rtol=1.0e-13)",
+        looptnr_text,
+    )
+    @test occursin("alg_orth: Householder", looptnr_text)
+    @test !occursin("TruncationIntersection", looptnr_text)
+    @test !occursin("DefaultDriver", looptnr_text)
 end
 
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin
     B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
-    alg = PeriodicSplit(
-        SVDAnsatz(TruncationStrategy()),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+    alg = ALSSplit(;
+        ansatz=SVDAnsatz(; truncation=TruncationStrategy()),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
     B1, log = split(A, alg)
 
@@ -100,7 +130,7 @@ end
     B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
     ctx = SplitContext(A, deepcopy(B0))
-    for st in CircularSweep(4; maximal_sweep=1)
+    for st in CircularSweep(; N=4, maximal_sweep=1)
         update!(ctx, CholeskySolve(), st)
     end
     @test diff_norm(ctx.mpsB, B0) ≈ 0 atol=1e-10
@@ -110,10 +140,10 @@ end
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, P ⊗ P, V)
-    alg = PeriodicSplit(
-        RandomAnsatz(V, 4),
-        ZigzagSweep(4; maximal_sweep=1),
-        LUSolve(),
+    alg = ALSSplit(;
+        ansatz=RandomAnsatz(; virtual_space=fill(V, 4)),
+        sweep=ZigzagSweep(; N=4, maximal_sweep=1),
+        solve=LUSolve(),
     )
     B1, log = split(mpsA, alg)
 
@@ -125,11 +155,11 @@ end
 @testset "update! — exact periodic cost descends for both sweep orders" begin
     Random.seed!(1234)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
-    ansatz = SVDAnsatz(TruncationStrategy(maxrank=1))
+    ansatz = SVDAnsatz(; truncation=TruncationStrategy(maxrank=1))
 
     for sweep in (
-            CircularSweep(4; maximal_sweep=2),
-            ZigzagSweep(4; maximal_sweep=2),
+            CircularSweep(; N=4, maximal_sweep=2),
+            ZigzagSweep(; N=4, maximal_sweep=2),
         )
         ctx = SplitContext(mpsA, initial_approximation(mpsA, ansatz))
         previous_cost = squared_distance(mpsA, ctx.mpsB)
@@ -148,10 +178,10 @@ end
     Random.seed!(4321)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     nsweeps = 3
-    alg = PeriodicSplit(
-        SVDAnsatz(TruncationStrategy(maxrank=1)),
-        CircularSweep(4; maximal_sweep=nsweeps),
-        LUSolve(),
+    alg = ALSSplit(;
+        ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=1)),
+        sweep=CircularSweep(; N=4, maximal_sweep=nsweeps),
+        solve=LUSolve(),
     )
     mpsB, log = split(mpsA, alg)
     sweep_costs = getfield.(log.site_logs[4:4:end], :error)

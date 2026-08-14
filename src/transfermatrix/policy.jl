@@ -20,15 +20,15 @@ Construct exact, materialized [`DenseTransferMatrix`](@ref) values.
 struct DenseTransferPolicy <: AbstractTransferPolicy end
 
 """
-    TruncatedTransferPolicy(truncation)
+    TruncatedTransferPolicy(; truncation=truncerror(rtol=1e-13))
 
 Construct factored [`TruncatedTransferMatrix`](@ref) site values and apply
 `truncation` again whenever transfer products are accumulated.
 """
-struct TruncatedTransferPolicy{
+@kwdef struct TruncatedTransferPolicy{
         T<:TruncationStrategy
     } <: AbstractTransferPolicy
-    truncation::T
+    truncation::T = truncerror(; rtol=1.0e-13)
 end
 
 transfer_at(

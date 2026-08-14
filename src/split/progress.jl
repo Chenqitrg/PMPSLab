@@ -29,10 +29,10 @@ end
 
 function _observer_running!(observer::SplitProgressObserver, ::SplitRun)
     if observer.started
-        @info "Periodic split resumed"
+        @info "ALS split resumed"
     else
         observer.started = true
-        @info "Periodic split started"
+        @info "ALS split started"
     end
     return nothing
 end
@@ -45,19 +45,19 @@ function _observer_step!(
     state = event.log.state
     sweep = state.n + 1
     if observer.sweep != sweep
-        _close_progress!(observer, "Periodic split sweep changed")
+        _close_progress!(observer, "ALS split sweep changed")
         observer.sweep = sweep
         observer.sweep_time = 0.0
     end
 
     observer.sweep_time += event.log.time
     progress_name =
-        "Periodic split: sweep=$sweep site=$(state.site) cost=$(event.log.error)"
+        "ALS split: sweep=$sweep site=$(state.site) cost=$(event.log.error)"
     _emit_progress!(observer, progress_name)
 
     if _completes_sweep(state, run.pending_iteration)
         _close_progress!(observer, progress_name)
-        summary = "Periodic split sweep $sweep completed: " *
+        summary = "ALS split sweep $sweep completed: " *
             "cost=$(event.log.error), time=$(observer.sweep_time)s"
         @info summary
         observer.sweep = nothing
@@ -67,20 +67,20 @@ function _observer_step!(
 end
 
 function _observer_paused!(observer::SplitProgressObserver, ::SplitRun)
-    _close_progress!(observer, "Periodic split paused")
-    @info "Periodic split paused"
+    _close_progress!(observer, "ALS split paused")
+    @info "ALS split paused"
     return nothing
 end
 
 function _observer_cancelled!(observer::SplitProgressObserver, ::SplitRun)
-    _close_progress!(observer, "Periodic split cancelled")
-    @info "Periodic split cancelled"
+    _close_progress!(observer, "ALS split cancelled")
+    @info "ALS split cancelled"
     return nothing
 end
 
 function _observer_completed!(observer::SplitProgressObserver, run::SplitRun)
-    _close_progress!(observer, "Periodic split completed")
-    @info "Periodic split completed after $(length(run.log.site_logs)) site updates"
+    _close_progress!(observer, "ALS split completed")
+    @info "ALS split completed after $(length(run.log.site_logs)) site updates"
     return nothing
 end
 
@@ -89,7 +89,7 @@ function _observer_failed!(
         ::SplitRun,
         exception,
     )
-    _close_progress!(observer, "Periodic split failed")
-    @error "Periodic split failed: $(sprint(showerror, exception))"
+    _close_progress!(observer, "ALS split failed")
+    @error "ALS split failed: $(sprint(showerror, exception))"
     return nothing
 end

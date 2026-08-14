@@ -8,7 +8,7 @@ _target_spaces(mpsA::PeriodicMPS) =
 
 function _split_problem_identity(
         mpsA::PeriodicMPS,
-        algorithm::PeriodicSplit,
+        algorithm::ALSSplit,
     )
     return SplitProblemIdentity(
         _target_spaces(mpsA),
@@ -19,7 +19,7 @@ end
 function _matches_split_problem(
         identity::SplitProblemIdentity,
         mpsA::PeriodicMPS,
-        algorithm::PeriodicSplit,
+        algorithm::ALSSplit,
     )
     return identity.target_spaces == _target_spaces(mpsA) &&
            identity.algorithm == algorithm

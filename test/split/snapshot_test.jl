@@ -1,9 +1,9 @@
 @testset "SplitSnapshot — captures an isolated safe-boundary state" begin
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
     run = initialize_run(mpsA, algorithm)
     step!(run)
@@ -40,10 +40,10 @@ end
 
 @testset "SplitSnapshot — restores one mid-sweep boundary" begin
     mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
     uninterrupted = initialize_run(mpsA, algorithm)
     step!(uninterrupted)
@@ -92,10 +92,14 @@ end
     end
 
     for sweep in (
-            CircularSweep(4; maximal_sweep=2),
-            ZigzagSweep(4; maximal_sweep=2),
+            CircularSweep(; N=4, maximal_sweep=2),
+            ZigzagSweep(; N=4, maximal_sweep=2),
         )
-        algorithm = PeriodicSplit(SVDAnsatz(), sweep, CholeskySolve())
+        algorithm = ALSSplit(;
+            ansatz=SVDAnsatz(),
+            sweep,
+            solve=CholeskySolve(),
+        )
         for completed_steps in 0:length(sweep)
             uninterrupted = initialize_run(mpsA, algorithm)
             for _ in 1:completed_steps
@@ -120,10 +124,10 @@ end
 
 @testset "SplitSnapshot — rejects an inconsistent cursor or sweep" begin
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=2),
-        CholeskySolve(),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=2),
+        solve=CholeskySolve(),
     )
     run = initialize_run(mpsA, algorithm)
     for _ in 1:3
@@ -140,27 +144,27 @@ end
     )
     @test_throws ArgumentError restore_run(bad_cursor, mpsA, algorithm)
 
-    wrong_sweep = PeriodicSplit(
-        algorithm.ansatz,
-        ZigzagSweep(4; maximal_sweep=2),
-        algorithm.solve,
+    wrong_sweep = ALSSplit(;
+        ansatz=algorithm.ansatz,
+        sweep=ZigzagSweep(; N=4, maximal_sweep=2),
+        solve=algorithm.solve,
     )
     @test_throws ArgumentError restore_run(saved, mpsA, wrong_sweep)
 
-    wrong_domain = PeriodicSplit(
-        algorithm.ansatz,
-        CircularSweep(1; maximal_sweep=2),
-        algorithm.solve,
+    wrong_domain = ALSSplit(;
+        ansatz=algorithm.ansatz,
+        sweep=CircularSweep(; N=1, maximal_sweep=2),
+        solve=algorithm.solve,
     )
     @test_throws DimensionMismatch restore_run(saved, mpsA, wrong_domain)
 end
 
 @testset "SplitSnapshot — restore requires compatible inputs" begin
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
     saved = snapshot(initialize_run(mpsA, algorithm))
 
@@ -170,34 +174,36 @@ end
     incompatible_target = rand(PeriodicMPS, ComplexF64, 2, (3, 3), 1)
     @test_throws ArgumentError restore_run(saved, incompatible_target, algorithm)
 
-    different_solver = PeriodicSplit(
-        algorithm.ansatz,
-        algorithm.sweep,
-        LUSolve(),
+    different_solver = ALSSplit(;
+        ansatz=algorithm.ansatz,
+        sweep=algorithm.sweep,
+        solve=LUSolve(),
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_solver)
 
-    different_ansatz = PeriodicSplit(
-        OneAnsatz(Z2Space(0 => 1), 4),
-        algorithm.sweep,
-        algorithm.solve,
+    different_ansatz = ALSSplit(;
+        ansatz=OneAnsatz(; virtual_space=fill(Z2Space(0 => 1), 4)),
+        sweep=algorithm.sweep,
+        solve=algorithm.solve,
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_ansatz)
 
-    different_environments = PeriodicSplit(
-        algorithm.ansatz,
-        algorithm.sweep,
-        algorithm.solve;
-        environments=SplitEnvironmentPolicy(
-            TruncatedTransferPolicy(TruncationStrategy())
+    truncated = TruncatedTransferPolicy(; truncation=TruncationStrategy())
+    different_environments = ALSSplit(;
+        ansatz=algorithm.ansatz,
+        sweep=algorithm.sweep,
+        solve=algorithm.solve,
+        environments=SplitEnvironmentPolicy(;
+            norm=truncated,
+            mixed=truncated,
         ),
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_environments)
 
-    different_stopping = PeriodicSplit(
-        algorithm.ansatz,
-        algorithm.sweep,
-        algorithm.solve;
+    different_stopping = ALSSplit(;
+        ansatz=algorithm.ansatz,
+        sweep=algorithm.sweep,
+        solve=algorithm.solve,
         stopping=CostConvergence(),
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_stopping)
@@ -205,10 +211,10 @@ end
     virtual_space = Z2Space(0 => 2, 1 => 1)
     physical_space = Z2Space(0 => 2)
     graded_target = rand(PeriodicMPS, ComplexF64, 2, physical_space ⊗ physical_space, virtual_space)
-    random_algorithm = PeriodicSplit(
-        RandomAnsatz(virtual_space, 4),
-        CircularSweep(4; maximal_sweep=1),
-        LUSolve(),
+    random_algorithm = ALSSplit(;
+        ansatz=RandomAnsatz(; virtual_space=fill(virtual_space, 4)),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=LUSolve(),
     )
     random_saved = snapshot(initialize_run(graded_target, random_algorithm))
     @test_nowarn restore_run(

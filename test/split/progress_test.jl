@@ -1,9 +1,9 @@
 function split_progress_fixture()
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
     return target, algorithm
 end
@@ -47,9 +47,9 @@ end
     @test count(record -> !record.message.done, progress) == 4
     @test count(record -> record.message.done, progress) == 1
     @test all(record -> record.level == ProgressLogging.ProgressLevel, progress)
-    @test any(==("Periodic split started"), messages)
-    @test any(startswith("Periodic split sweep 1 completed: cost="), messages)
-    @test any(==("Periodic split completed after 4 site updates"), messages)
+    @test any(==("ALS split started"), messages)
+    @test any(startswith("ALS split sweep 1 completed: cost="), messages)
+    @test any(==("ALS split completed after 4 site updates"), messages)
 end
 
 @testset "default split observer — local session progress" begin
@@ -73,10 +73,10 @@ end
         records,
     ) == 5
     messages = string.(getproperty.(records, :message))
-    @test "Periodic split started" in messages
-    @test "Periodic split paused" in messages
-    @test "Periodic split resumed" in messages
-    @test "Periodic split completed after 4 site updates" in messages
+    @test "ALS split started" in messages
+    @test "ALS split paused" in messages
+    @test "ALS split resumed" in messages
+    @test "ALS split completed after 4 site updates" in messages
 end
 
 @testset "split observers — silence and replacement" begin

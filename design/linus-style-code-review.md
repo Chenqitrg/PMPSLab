@@ -41,7 +41,7 @@
 
 相关代码：
 
-- `src/split/interface.jl`：`PeriodicSplit` 独立持有一个已经包含 `N` 的 sweep。
+- `src/split/interface.jl`：`ALSSplit` 独立持有一个已经包含 `N` 的 sweep。
 - `src/split/run.jl`：`initialize_run` 从 ansatz 构造 approximation 后，直接迭代 `algorithm.sweep`，没有验证 sweep 覆盖 `length(approximation)`。
 - `src/split/run.jl`：`isfinished` 只判断 sweep iterator 是否耗尽。
 

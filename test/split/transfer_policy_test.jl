@@ -1,18 +1,28 @@
 @testset "split transfer policies — construction and defaults" begin
     dense_policy = DenseTransferPolicy()
-    truncated_policy = TruncatedTransferPolicy(TruncationStrategy(maxrank=2))
+    truncated_policy = TruncatedTransferPolicy(; truncation=TruncationStrategy(maxrank=2))
+    @test TruncatedTransferPolicy().truncation ==
+        truncerror(; rtol=1.0e-13)
 
     defaults = SplitEnvironmentPolicy()
     @test defaults.norm isa DenseTransferPolicy
     @test defaults.mixed isa DenseTransferPolicy
 
-    shared = SplitEnvironmentPolicy(truncated_policy)
+    shared = SplitEnvironmentPolicy(;
+        norm=truncated_policy,
+        mixed=truncated_policy,
+    )
     @test shared.norm === truncated_policy
     @test shared.mixed === truncated_policy
 
-    algorithm = PeriodicSplit(
-        SVDAnsatz(), CircularSweep(4; maximal_sweep=1), CholeskySolve();
-        environments=SplitEnvironmentPolicy(dense_policy),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
+        environments=SplitEnvironmentPolicy(;
+            norm=dense_policy,
+            mixed=dense_policy,
+        ),
     )
     @test algorithm.environments.norm isa DenseTransferPolicy
     @test algorithm.environments.mixed isa DenseTransferPolicy
@@ -23,16 +33,16 @@ end
     mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     mpsA = pair_contraction(mpsB)
     dense_policy = DenseTransferPolicy()
-    truncated_policy = TruncatedTransferPolicy(TruncationStrategy())
+    truncated_policy = TruncatedTransferPolicy(; truncation=TruncationStrategy())
 
     cases = (
-        (SplitEnvironmentPolicy(dense_policy, dense_policy),
+        (SplitEnvironmentPolicy(; norm=dense_policy, mixed=dense_policy),
          DenseTransferMatrix, DenseTransferMatrix),
-        (SplitEnvironmentPolicy(dense_policy, truncated_policy),
+        (SplitEnvironmentPolicy(; norm=dense_policy, mixed=truncated_policy),
          DenseTransferMatrix, TruncatedTransferMatrix),
-        (SplitEnvironmentPolicy(truncated_policy, dense_policy),
+        (SplitEnvironmentPolicy(; norm=truncated_policy, mixed=dense_policy),
          TruncatedTransferMatrix, DenseTransferMatrix),
-        (SplitEnvironmentPolicy(truncated_policy, truncated_policy),
+        (SplitEnvironmentPolicy(; norm=truncated_policy, mixed=truncated_policy),
          TruncatedTransferMatrix, TruncatedTransferMatrix),
     )
 
@@ -49,12 +59,13 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     mpsB = initial_approximation(mpsA, SVDAnsatz())
     dense_policy = DenseTransferPolicy()
-    truncated_policy = TruncatedTransferPolicy(TruncationStrategy())
+    truncated_policy = TruncatedTransferPolicy(; truncation=TruncationStrategy())
 
     # The mixed environment only constructs W, so it may be factored while the
     # dense normal environment is handled by a direct solver.
-    direct_environments = SplitEnvironmentPolicy(
-        dense_policy, truncated_policy
+    direct_environments = SplitEnvironmentPolicy(;
+        norm=dense_policy,
+        mixed=truncated_policy,
     )
     direct_ctx = PMPSLab._build_split_context(
         mpsA, deepcopy(mpsB), direct_environments
@@ -69,11 +80,14 @@ end
 
     # A factored normal environment supplies an action rather than a materialized
     # matrix and therefore composes with KrylovSolve.
-    factored_environments = SplitEnvironmentPolicy(truncated_policy)
+    factored_environments = SplitEnvironmentPolicy(;
+        norm=truncated_policy,
+        mixed=truncated_policy,
+    )
     krylov_ctx = PMPSLab._build_split_context(
         mpsA, deepcopy(mpsB), factored_environments
     )
-    krylov = KrylovSolve(GMRES(; maxiter=100, tol=1e-12))
+    krylov = KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12))
     _, krylov_cost = update!(
         krylov_ctx,
         krylov,
@@ -94,11 +108,11 @@ end
     )
     @test isfinite(factored_direct_cost)
 
-    direct_algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
-        factored_environments,
+    direct_algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
+        environments=factored_environments,
     )
     @test_nowarn initialize_run(mpsA, direct_algorithm)
 end
@@ -106,14 +120,16 @@ end
 @testset "split — truncated transfer policy is wired through a complete run" begin
     Random.seed!(20260811)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
-    policy = SplitEnvironmentPolicy(
-        TruncatedTransferPolicy(TruncationStrategy())
+    truncated = TruncatedTransferPolicy(; truncation=TruncationStrategy())
+    policy = SplitEnvironmentPolicy(;
+        norm=truncated,
+        mixed=truncated,
     )
-    algorithm = PeriodicSplit(
-        SVDAnsatz(TruncationStrategy(maxrank=2)),
-        CircularSweep(4; maximal_sweep=2),
-        KrylovSolve(GMRES(; maxiter=100, tol=1e-12)),
-        policy,
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=2)),
+        sweep=CircularSweep(; N=4, maximal_sweep=2),
+        solve=KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12)),
+        environments=policy,
     )
 
     run = initialize_run(mpsA, algorithm)

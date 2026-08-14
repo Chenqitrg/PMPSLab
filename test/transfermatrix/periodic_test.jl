@@ -145,7 +145,11 @@ end
     )
     @test dense(transfer_at(ket, 2, trunc)) ≈
           dense(TruncatedTransferMatrix(ket[2], trunc))
-    @test dense(transfer_at(ket, 2, TruncatedTransferPolicy(trunc))) ≈
+    @test dense(transfer_at(
+        ket,
+        2,
+        TruncatedTransferPolicy(; truncation=trunc),
+    )) ≈
           dense(TruncatedTransferMatrix(ket[2], trunc))
     @test dense(transfer_at(bra, ket, 2, trunc)) ≈ dense(ptm[2])
     @test expectation(bra, ket, trunc) ≈ expectation(ptm)

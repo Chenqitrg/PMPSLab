@@ -1,7 +1,7 @@
 """
     SplitRun
 
-Mutable execution state for a [`PeriodicSplit`](@ref). `context` owns the
+Mutable execution state for a [`ALSSplit`](@ref). `context` owns the
 numerical working state, while the run owns the algorithm, sweep cursor,
 and progress log.
 """
@@ -11,7 +11,7 @@ const SplitPendingIteration = Union{
 }
 
 mutable struct SplitRun{
-        A<:PeriodicSplit,
+        A<:ALSSplit,
         C<:SplitContext,
         P<:SplitPendingIteration,
         H<:MeasurementHistory,
@@ -77,7 +77,7 @@ function _validate_split_sweep(sweep::AbstractSweep, site_count::Int)
     return nothing
 end
 
-function initialize_run(mps::PeriodicMPS, algorithm::PeriodicSplit)
+function initialize_run(mps::PeriodicMPS, algorithm::ALSSplit)
     approximation = initial_approximation(mps, algorithm.ansatz)
     _validate_split_sweep(algorithm.sweep, length(approximation))
     context = _build_split_context(mps, approximation, algorithm.environments)
@@ -129,7 +129,7 @@ end
 function _replay_split_progress(
         site_logs::AbstractVector{<:SplitSiteLog},
         sweep::AbstractSweep,
-        stopping::Union{Nothing,AbstractStoppingCriterion},
+        stopping::AbstractStoppingCriterion,
     )
     expected_iteration = iterate(sweep)
     for (step, site_log) in enumerate(site_logs)
@@ -159,7 +159,7 @@ end
 function _validate_split_cursor(
         saved::SplitSnapshot,
         sweep::AbstractSweep,
-        stopping::Union{Nothing,AbstractStoppingCriterion},
+        stopping::AbstractStoppingCriterion,
     )
     expected_iteration, expected_converged = _replay_split_progress(
         saved.log.site_logs,
@@ -176,7 +176,7 @@ function _validate_split_cursor(
 end
 
 """
-    restore_run(saved::SplitSnapshot, mpsA::PeriodicMPS, algorithm::PeriodicSplit)
+    restore_run(saved::SplitSnapshot, mpsA::PeriodicMPS, algorithm::ALSSplit)
 
 Reconstruct a split run at the safe boundary captured by `saved`. Transfer
 matrices and contraction caches are derived again from the immutable target
@@ -185,7 +185,7 @@ matrices and contraction caches are derived again from the immutable target
 function restore_run(
         saved::SplitSnapshot,
         mpsA::PeriodicMPS,
-        algorithm::PeriodicSplit,
+        algorithm::ALSSplit,
     )
     length(saved.mpsB) == 2 * length(mpsA) || throw(DimensionMismatch(
         "snapshot approximation has $(length(saved.mpsB)) sites but target has " *
@@ -255,7 +255,7 @@ end
 """
     split(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
-        alg::PeriodicSplit;
+        alg::ALSSplit;
         observer,
     )
 
@@ -271,7 +271,7 @@ replace the default observer.
 """
 function split(
         mps::PeriodicMPS,
-        algorithm::PeriodicSplit;
+        algorithm::ALSSplit;
         observer = _DEFAULT_OBSERVER,
     )
     run = initialize_run(mps, algorithm)

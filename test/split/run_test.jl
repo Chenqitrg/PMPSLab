@@ -2,10 +2,10 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
 
 @testset "SplitRun — one safe step updates exactly one site" begin
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=1),
-        CholeskySolve(),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
     run = initialize_run(mpsA, algorithm)
 
@@ -52,10 +52,10 @@ end
 
 @testset "SplitRun — an empty sweep is complete at initialization" begin
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(4; maximal_sweep=0),
-        CholeskySolve(),
+    algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=4, maximal_sweep=0),
+        solve=CholeskySolve(),
     )
     run = initialize_run(mpsA, algorithm)
 
@@ -68,17 +68,23 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
 
     for sweep in (
-            CircularSweep(1; maximal_sweep=1),
-            CircularSweep(5; maximal_sweep=1),
-            ZigzagSweep(3; maximal_sweep=0),
+            CircularSweep(; N=1, maximal_sweep=1),
+            CircularSweep(; N=5, maximal_sweep=1),
+            ZigzagSweep(; N=3, maximal_sweep=0),
         )
-        algorithm = PeriodicSplit(SVDAnsatz(), sweep, CholeskySolve())
+        algorithm = ALSSplit(;
+            ansatz=SVDAnsatz(),
+            sweep,
+            solve=CholeskySolve(),
+        )
         @test_throws DimensionMismatch initialize_run(mpsA, algorithm)
         @test_throws DimensionMismatch split(mpsA, algorithm)
     end
 
-    domainless = PeriodicSplit(
-        SVDAnsatz(), DomainlessSweep(), CholeskySolve()
+    domainless = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=DomainlessSweep(),
+        solve=CholeskySolve(),
     )
     @test_throws ArgumentError initialize_run(mpsA, domainless)
 end

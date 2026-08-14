@@ -4,6 +4,17 @@
 
 abstract type AbstractPeriodicCanonical <: AbstractAlgorithmConfig end
 
+"""
+    ProjectorCanonical(;
+        tol=1e-12,
+        maxiter=100,
+        trscheme=TruncationStrategy(),
+        alg_orth=MPSKit.Defaults.alg_orth(),
+    )
+
+Configure periodic left/right canonicalization and the truncation used to
+construct the resulting bond projectors.
+"""
 @kwdef struct ProjectorCanonical{
         T<:TruncationStrategy, O
     } <: AbstractPeriodicCanonical

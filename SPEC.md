@@ -158,7 +158,7 @@ c = \langle A|A\rangle + \langle B|B\rangle
 ```
 
 The default observer renders site progress and one persistent summary for each
-completed sweep. Numerical stopping remains part of `PeriodicSplit`; pause and
+completed sweep. Numerical stopping remains part of `ALSSplit`; pause and
 cancellation remain execution-session responsibilities.
 
 ## Norm semantics

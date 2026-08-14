@@ -30,7 +30,7 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     mpsB = initial_approximation(mpsA, SVDAnsatz())
     ctx = SplitContext(mpsA, mpsB)
-    solver = KrylovSolve(GMRES(; maxiter=100, tol=1e-12))
+    solver = KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12))
 
     _, cost = update!(ctx, solver, SweepState{Forward}(1, 0))
     @test isfinite(cost)

@@ -3,12 +3,12 @@ import ProgressLogging
 
 function looptnr_progress_fixture(; maximal_rg::Int=1)
     gate = ones(ComplexF64, ℂ^1 ⊗ ℂ^1, ℂ^1 ⊗ ℂ^1)
-    split_algorithm = PeriodicSplit(
-        SVDAnsatz(),
-        CircularSweep(8; maximal_sweep=1),
-        CholeskySolve(),
+    split_algorithm = ALSSplit(;
+        ansatz=SVDAnsatz(),
+        sweep=CircularSweep(; N=8, maximal_sweep=1),
+        solve=CholeskySolve(),
     )
-    return UniformGates(gate), LoopTNR(split_algorithm; maximal_rg)
+    return UniformGates(gate), LoopTNR(; split=split_algorithm, maximal_rg)
 end
 
 function captured_looptnr_logs(f)
@@ -144,11 +144,14 @@ end
     @test "LoopTNR cancelled · RG 0/1 normalization pending" in
         string.(getproperty.(cancelled_records, :message))
 
-    failing_measurement = TNRMeasurement(
-        InfinityNormNormalization(), FailingFixedPointMeasurement()
+    failing_measurement = TNRMeasurement(;
+        normalization=InfinityNormNormalization(),
+        fixed_point=FailingFixedPointMeasurement(),
     )
-    failing_algorithm = LoopTNR(
-        algorithm.split; maximal_rg=0, measurement=failing_measurement
+    failing_algorithm = LoopTNR(;
+        split=algorithm.split,
+        maximal_rg=0,
+        measurement=failing_measurement,
     )
     failing_run = initialize_run(cell, failing_algorithm)
     failing_observer = PMPSLab._default_observer(failing_run)
