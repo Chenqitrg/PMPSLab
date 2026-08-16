@@ -2,8 +2,8 @@ function split_progress_fixture()
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
     )
     return target, algorithm
 end

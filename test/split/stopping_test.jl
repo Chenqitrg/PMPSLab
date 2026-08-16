@@ -69,8 +69,8 @@ end
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=2),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=2),
+        solver=CholeskySolve(),
         stopping=ThrowingStoppingCriterion(),
     )
     run = initialize_run(target, algorithm)
@@ -92,16 +92,16 @@ end
 @testset "ALSSplit — cost convergence stops at complete sweeps" begin
     Random.seed!(20260811)
     initial = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
-    target = pair_contraction(initial)
+    target = contract_pairs(initial)
 
     for (sweep, steps_per_sweep) in (
-            (CircularSweep(; N=4, maximal_sweep=10), 4),
-            (ZigzagSweep(; N=4, maximal_sweep=10), 6),
+            (CircularSweep(; site_count=4, max_sweeps=10), 4),
+            (ZigzagSweep(; site_count=4, max_sweeps=10), 6),
         )
         algorithm = ALSSplit(;
             ansatz=SVDAnsatz(),
             sweep,
-            solve=CholeskySolve(),
+            solver=CholeskySolve(),
             stopping=CostConvergence(;
                 atol=1e-10,
                 rtol=0,
@@ -113,17 +113,17 @@ end
 
         @test log.converged
         @test length(log.site_logs) == 2steps_per_sweep
-        @test last(log.site_logs).state.n == 1
+        @test last(log.site_logs).state.completed_sweeps == 1
     end
 end
 
 @testset "ALSSplit — convergence patience and minimum sweeps" begin
     Random.seed!(20260812)
-    target = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
+    target = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=10),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=10),
+        solver=CholeskySolve(),
         stopping=CostConvergence(;
             atol=1e-10,
             rtol=0,
@@ -138,8 +138,8 @@ end
 
     capped = ALSSplit(;
         ansatz=algorithm.ansatz,
-        sweep=CircularSweep(; N=4, maximal_sweep=2),
-        solve=algorithm.solve,
+        sweep=CircularSweep(; site_count=4, max_sweeps=2),
+        solver=algorithm.solver,
         stopping=CostConvergence(;
             atol=1e-10,
             rtol=0,
@@ -154,11 +154,11 @@ end
 
 @testset "SplitSnapshot — restores cost convergence state" begin
     Random.seed!(20260813)
-    target = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
+    target = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=10),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=10),
+        solver=CholeskySolve(),
         stopping=CostConvergence(;
             atol=1e-10,
             rtol=0,
@@ -197,11 +197,11 @@ end
 
     inconsistent_log = SplitLog(
         copy(completed.log.site_logs),
-        completed.log.sweep_time,
+        completed.log.duration,
         false,
     )
     inconsistent = SplitSnapshot(
-        completed.mpsB,
+        completed.approximation,
         completed.pending_iteration,
         inconsistent_log,
         completed.measurement_results,

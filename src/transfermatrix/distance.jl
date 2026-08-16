@@ -76,9 +76,12 @@ end
 squared_distance(mps1::PeriodicMPS, mps2::PeriodicMPS) =
     first(_squared_distance_data(mps1, mps2))
 
-# Compatibility name retained for callers that already treated `diff_norm` as
-# a squared distance.
-diff_norm(mps1::PeriodicMPS, mps2::PeriodicMPS) = squared_distance(mps1, mps2)
+# Compatibility wrapper for the former name, which misleadingly suggested a
+# norm despite returning a squared distance.
+function diff_norm(mps1::PeriodicMPS, mps2::PeriodicMPS)
+    Base.depwarn("diff_norm returns a squared distance; use squared_distance", :diff_norm)
+    return squared_distance(mps1, mps2)
+end
 
 function Base.isapprox(
         mps1::PeriodicMPS,

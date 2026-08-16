@@ -7,18 +7,18 @@ measurement results are stored separately in [`MeasurementHistory`](@ref).
 struct RGLog{S<:Union{Nothing,SplitLog}}
     rg::Int
     split_log::S
-    coarse_grain_time::Float64
+    coarse_grain_duration::Float64
 end
 
 function RGLog(
         rg::Integer,
         split_log::Union{Nothing,SplitLog},
-        coarse_grain_time::Real,
+        coarse_grain_duration::Real,
     )
     return RGLog(
         Int(rg),
         split_log,
-        Float64(coarse_grain_time),
+        Float64(coarse_grain_duration),
     )
 end
 

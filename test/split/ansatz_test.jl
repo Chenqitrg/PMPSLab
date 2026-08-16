@@ -7,7 +7,7 @@
         :SplitEnvironmentPolicy,
     ))
     @test SVDAnsatz().trunc isa TruncationStrategy
-    @test PeriodicGaugeAnsatz().svd_pre isa SVDAnsatz
+    @test PeriodicGaugeAnsatz().initial_split isa SVDAnsatz
 end
 
 @testset "RandomAnsatz / OneAnsatz — construction and initial approximation" begin
@@ -17,11 +17,11 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, N, P ⊗ P, V)
 
     for ansatz in (
-            RandomAnsatz(; virtual_space=fill(V, 2N)),
-            OneAnsatz(; virtual_space=fill(V, 2N)),
+            RandomAnsatz(; virtual_spaces=fill(V, 2N)),
+            OneAnsatz(; virtual_spaces=fill(V, 2N)),
         )
-        @test length(ansatz.virtual_space) == 2N
-        @test ansatz.virtual_space[half(3)] == V
+        @test length(ansatz.virtual_spaces) == 2N
+        @test ansatz.virtual_spaces[half(3)] == V
 
         mpsB = initial_approximation(mpsA, ansatz)
         @test length(mpsB) == 2N
@@ -36,15 +36,15 @@ end
 
     @test_throws DimensionMismatch initial_approximation(
         mpsA,
-        RandomAnsatz(; virtual_space=fill(V, 2N + 1)),
+        RandomAnsatz(; virtual_spaces=fill(V, 2N + 1)),
     )
 end
 
-@testset "split_site — SVD split of one 2-site tensor" begin
+@testset "split_tensor — SVD split of one two-physical-leg tensor" begin
     D, d = 3, 2
     T = randn(ComplexF64, ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D)
     trunc = TruncationStrategy()
-    B1, B2 = split_site(T, trunc)
+    B1, B2 = split_tensor(T, trunc)
 
     @test length(codomain(B1)) == 2
     @test codomain(B1)[1] == ℂ^D
@@ -61,7 +61,7 @@ end
 
 @testset "SVDAnsatz — initial approximation preserves periodic density" begin
     B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
-    A = pair_contraction(B0)
+    A = contract_pairs(B0)
     mpsB = initial_approximation(A, SVDAnsatz(; trunc=TruncationStrategy()))
 
     @test length(mpsB) == 4

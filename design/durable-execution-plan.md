@@ -207,12 +207,12 @@ end
 ```
 
 Add `identity::SplitProblemIdentity` to `SplitSnapshot`. Capture it from
-`run.context.mpsA` and `run.algorithm` in `snapshot(run)`; validate it before
-copying `saved.mpsB` or rebuilding a `SplitContext` in `restore_run`.
+`run.context.target` and `run.algorithm` in `snapshot(run)`; validate it before
+copying `saved.approximation` or rebuilding a `SplitContext` in `restore_run`.
 
 ### Identity Contract
 
-Introduce a private `_split_problem_identity(mpsA, algorithm)` helper with
+Introduce a private `_split_problem_identity(target, algorithm)` helper with
 these requirements:
 
 1. It records the target tensor codomains and domains explicitly.
@@ -225,14 +225,14 @@ these requirements:
    addresses.
 
 The supported configuration graph is the existing split ansatz, sweep, solver,
-canonicalization, and dense/truncated transfer-policy values. These immutable
+projector gauge fixing, and dense/truncated transfer-policy values. These immutable
 configuration types inherit `AbstractAlgorithmConfig`, which defines `==`,
 `isequal`, and `hash` from their concrete type and fields. Checkpoint code must
 not implement a second reflection-based equality protocol.
 
 ### Restore Semantics
 
-`restore_run(saved, mpsA, algorithm)` must:
+`restore_run(saved, target, algorithm)` must:
 
 1. retain the existing MPS-length and sweep-domain checks for useful diagnostics;
 2. compare the supplied target spaces and algorithm to `saved.identity`;
@@ -242,7 +242,7 @@ not implement a second reflection-based equality protocol.
 
 This does not make a mutable caller-owned target MPS safe to modify while a
 run is active. The existing API treats it as immutable input. Document that
-callers must not mutate `mpsA` or `algorithm` after `initialize_run`.
+callers must not mutate `target` or `algorithm` after `initialize_run`.
 
 ### Checkpoint Compatibility
 

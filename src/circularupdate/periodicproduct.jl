@@ -38,7 +38,7 @@ range_product(v::AbstractPeriodicProduct, r::AbstractUnitRange) =
 #
 #   site — the position to update
 #   D    — the scan direction, encoded in the state type
-#   n    — completed period count (for stop-check against maximal_sweep)
+#   completed_sweeps — completed period count
 # ------------------------------------------------------------------------------
 
 abstract type SweepDirection end
@@ -47,5 +47,5 @@ struct Backward <: SweepDirection end
 
 struct SweepState{D<:SweepDirection}
     site::Int
-    n::Int
+    completed_sweeps::Int
 end

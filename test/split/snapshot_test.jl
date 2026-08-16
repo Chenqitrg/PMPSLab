@@ -2,8 +2,8 @@
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
     )
     run = initialize_run(mpsA, algorithm)
     step!(run)
@@ -11,24 +11,24 @@
 
     saved = snapshot(run)
     @test saved isa SplitSnapshot
-    @test saved.mpsB !== run.context.mpsB
-    @test parent(saved.mpsB) !== parent(run.context.mpsB)
-    @test all(saved.mpsB[i] !== run.context.mpsB[i] for i in eachindex(saved.mpsB))
+    @test saved.approximation !== run.context.approximation
+    @test parent(saved.approximation) !== parent(run.context.approximation)
+    @test all(saved.approximation[i] !== run.context.approximation[i] for i in eachindex(saved.approximation))
     @test saved.pending_iteration == run.pending_iteration
     @test saved.log !== run.log
     @test saved.log.site_logs !== run.log.site_logs
     @test saved.log.site_logs == run.log.site_logs
-    @test saved.log.sweep_time == run.log.sweep_time
+    @test saved.log.duration == run.log.duration
     @test saved.measurement_results !== run.measurement_results
     @test collect(saved.measurement_results) == collect(run.measurement_results)
 
-    saved_next_tensor = copy(saved.mpsB[2])
+    saved_next_tensor = copy(saved.approximation[2])
     step!(run)
     @test saved.pending_iteration != run.pending_iteration
     @test length(saved.log.site_logs) == 1
     @test length(run.log.site_logs) == 2
     @test length(saved.measurement_results) == 1
-    @test saved.mpsB[2] == saved_next_tensor
+    @test saved.approximation[2] == saved_next_tensor
 
     while !isfinished(run)
         step!(run)
@@ -39,24 +39,24 @@
 end
 
 @testset "SplitSnapshot — restores one mid-sweep boundary" begin
-    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
+    mpsA = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
     )
     uninterrupted = initialize_run(mpsA, algorithm)
     step!(uninterrupted)
     step!(uninterrupted)
 
     saved = snapshot(uninterrupted)
-    saved_tensor = copy(saved.mpsB[3])
+    saved_tensor = copy(saved.approximation[3])
     restored = restore_run(saved, mpsA, algorithm)
 
     @test restored !== uninterrupted
-    @test restored.context.mpsB !== saved.mpsB
-    @test all(restored.context.mpsB[i] !== saved.mpsB[i]
-              for i in eachindex(saved.mpsB))
+    @test restored.context.approximation !== saved.approximation
+    @test all(restored.context.approximation[i] !== saved.approximation[i]
+              for i in eachindex(saved.approximation))
     @test restored.log !== saved.log
     @test restored.log.site_logs !== saved.log.site_logs
     @test restored.log.site_logs == saved.log.site_logs
@@ -76,9 +76,9 @@ end
     restored_mps = restored_result.mps
     restored_log = restored_result.log
     @test dense(restored_mps) ≈ dense(expected_mps) rtol=1e-12
-    @test getfield.(restored_log.site_logs, :error) ≈
-          getfield.(expected_log.site_logs, :error)
-    @test saved.mpsB[3] == saved_tensor
+    @test getfield.(restored_log.site_logs, :cost) ≈
+          getfield.(expected_log.site_logs, :cost)
+    @test saved.approximation[3] == saved_tensor
     @test length(saved.log.site_logs) == 2
 end
 
@@ -92,13 +92,13 @@ end
     end
 
     for sweep in (
-            CircularSweep(; N=4, maximal_sweep=2),
-            ZigzagSweep(; N=4, maximal_sweep=2),
+            CircularSweep(; site_count=4, max_sweeps=2),
+            ZigzagSweep(; site_count=4, max_sweeps=2),
         )
         algorithm = ALSSplit(;
             ansatz=SVDAnsatz(),
             sweep,
-            solve=CholeskySolve(),
+            solver=CholeskySolve(),
         )
         for completed_steps in 0:length(sweep)
             uninterrupted = initialize_run(mpsA, algorithm)
@@ -115,8 +115,8 @@ end
             restored_log = restored_result.log
 
             @test dense(restored_mps) ≈ dense(expected_mps) rtol=1e-12
-            @test getfield.(restored_log.site_logs, :error) ≈
-                  getfield.(expected_log.site_logs, :error)
+            @test getfield.(restored_log.site_logs, :cost) ≈
+                  getfield.(expected_log.site_logs, :cost)
             @test length(restored_log.site_logs) == length(sweep)
         end
     end
@@ -126,8 +126,8 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=2),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=2),
+        solver=CholeskySolve(),
     )
     run = initialize_run(mpsA, algorithm)
     for _ in 1:3
@@ -136,7 +136,7 @@ end
     saved = snapshot(run)
 
     bad_cursor = SplitSnapshot(
-        saved.mpsB,
+        saved.approximation,
         iterate(algorithm.sweep),
         saved.log,
         saved.measurement_results,
@@ -146,15 +146,15 @@ end
 
     wrong_sweep = ALSSplit(;
         ansatz=algorithm.ansatz,
-        sweep=ZigzagSweep(; N=4, maximal_sweep=2),
-        solve=algorithm.solve,
+        sweep=ZigzagSweep(; site_count=4, max_sweeps=2),
+        solver=algorithm.solver,
     )
     @test_throws ArgumentError restore_run(saved, mpsA, wrong_sweep)
 
     wrong_domain = ALSSplit(;
         ansatz=algorithm.ansatz,
-        sweep=CircularSweep(; N=1, maximal_sweep=2),
-        solve=algorithm.solve,
+        sweep=CircularSweep(; site_count=1, max_sweeps=2),
+        solver=algorithm.solver,
     )
     @test_throws DimensionMismatch restore_run(saved, mpsA, wrong_domain)
 end
@@ -163,8 +163,8 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
     )
     saved = snapshot(initialize_run(mpsA, algorithm))
 
@@ -177,14 +177,14 @@ end
     different_solver = ALSSplit(;
         ansatz=algorithm.ansatz,
         sweep=algorithm.sweep,
-        solve=LUSolve(),
+        solver=LUSolve(),
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_solver)
 
     different_ansatz = ALSSplit(;
-        ansatz=OneAnsatz(; virtual_space=fill(Z2Space(0 => 1), 4)),
+        ansatz=OneAnsatz(; virtual_spaces=fill(Z2Space(0 => 1), 4)),
         sweep=algorithm.sweep,
-        solve=algorithm.solve,
+        solver=algorithm.solver,
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_ansatz)
 
@@ -192,9 +192,9 @@ end
     different_environments = ALSSplit(;
         ansatz=algorithm.ansatz,
         sweep=algorithm.sweep,
-        solve=algorithm.solve,
+        solver=algorithm.solver,
         environments=SplitEnvironmentPolicy(;
-            norm=truncated,
+            normal=truncated,
             mixed=truncated,
         ),
     )
@@ -203,7 +203,7 @@ end
     different_stopping = ALSSplit(;
         ansatz=algorithm.ansatz,
         sweep=algorithm.sweep,
-        solve=algorithm.solve,
+        solver=algorithm.solver,
         stopping=CostConvergence(),
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_stopping)
@@ -212,9 +212,9 @@ end
     physical_space = Z2Space(0 => 2)
     graded_target = rand(PeriodicMPS, ComplexF64, 2, physical_space ⊗ physical_space, virtual_space)
     random_algorithm = ALSSplit(;
-        ansatz=RandomAnsatz(; virtual_space=fill(virtual_space, 4)),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=LUSolve(),
+        ansatz=RandomAnsatz(; virtual_spaces=fill(virtual_space, 4)),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=LUSolve(),
     )
     random_saved = snapshot(initialize_run(graded_target, random_algorithm))
     @test_nowarn restore_run(

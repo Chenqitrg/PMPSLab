@@ -121,26 +121,26 @@ function should_stop(
     isempty(site_logs) && return false
 
     latest = last(site_logs)
-    latest.state.n + 1 >= criterion.min_sweeps || return false
-    isfinite(latest.error) || return false
-    abs(latest.error) < criterion.atol || return false
+    latest.state.completed_sweeps + 1 >= criterion.min_sweeps || return false
+    isfinite(latest.cost) || return false
+    abs(latest.cost) < criterion.atol || return false
 
     previous = nothing
     for index in (length(site_logs) - 1):-1:1
         candidate = site_logs[index]
-        candidate.state.n == latest.state.n && continue
-        candidate.state.n == latest.state.n - 1 || return false
+        candidate.state.completed_sweeps == latest.state.completed_sweeps && continue
+        candidate.state.completed_sweeps == latest.state.completed_sweeps - 1 || return false
         previous = candidate
         break
     end
     isnothing(previous) && return false
-    isfinite(previous.error) || return false
+    isfinite(previous.cost) || return false
 
-    difference = abs(latest.error - previous.error)
-    relative_change = iszero(previous.error) ?
-        (iszero(difference) ? 0.0 : Inf) :
-        difference / abs(previous.error)
-    return relative_change < criterion.rtol
+    cost_change = abs(latest.cost - previous.cost)
+    relative_cost_change = iszero(previous.cost) ?
+        (iszero(cost_change) ? 0.0 : Inf) :
+        cost_change / abs(previous.cost)
+    return relative_cost_change < criterion.rtol
 end
 
 function should_stop(
@@ -150,18 +150,18 @@ function should_stop(
     isempty(site_logs) && return false
 
     latest = last(site_logs)
-    latest.state.n + 1 >= criterion.min_sweeps || return false
+    latest.state.completed_sweeps + 1 >= criterion.min_sweeps || return false
 
     comparisons = 0
-    latest_sweep = latest.state.n
+    latest_sweep = latest.state.completed_sweeps
     for index in (length(site_logs) - 1):-1:1
         earlier = site_logs[index]
-        earlier.state.n == latest_sweep && continue
-        earlier.state.n == latest_sweep - 1 || return false
-        isfinite(earlier.error) && isfinite(latest.error) || return false
+        earlier.state.completed_sweeps == latest_sweep && continue
+        earlier.state.completed_sweeps == latest_sweep - 1 || return false
+        isfinite(earlier.cost) && isfinite(latest.cost) || return false
         isapprox(
-            earlier.error,
-            latest.error;
+            earlier.cost,
+            latest.cost;
             atol=criterion.atol,
             rtol=criterion.rtol,
         ) || return false
@@ -169,7 +169,7 @@ function should_stop(
         comparisons += 1
         comparisons == criterion.consecutive_sweeps && return true
         latest = earlier
-        latest_sweep = earlier.state.n
+        latest_sweep = earlier.state.completed_sweeps
     end
     return false
 end

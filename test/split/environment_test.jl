@@ -2,12 +2,12 @@ function test_factored_split_environments(mpsA, mpsB)
     ctx = SplitContext(mpsA, mpsB)
 
     for site in (1, 2)
-        pa = pa_from_pb(site)
-        x = transpose(this_B(ctx, site), ((2,), (1, 3)))
-        A = this_A(ctx, site)
-        other_Bᴴ = other_B(ctx, site)'
+        pa = target_site_for(site)
+        x = transpose(current_approximation(ctx, site), ((2,), (1, 3)))
+        A = target_tensor(ctx, site)
+        paired_approximationᴴ = paired_approximation(ctx, site)'
 
-        dense_BB = environment(ctx.cacheBB, site)
+        dense_BB = environment(ctx.normal_cache, site)
         truncated_BB = TruncatedTransferMatrix(
             dense_BB, TruncationStrategy()
         )
@@ -15,12 +15,12 @@ function test_factored_split_environments(mpsA, mpsB)
         @test PMPSLab._split_norm_action(x, truncated_BB) ≈
               expected_action rtol=1e-12
 
-        dense_AB = environment(ctx.cacheAB, pa)
+        dense_AB = environment(ctx.mixed_cache, pa)
         truncated_AB = TruncatedTransferMatrix(
             dense_AB, TruncationStrategy()
         )
-        expected_rhs = PMPSLab._split_rhs(dense_AB, A, other_Bᴴ, site)
-        @test PMPSLab._split_rhs(truncated_AB, A, other_Bᴴ, site) ≈
+        expected_rhs = PMPSLab._split_rhs(dense_AB, A, paired_approximationᴴ, site)
+        @test PMPSLab._split_rhs(truncated_AB, A, paired_approximationᴴ, site) ≈
               expected_rhs rtol=1e-12
     end
     return nothing
@@ -28,7 +28,7 @@ end
 
 @testset "split environments — truncated factored contractions" begin
     mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
-    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
+    mpsA = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     test_factored_split_environments(mpsA, mpsB)
 end
 
@@ -36,29 +36,29 @@ end
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
     mpsB = rand(PeriodicMPS, ComplexF64, 4, P, V)
-    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, P, V))
+    mpsA = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, P, V))
     test_factored_split_environments(mpsA, mpsB)
 end
 
-@testset "split environments — truncated Krylov solve" begin
+@testset "split environments — truncated Krylov solver" begin
     mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
-    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
+    mpsA = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, 2, 2))
     ctx = SplitContext(mpsA, mpsB)
     site = 1
-    pa = pa_from_pb(site)
+    pa = target_site_for(site)
 
-    dense_BB = environment(ctx.cacheBB, site)
+    dense_BB = environment(ctx.normal_cache, site)
     truncated_BB = TruncatedTransferMatrix(dense_BB, TruncationStrategy())
-    dense_AB = environment(ctx.cacheAB, pa)
+    dense_AB = environment(ctx.mixed_cache, pa)
     truncated_AB = TruncatedTransferMatrix(dense_AB, TruncationStrategy())
-    x0 = transpose(this_B(ctx, site), ((2,), (1, 3)))
+    x0 = transpose(current_approximation(ctx, site), ((2,), (1, 3)))
     W = PMPSLab._split_rhs(
-        truncated_AB, this_A(ctx, site), other_B(ctx, site)', site
+        truncated_AB, target_tensor(ctx, site), paired_approximation(ctx, site)', site
     )
-    solve = KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12))
+    solver = KrylovSolve(; algorithm=GMRES(; maxiter=100, tol=1e-12))
 
-    expected = PMPSLab._solve_split_norm(solve, x0, dense_BB, W)
-    actual = PMPSLab._solve_split_norm(solve, x0, truncated_BB, W)
+    expected = PMPSLab._solve_split_norm(solver, x0, dense_BB, W)
+    actual = PMPSLab._solve_split_norm(solver, x0, truncated_BB, W)
     @test actual ≈ expected rtol=1e-10
 
     direct_expected = PMPSLab._solve_split_norm(

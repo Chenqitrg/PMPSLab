@@ -25,12 +25,12 @@ struct LDLTSolve <: DenseSolve end
 struct CholeskySolve <: DenseSolve end
 
 """
-    KrylovSolve(; alg)
+    KrylovSolve(; algorithm)
 
 Use the supplied KrylovKit linear-solve algorithm for local split updates.
 """
 @kwdef struct KrylovSolve{A} <: AbstractSolve
-    alg::A   # e.g. GMRES(; maxiter=250, krylovdim=128, tol=1.0e-10)
+    algorithm::A   # e.g. GMRES(; maxiter=250, krylovdim=128, tol=1.0e-10)
 end
 
 # ---------------------------------------------------------------------------
@@ -71,9 +71,9 @@ ldiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTen
 # Krylov solver — delegates to KrylovKit.linsolve
 # ---------------------------------------------------------------------------
 
-function ldiv(sol::KrylovSolve, x0::AbstractTensorMap, A::AbstractTensorMap,
+function ldiv(solver::KrylovSolve, x0::AbstractTensorMap, A::AbstractTensorMap,
               b::AbstractTensorMap)
-    x, info = linsolve(x -> A * x, b, x0, sol.alg)
+    x, info = linsolve(x -> A * x, b, x0, solver.algorithm)
     iszero(info.converged) && @warn "Krylov linsolve did not converge."
     return x
 end
@@ -116,21 +116,21 @@ rdiv(::CholeskySolve, x::AbstractTensorMap, A::AbstractTensorMap, b::AbstractTen
     x + rdiv(CholeskySolve(), A, b - x * A; uplo=uplo)
 
 function rdiv(
-        sol::KrylovSolve,
+        solver::KrylovSolve,
         x0::AbstractTensorMap,
         action::Function,
         b::AbstractTensorMap,
     )
-    x, info = linsolve(action, b, x0, sol.alg)
+    x, info = linsolve(action, b, x0, solver.algorithm)
     iszero(info.converged) && @warn "Krylov linsolve did not converge."
     return x
 end
 
 function rdiv(
-        sol::KrylovSolve,
+        solver::KrylovSolve,
         x0::AbstractTensorMap,
         A::AbstractTensorMap,
         b::AbstractTensorMap,
     )
-    return rdiv(sol, x0, x -> x * A, b)
+    return rdiv(solver, x0, x -> x * A, b)
 end

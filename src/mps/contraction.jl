@@ -43,13 +43,13 @@ function dense(
 end
 
 """
-    pair_contraction(mps::PeriodicMPS, start_site=1) -> PeriodicMPS
+    contract_pairs(mps::PeriodicMPS, start_site=1) -> PeriodicMPS
 
 Coarse-grain `mps` by contracting adjacent pairs, beginning with
 `(start_site, start_site + 1)` and advancing by two sites around the period.
 Thus `start_site=1` contracts `(1,2), (3,4), …`, while `start_site=2`
 contracts `(2,3), (4,5), …, (N,1)`. Each pair `(T_i, T_{i+1})` becomes one
-two-site tensor
+two-physical-leg tensor
 
     T_k' : L_i ⊗ P_i ⊗ P_{i+1} ← R_{i+1}
 
@@ -57,7 +57,7 @@ summing over the shared virtual leg. The result contains `N/2` tensors and
 requires even `N`. Site indices are periodic, and the output physical-leg
 order begins at `start_site`.
 """
-function pair_contraction(
+function contract_pairs(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
         start_site::Integer = 1,
     ) where {E,S}
@@ -73,6 +73,11 @@ function pair_contraction(
         for k in 1:(N ÷ 2)
     ]
     return PeriodicMPS(paired)
+end
+
+function pair_contraction(mps::PeriodicMPS, start_site::Integer=1)
+    Base.depwarn("use contract_pairs(mps, start_site)", :pair_contraction)
+    return contract_pairs(mps, start_site)
 end
 
 function _pair_contract(

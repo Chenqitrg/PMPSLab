@@ -1,4 +1,4 @@
-@testset "DenseTransferMatrix — 1-site ket constructor" begin
+@testset "DenseTransferMatrix — single-physical-leg ket" begin
     D, d = 3, 2
     T = randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)
     E = DenseTransferMatrix(T)
@@ -61,7 +61,7 @@ end
           TransferMatrix(tensor, tensor) * bond_tensor
 end
 
-@testset "DenseTransferMatrix — 2-site ket constructor" begin
+@testset "DenseTransferMatrix — two-physical-leg ket" begin
     D, d = 3, 2
     T = randn(ComplexF64, ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D)
     E = DenseTransferMatrix(T)
@@ -74,7 +74,7 @@ end
     @test E ≈ manual
 end
 
-@testset "transfer constructors — mixed 2-site/1-site tensors" begin
+@testset "transfer constructors — mixed target/approximation tensors" begin
     D, d = 3, 2
     A = randn(ComplexF64, ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D)
     B1 = randn(ComplexF64, ℂ^D ⊗ ℂ^d, ℂ^D)

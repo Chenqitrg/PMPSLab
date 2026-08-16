@@ -2,26 +2,26 @@
 # Projector-based periodic gauge fixing
 # ------------------------------------------------------------------------------
 
-abstract type AbstractPeriodicCanonical <: AbstractAlgorithmConfig end
+abstract type AbstractGaugeFix <: AbstractAlgorithmConfig end
 
 """
-    ProjectorCanonical(;
+    ProjectorGaugeFix(;
         tol=1e-12,
         maxiter=100,
         trunc=TruncationStrategy(),
-        alg_orth=MPSKit.Defaults.alg_orth(),
+        orthogonalization_algorithm=MPSKit.Defaults.alg_orth(),
     )
 
 Configure periodic left/right canonicalization and the truncation used to
 construct the resulting bond projectors.
 """
-@kwdef struct ProjectorCanonical{
+@kwdef struct ProjectorGaugeFix{
         T<:TruncationStrategy, O
-    } <: AbstractPeriodicCanonical
+    } <: AbstractGaugeFix
     tol::Float64 = 1e-12
     maxiter::Int = 100
     trunc::T = TruncationStrategy()
-    alg_orth::O = MPSKit.Defaults.alg_orth()
+    orthogonalization_algorithm::O = MPSKit.Defaults.alg_orth()
 end
 
 # Tensor-layout helpers supporting any number of physical output legs.
@@ -34,13 +34,15 @@ _projector_mul_front(
     ) where {E,S,N} =
     _projector_front(C * _projector_tail(A))
 
-_left_algorithm(alg::ProjectorCanonical) = MPSKit.LeftCanonical(;
-    alg.tol, alg.maxiter, verbosity = MPSKit.VERBOSE_NONE,
-    alg.alg_orth, eig_miniter = typemax(Int)
+_left_algorithm(algorithm::ProjectorGaugeFix) = MPSKit.LeftCanonical(;
+    algorithm.tol, algorithm.maxiter, verbosity = MPSKit.VERBOSE_NONE,
+    alg_orth=algorithm.orthogonalization_algorithm,
+    eig_miniter=typemax(Int),
 )
-_right_algorithm(alg::ProjectorCanonical) = MPSKit.RightCanonical(;
-    alg.tol, alg.maxiter, verbosity = MPSKit.VERBOSE_NONE,
-    alg.alg_orth, eig_miniter = typemax(Int)
+_right_algorithm(algorithm::ProjectorGaugeFix) = MPSKit.RightCanonical(;
+    algorithm.tol, algorithm.maxiter, verbosity = MPSKit.VERBOSE_NONE,
+    alg_orth=algorithm.orthogonalization_algorithm,
+    eig_miniter=typemax(Int),
 )
 
 function _gauge_seed(
@@ -51,7 +53,7 @@ end
 
 function _mpskit_gauges(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}},
-        alg::ProjectorCanonical
+        algorithm::ProjectorGaugeFix,
     ) where {E,S,N}
     A = parent(mps)
     Aorth = similar.(A)
@@ -59,13 +61,13 @@ function _mpskit_gauges(
 
     L = similar(A, typeof(seed))
     MPSKit.uniform_leftorth!(
-        (Aorth, L), A, seed, _left_algorithm(alg)
+        (Aorth, L), A, seed, _left_algorithm(algorithm)
     )
     foreach(normalize!, L)
 
     R = similar(A, typeof(seed))
     MPSKit.uniform_rightorth!(
-        (Aorth, R), A, seed, _right_algorithm(alg)
+        (Aorth, R), A, seed, _right_algorithm(algorithm)
     )
     foreach(normalize!, R)
 
@@ -106,7 +108,7 @@ function P_decomp(
 end
 
 """
-    find_projectors(mps, alg) -> (PR, PL)
+    find_projectors(mps, algorithm) -> (PR, PL)
 
 Run MPSKit's left and right periodic gauge solvers directly on the read-only
 `mps.tensors` container. A single internal orthogonal-tensor buffer is reused
@@ -117,14 +119,14 @@ use `gaugefix!` when exact structural cleanup may be required.
 """
 function find_projectors(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}},
-        alg::ProjectorCanonical
+        algorithm::ProjectorGaugeFix,
     ) where {E,S,N}
     _require_structurally_fullrank(mps)
-    L, R = _mpskit_gauges(mps, alg)
+    L, R = _mpskit_gauges(mps, algorithm)
 
     projectors = map(eachindex(mps)) do bond
         pos = half(2bond + 1)
-        P_decomp(R[pos], L[pos], alg.trunc)
+        P_decomp(R[pos], L[pos], algorithm.trunc)
     end
     return HalfPeriodicVector(first.(projectors)), HalfPeriodicVector(last.(projectors))
 end

@@ -4,7 +4,7 @@ import PMPSLab
 using PMPSLab:
     PeriodicMPS,
     one_mps,
-    pair_contraction,
+    contract_pairs,
     dense,
     combine_truncation,
     DenseTransferMatrix,
@@ -26,11 +26,10 @@ using PMPSLab:
     expectation,
     squared_norm,
     squared_distance,
-    diff_norm,
     normalize,
     normalize!,
     gaugefix!,
-    ProjectorCanonical
+    ProjectorGaugeFix
 using TensorKit
 import MatrixAlgebraKit
 using MPSKit: AbstractTransferMatrix, PeriodicVector, TransferMatrix,

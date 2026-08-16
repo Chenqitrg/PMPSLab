@@ -27,20 +27,21 @@ function _transfer_period_length(
 end
 
 function _transfer_period_length(
-        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
-        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        target::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        approximation::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
     ) where {E,S}
-    length(mpsB) == 2 * length(mpsA) || throw(DimensionMismatch(
-        "two-site mpsA has $(length(mpsA)) sites but one-site mpsB has " *
-        "$(length(mpsB)) (expected $(2 * length(mpsA)))"
+    length(approximation) == 2 * length(target) || throw(DimensionMismatch(
+        "the target has $(length(target)) two-physical-leg tensors but the " *
+        "approximation has $(length(approximation)) single-physical-leg " *
+        "tensors (expected $(2 * length(target)))"
     ))
-    return length(mpsA)
+    return length(target)
 end
 
 _transfer_period_length(
-        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
-        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
-    ) where {E,S} = _transfer_period_length(mpsA, mpsB)
+        approximation::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        target::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+    ) where {E,S} = _transfer_period_length(target, approximation)
 
 """
     transfer_at(mps::PeriodicMPS, site::Int)
@@ -48,9 +49,10 @@ _transfer_period_length(
     transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int)
     transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int, trunc)
 
-Construct the transfer matrix at `site`. Mixed two-site/one-site MPS pairs are
-contracted over the corresponding pair of one-site tensors. Supplying `trunc`
-returns a [`TruncatedTransferMatrix`](@ref); otherwise the result is dense.
+Construct the transfer matrix at `site`. A mixed target/approximation pair is
+contracted over the two corresponding single-physical-leg approximation
+tensors. Supplying `trunc` returns a [`TruncatedTransferMatrix`](@ref);
+otherwise the result is dense.
 """
 transfer_at(mps::PeriodicMPS, site::Int) = transfer_at(mps, mps, site)
 
@@ -58,19 +60,19 @@ transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int) =
     DenseTransferMatrix(bra[site], ket[site])
 
 transfer_at(
-        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
-        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        target::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        approximation::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
         site::Int,
     ) where {E,S} = DenseTransferMatrix(
-        mpsA[site], mpsB[2site - 1], mpsB[2site]
+        target[site], approximation[2site - 1], approximation[2site]
     )
 
 transfer_at(
-        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
-        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        approximation::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        target::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
         site::Int,
     ) where {E,S} = DenseTransferMatrix(
-        mpsB[2site - 1], mpsB[2site], mpsA[site]
+        approximation[2site - 1], approximation[2site], target[site]
     )
 
 transfer_at(
@@ -87,21 +89,21 @@ transfer_at(
     ) = TruncatedTransferMatrix(bra[site], ket[site], trunc)
 
 transfer_at(
-        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
-        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        target::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        approximation::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
         site::Int,
         trunc::TruncationStrategy,
     ) where {E,S} = TruncatedTransferMatrix(
-        mpsA[site], mpsB[2site - 1], mpsB[2site], trunc
+        target[site], approximation[2site - 1], approximation[2site], trunc
     )
 
 transfer_at(
-        mpsB::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
-        mpsA::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        approximation::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},
+        target::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
         site::Int,
         trunc::TruncationStrategy,
     ) where {E,S} = TruncatedTransferMatrix(
-        mpsB[2site - 1], mpsB[2site], mpsA[site], trunc
+        approximation[2site - 1], approximation[2site], target[site], trunc
     )
 
 function PeriodicTransferMatrix(bra::PeriodicMPS, ket::PeriodicMPS)

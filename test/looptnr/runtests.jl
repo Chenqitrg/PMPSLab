@@ -1,6 +1,6 @@
 include("normalization_test.jl")
 include("interface_test.jl")
-include("coarsegrain_test.jl")
+include("coarse_grain_test.jl")
 include("run_test.jl")
 include("snapshot_test.jl")
 include("progress_test.jl")

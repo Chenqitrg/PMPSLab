@@ -17,7 +17,7 @@ function _absorb_projectors!(
 end
 
 """
-    gaugefix!(mps::PeriodicMPS, alg::ProjectorCanonical)
+    gaugefix!(mps::PeriodicMPS, algorithm::ProjectorGaugeFix)
 
 Use MPSKit's periodic left/right canonicalization to obtain normalized bond
 gauges, construct the bond projectors, and absorb them into `mps`. Modifies and
@@ -26,10 +26,14 @@ structurally incompatible virtual spaces are reduced exactly with local QR/LQ
 transformations. The internal MPSKit solvers run without native log output.
 """
 function gaugefix!(
-        mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}}, alg::ProjectorCanonical
+        mps::PeriodicMPS{<:AbstractTensorMap{E,S,N,1}},
+        algorithm::ProjectorGaugeFix,
     ) where {E,S,N}
-    MPSKit.makefullrank!(mps.tensors; alg_orth = alg.alg_orth)
+    MPSKit.makefullrank!(
+        mps.tensors;
+        alg_orth=algorithm.orthogonalization_algorithm,
+    )
     assertconsistency(mps)
-    PR_vec, PL_vec = find_projectors(mps, alg)
+    PR_vec, PL_vec = find_projectors(mps, algorithm)
     return _absorb_projectors!(mps, PR_vec, PL_vec)
 end

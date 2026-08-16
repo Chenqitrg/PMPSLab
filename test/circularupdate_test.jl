@@ -303,40 +303,40 @@ end
 
 @testset "ZigzagSweep — 往返顺序" begin
     # 1, 2, …, N, N-1, …, 2（不重复访问 1）
-    @test collect(st.site for st in ZigzagSweep(; N=4, maximal_sweep=1)) == [1, 2, 3, 4, 3, 2]
-    @test collect(st.site for st in ZigzagSweep(; N=5, maximal_sweep=1)) == [1, 2, 3, 4, 5, 4, 3, 2]
+    @test collect(st.site for st in ZigzagSweep(; site_count=4, max_sweeps=1)) == [1, 2, 3, 4, 3, 2]
+    @test collect(st.site for st in ZigzagSweep(; site_count=5, max_sweeps=1)) == [1, 2, 3, 4, 5, 4, 3, 2]
     # 掉头处状态类型由 Forward 变为 Backward
-    states = collect(ZigzagSweep(; N=4, maximal_sweep=1))
+    states = collect(ZigzagSweep(; site_count=4, max_sweeps=1))
     @test map(st -> st isa SweepState{Forward}, states) ==
           [true, true, true, false, false, false]
-    # 多趟：maximal_sweep=2 重复两趟
-    @test collect(st.site for st in ZigzagSweep(; N=3, maximal_sweep=2)) ==
+    # 多趟：max_sweeps=2 重复两趟
+    @test collect(st.site for st in ZigzagSweep(; site_count=3, max_sweeps=2)) ==
           [1, 2, 3, 2, 1, 2, 3, 2]
-    @test collect(st.site for st in ZigzagSweep(; N=2, maximal_sweep=2)) ==
+    @test collect(st.site for st in ZigzagSweep(; site_count=2, max_sweeps=2)) ==
           [1, 2, 1, 2]
 end
 
 @testset "CircularSweep — 循环与最大趟数" begin
-    cs = CircularSweep(; N=4, maximal_sweep=2)
+    cs = CircularSweep(; site_count=4, max_sweeps=2)
     @test collect(st.site for st in cs) == [1, 2, 3, 4, 1, 2, 3, 4]
     # 单向循环：状态类型恒为 Forward
-    @test all(st isa SweepState{Forward} for st in CircularSweep(; N=4, maximal_sweep=2))
+    @test all(st isa SweepState{Forward} for st in CircularSweep(; site_count=4, max_sweeps=2))
     # 一趟 N 个 site
-    @test length(collect(CircularSweep(; N=3, maximal_sweep=1))) == 3
-    @test length(collect(CircularSweep(; N=1, maximal_sweep=3))) == 3
+    @test length(collect(CircularSweep(; site_count=3, max_sweeps=1))) == 3
+    @test length(collect(CircularSweep(; site_count=1, max_sweeps=3))) == 3
 end
 
 @testset "sweep constructors validate their configuration" begin
-    @test_throws ArgumentError ZigzagSweep(; N=0, maximal_sweep=1)
-    @test_throws ArgumentError ZigzagSweep(; N=1, maximal_sweep=1)
-    @test_throws ArgumentError CircularSweep(; N=0, maximal_sweep=1)
+    @test_throws ArgumentError ZigzagSweep(; site_count=0, max_sweeps=1)
+    @test_throws ArgumentError ZigzagSweep(; site_count=1, max_sweeps=1)
+    @test_throws ArgumentError CircularSweep(; site_count=0, max_sweeps=1)
     for Sweep in (ZigzagSweep, CircularSweep)
-        @test_throws ArgumentError Sweep(; N=2, maximal_sweep=-1)
-        @test isempty(collect(Sweep(; N=2, maximal_sweep=0)))
+        @test_throws ArgumentError Sweep(; site_count=2, max_sweeps=-1)
+        @test isempty(collect(Sweep(; site_count=2, max_sweeps=0)))
     end
 end
 
 @testset "sweep domain" begin
-    @test PMPSLab.sweep_domain(CircularSweep(; N=4, maximal_sweep=2)) == Base.OneTo(4)
-    @test PMPSLab.sweep_domain(ZigzagSweep(; N=3, maximal_sweep=2)) == Base.OneTo(3)
+    @test PMPSLab.sweep_domain(CircularSweep(; site_count=4, max_sweeps=2)) == Base.OneTo(4)
+    @test PMPSLab.sweep_domain(ZigzagSweep(; site_count=3, max_sweeps=2)) == Base.OneTo(3)
 end

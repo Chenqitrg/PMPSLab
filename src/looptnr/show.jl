@@ -7,25 +7,25 @@ function _looptnr_position(
         active_split::Union{Nothing,SplitRun,SplitSnapshot},
         algorithm::LoopTNR,
     )
-    maximal_rg = algorithm.maximal_rg
+    max_rg_steps = algorithm.max_rg_steps
     if phase == TNR_INITIALIZE
-        return "RG 0/$maximal_rg normalization pending"
+        return "RG 0/$max_rg_steps normalization pending"
     elseif phase == TNR_PREPARE_SPLIT
-        return "RG $(completed_rg + 1)/$maximal_rg split pending"
+        return "RG $(completed_rg + 1)/$max_rg_steps split pending"
     elseif phase == TNR_OPTIMIZE
         active_split === nothing &&
-            return "RG $(completed_rg + 1)/$maximal_rg split pending"
+            return "RG $(completed_rg + 1)/$max_rg_steps split pending"
         pending = _split_pending_iteration(active_split)
         pending === nothing &&
-            return "RG $(completed_rg + 1)/$maximal_rg coarse graining pending"
+            return "RG $(completed_rg + 1)/$max_rg_steps coarse graining pending"
         state = first(pending)
         site_count = length(sweep_domain(algorithm.split.sweep))
-        return "RG $(completed_rg + 1)/$maximal_rg · " *
-            "split sweep $(state.n + 1) · next site $(state.site)/$site_count"
+        return "RG $(completed_rg + 1)/$max_rg_steps · " *
+            "split sweep $(state.completed_sweeps + 1) · next site $(state.site)/$site_count"
     elseif phase == TNR_COARSE_GRAIN
-        return "RG $(completed_rg + 1)/$maximal_rg coarse graining pending"
+        return "RG $(completed_rg + 1)/$max_rg_steps coarse graining pending"
     end
-    return "RG $completed_rg/$maximal_rg complete"
+    return "RG $completed_rg/$max_rg_steps complete"
 end
 
 _looptnr_position(run::LoopTNRRun) = _looptnr_position(

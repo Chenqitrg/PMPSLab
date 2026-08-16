@@ -1,5 +1,5 @@
-@testset "dense — TwoSiteMPS" begin
-    @testset "N=1 (partial trace)" begin
+@testset "dense — two-physical-leg tensors" begin
+    @testset "one tensor (partial trace)" begin
         D, d = 2, 2
         mps = rand(PeriodicMPS, ComplexF64, 1, (d, d), D)
         T = mps[1]
@@ -9,7 +9,7 @@
         @test norm(result - manual) < 1e-12
     end
 
-    @testset "N=2 vs manual @plansor" begin
+    @testset "two tensors vs manual @plansor" begin
         D, d = 2, 2
         mps = rand(PeriodicMPS, ComplexF64, 2, (d, d), D)
         result = dense(mps)
@@ -19,7 +19,7 @@
         @test norm(result - manual) < 1e-12
     end
 
-    @testset "Z2Irrep N=2 vs manual @plansor" begin
+    @testset "Z2Irrep, two tensors vs manual @plansor" begin
         V = Z2Space(0 => 3, 1 => 2)
         P = Z2Space(0 => 2)
         mps = rand(PeriodicMPS, ComplexF64, 2, P ⊗ P, V)

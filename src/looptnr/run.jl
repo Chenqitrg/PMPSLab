@@ -91,7 +91,7 @@ function _initialize_tnr_step(run::LoopTNRRun)
     push!(run.log.rg_logs, rg_log)
     push!(run.measurement_results, measurement_result)
     run.completed_rg = 0
-    run.phase = run.algorithm.maximal_rg == 0 ?
+    run.phase = run.algorithm.max_rg_steps == 0 ?
         TNR_FINISHED : TNR_PREPARE_SPLIT
     return LoopTNRCoarseGrained(0, rg_log, measurement_result)
 end
@@ -139,7 +139,7 @@ function _coarse_grain_tnr_step!(
     started_at = time()
     coarse = _coarse_grain(split_result.mps)
     candidate = PlaquetteGates(coarse)
-    coarse_grain_time = time() - started_at
+    coarse_grain_duration = time() - started_at
     assertconsistency(candidate)
 
     normalization_result = normalize!(
@@ -152,14 +152,14 @@ function _coarse_grain_tnr_step!(
     measurement_result = TNRMeasurementResult(
         rg, normalization_result, fixed_point_result
     )
-    rg_log = RGLog(rg, split_result.log, coarse_grain_time)
+    rg_log = RGLog(rg, split_result.log, coarse_grain_duration)
 
     run.cell = candidate
     push!(run.log.rg_logs, rg_log)
     push!(run.measurement_results, measurement_result)
     run.completed_rg = rg
     run.active_split = nothing
-    run.phase = rg == run.algorithm.maximal_rg ?
+    run.phase = rg == run.algorithm.max_rg_steps ?
         TNR_FINISHED : TNR_PREPARE_SPLIT
     return LoopTNRCoarseGrained(rg, rg_log, measurement_result)
 end

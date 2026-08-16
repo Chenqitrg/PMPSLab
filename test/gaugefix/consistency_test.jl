@@ -23,7 +23,7 @@
     @test assertconsistency(one_mps(ComplexF64, 3, P, V)) === nothing
 end
 
-@testset "multi-leg rand / one_mps2" begin
+@testset "multi-physical-leg rand / one_mps" begin
     mps = rand(PeriodicMPS, ComplexF64, 4, (2, 2), 3)
     @test length(mps) == 4
     @test assertconsistency(mps) === nothing
@@ -34,12 +34,12 @@ end
     @test codomain(mps[1])[3] == ℂ^2           # physical ℂ^d (site b)
     @test domain(mps[1])[1] == ℂ^3
 
-    # deterministic: one_mps2 is the uniform all-ones two-site MPS
-    mps_a = one_mps2(ComplexF64, 3, 2, 2)
-    mps_b = one_mps2(ComplexF64, 3, 2, 2)
+    # deterministic: one_mps is the uniform all-ones two-physical-leg MPS
+    mps_a = one_mps(ComplexF64, 3, (2, 2), 2)
+    mps_b = one_mps(ComplexF64, 3, (2, 2), 2)
     @test all(mps_a[i] ≈ mps_b[i] for i in 1:3)
-    @test assertconsistency(one_mps2(Float64, 4, 2, 2)) === nothing
-    @test scalartype(one_mps2(Float64, 4, 2, 2)[1]) == Float64
+    @test assertconsistency(one_mps(Float64, 4, (2, 2), 2)) === nothing
+    @test scalartype(one_mps(Float64, 4, (2, 2), 2)[1]) == Float64
 
     # graded spaces
     V = Z2Space(0 => 2, 1 => 2)
@@ -47,7 +47,7 @@ end
     mps_g = rand(PeriodicMPS, ComplexF64, 3, P ⊗ P, V)
     @test length(mps_g) == 3
     @test assertconsistency(mps_g) === nothing
-    @test assertconsistency(one_mps2(ComplexF64, 3, P, V)) === nothing
+    @test assertconsistency(one_mps(ComplexF64, 3, P ⊗ P, V)) === nothing
 end
 
 @testset "assertconsistency — valid and invalid" begin

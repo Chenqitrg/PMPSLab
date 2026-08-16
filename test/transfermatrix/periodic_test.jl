@@ -112,10 +112,10 @@ end
     @test_throws DimensionMismatch isapprox(bra, ket)
 end
 
-@testset "PeriodicTransferMatrix — mixed 2-site/1-site construction" begin
+@testset "PeriodicTransferMatrix — mixed target/approximation construction" begin
     D, d = 2, 2
     mpsB = rand(PeriodicMPS, ComplexF64, 4, d, D)
-    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, d, D))
+    mpsA = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, d, D))
     ptm = PeriodicTransferMatrix(mpsA, mpsB)
 
     @test length(ptm) == 2
@@ -194,7 +194,7 @@ end
     D, d = 2, 2
     trunc = truncrank(2)
     mpsB = rand(PeriodicMPS, ComplexF64, 4, d, D)
-    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, d, D))
+    mpsA = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, d, D))
 
     ab = PeriodicTransferMatrix(mpsA, mpsB, trunc)
     ba = PeriodicTransferMatrix(mpsB, mpsA, trunc)
@@ -225,7 +225,7 @@ end
     @test dense(cache.left[3]) ≈ dense(ptm[1] * ptm[2])
 end
 
-@testset "full-period product and expectation — 1-site" begin
+@testset "full-period product and expectation — single physical leg" begin
     N, d, D = 3, 2, 2
     mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     ptm = PeriodicTransferMatrix(mps)
@@ -248,7 +248,7 @@ end
     @test expectation(mps) ≈ expectation(ptm)
 end
 
-@testset "full-period product and expectation — 2-site MPS" begin
+@testset "full-period product and expectation — two physical legs" begin
     N, d, D = 2, 2, 2
     mps = rand(PeriodicMPS, ComplexF64, N, (d, d), D)
     ptm = PeriodicTransferMatrix(mps)
@@ -259,10 +259,10 @@ end
     @test *(ptm) ≈ ptm[1] * ptm[2]
 end
 
-@testset "expectation — mixed 2-site bra / 1-site ket" begin
+@testset "expectation — mixed target bra / approximation ket" begin
     D, d = 2, 2
     mpsB = rand(PeriodicMPS, ComplexF64, 4, d, D)
-    mpsA = pair_contraction(rand(PeriodicMPS, ComplexF64, 4, d, D))
+    mpsA = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, d, D))
     ptm = PeriodicTransferMatrix(mpsA, mpsB)
 
     @test expectation(ptm) ≈ overlap(mpsA, mpsB)

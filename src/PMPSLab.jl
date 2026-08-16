@@ -45,14 +45,16 @@ export AbstractStoppingCriterion, NoStopping, CostTolerance, CostConvergence
 export should_stop
 
 # Periodic MPS containers and operations
-export PeriodicMPS, HalfInt, HalfPeriodicVector, physicalspaces
-export assertconsistency, dense, pair_contraction
+export PeriodicMPS, HalfInt, HalfPeriodicVector
+export eachsite, virtualspace, virtualspaces, physicalspace, physicalspaces
+export left_virtualspace, right_virtualspace
+export assertconsistency, dense, contract_pairs
 export map_tensors, mul_left_virtual, mul_right_virtual, insert_gauge!, standardize
-export squared_norm, squared_distance, diff_norm, expectation
+export squared_norm, squared_distance, expectation
 export normalize, normalize!
 
 # Canonicalization
-export AbstractPeriodicCanonical, ProjectorCanonical
+export AbstractGaugeFix, ProjectorGaugeFix
 export gaugefix!
 
 # ALS split
@@ -84,7 +86,7 @@ export invalidate!, advance!, rebuild_left!, rebuild_right!, rebuild!
 export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 
 # Constructors and examples
-export one_mps, one_mps2, random_cdl, random_cdl_mps, lift
+export one_mps, random_cdl, random_cdl_mps, lift
 
 include("algorithm_config.jl")
 include("setconfig.jl")
@@ -123,8 +125,8 @@ include("transfermatrix/periodic.jl")
 include("transfermatrix/show.jl")
 include("transfermatrix/policy.jl")
 include("transfermatrix/distance.jl")
-include("canonicalize/projector.jl")
-include("canonicalize/interface.jl")
+include("gaugefix/projector.jl")
+include("gaugefix/interface.jl")
 include("split/stopping.jl")
 include("split/interface.jl")
 include("split/ansatz.jl")
@@ -138,7 +140,7 @@ include("split/run.jl")
 include("split/progress.jl")
 include("looptnr/interface.jl")
 include("looptnr/logs.jl")
-include("looptnr/coarsegrain.jl")
+include("looptnr/coarse_grain.jl")
 include("looptnr/run.jl")
 include("looptnr/snapshot.jl")
 include("looptnr/show.jl")

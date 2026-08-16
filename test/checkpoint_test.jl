@@ -23,10 +23,10 @@ function checkpoint_loop_fixture()
     gate = ones(ComplexF64, ℂ^1 ⊗ ℂ^1, ℂ^1 ⊗ ℂ^1)
     split_algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=8, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=8, max_sweeps=1),
+        solver=CholeskySolve(),
     )
-    algorithm = LoopTNR(; split=split_algorithm, maximal_rg=1)
+    algorithm = LoopTNR(; split=split_algorithm, max_rg_steps=1)
     return initialize_run(UniformGates(gate), algorithm), algorithm
 end
 
@@ -34,8 +34,8 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
         stopping=CostConvergence(; min_sweeps=2),
     )
     run = initialize_run(mpsA, algorithm)
@@ -53,7 +53,7 @@ end
         @test loaded.pending_iteration == saved.pending_iteration
         @test loaded.log.site_logs == saved.log.site_logs
         @test all(
-            loaded.mpsB[i] == saved.mpsB[i] for i in eachindex(saved.mpsB)
+            loaded.approximation[i] == saved.approximation[i] for i in eachindex(saved.approximation)
         )
 
         restored = restore_run(loaded, mpsA, algorithm)
@@ -157,8 +157,8 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
     )
     saved = snapshot(initialize_run(mpsA, algorithm))
 

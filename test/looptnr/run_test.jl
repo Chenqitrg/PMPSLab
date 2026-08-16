@@ -39,7 +39,7 @@ function rg0_cell_variants()
 end
 
 @testset "LoopTNR RG 0 — all tensor-cell variants" begin
-    algorithm = LoopTNR(; split=rg0_split(), maximal_rg=0)
+    algorithm = LoopTNR(; split=rg0_split(), max_rg_steps=0)
 
     for cell in rg0_cell_variants()
         input_before = copy.(collect(cell))
@@ -78,11 +78,11 @@ end
         @test event.result === only(result.measurement_results)
         @test event.log === only(result.log.rg_logs)
         @test event.log.split_log === nothing
-        @test event.log.coarse_grain_time == 0
+        @test event.log.coarse_grain_duration == 0
         @test fieldnames(typeof(event.log)) == (
             :rg,
             :split_log,
-            :coarse_grain_time,
+            :coarse_grain_duration,
         )
         @test isfinished(run)
         @test run.completed_rg == 0
@@ -99,7 +99,7 @@ end
 
 @testset "LoopTNR RG 0 — generic local execution" begin
     cell = UniformGates(normalization_gate())
-    run = initialize_run(cell, LoopTNR(; split=rg0_split(), maximal_rg=0))
+    run = initialize_run(cell, LoopTNR(; split=rg0_split(), max_rg_steps=0))
     session = start_run(run; observer=nothing, threaded=false)
     result = fetch(session)
 
@@ -114,7 +114,7 @@ end
         normalization=InfinityNormNormalization(),
         fixed_point=GateCountMeasurement(),
     )
-    algorithm = LoopTNR(; split=rg0_split(), maximal_rg=0, measurement)
+    algorithm = LoopTNR(; split=rg0_split(), max_rg_steps=0, measurement)
     events = AlgorithmEvent[]
 
     result = renormalize(
@@ -132,7 +132,7 @@ end
         normalization=InfinityNormNormalization(),
         fixed_point=FailingFixedPointMeasurement(),
     )
-    algorithm = LoopTNR(; split=rg0_split(), maximal_rg=0, measurement)
+    algorithm = LoopTNR(; split=rg0_split(), max_rg_steps=0, measurement)
     run = initialize_run(cell, algorithm)
     committed_before = copy.(collect(run.cell))
 
@@ -148,7 +148,7 @@ end
 @testset "LoopTNR multi-RG — zero-length split" begin
     cell = CheckerboardGates(normalization_gate(), normalization_gate())
     input_before = copy.(collect(cell))
-    algorithm = LoopTNR(; split=rg0_split(), maximal_rg=2)
+    algorithm = LoopTNR(; split=rg0_split(), max_rg_steps=2)
     events = AlgorithmEvent[]
 
     result = renormalize(
@@ -169,7 +169,7 @@ end
 end
 
 @testset "LoopTNR RG 1 — all input tensor-cell variants" begin
-    algorithm = LoopTNR(; split=rg0_split(), maximal_rg=1)
+    algorithm = LoopTNR(; split=rg0_split(), max_rg_steps=1)
 
     for cell in rg0_cell_variants()
         result = renormalize(cell, algorithm; observer=nothing)
@@ -185,10 +185,10 @@ end
     cell = UniformGates(gate)
     split_algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=8, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=8, max_sweeps=1),
+        solver=CholeskySolve(),
     )
-    run = initialize_run(cell, LoopTNR(; split=split_algorithm, maximal_rg=1))
+    run = initialize_run(cell, LoopTNR(; split=split_algorithm, max_rg_steps=1))
 
     rg0_event = step!(run)
     @test rg0_event isa LoopTNRCoarseGrained
@@ -225,7 +225,7 @@ end
     )
     run = initialize_run(
         cell,
-        LoopTNR(; split=rg0_split(), maximal_rg=1, measurement),
+        LoopTNR(; split=rg0_split(), max_rg_steps=1, measurement),
     )
     step!(run)
     committed_cell = run.cell
@@ -246,12 +246,12 @@ end
     gate = ones(ComplexF64, ℂ^1 ⊗ ℂ^1, ℂ^1 ⊗ ℂ^1)
     split_algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=8, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=8, max_sweeps=1),
+        solver=CholeskySolve(),
     )
     run = initialize_run(
         UniformGates(gate),
-        LoopTNR(; split=split_algorithm, maximal_rg=1),
+        LoopTNR(; split=split_algorithm, max_rg_steps=1),
     )
     session_ref = Ref{LocalRunSession}()
     events = AlgorithmEvent[]

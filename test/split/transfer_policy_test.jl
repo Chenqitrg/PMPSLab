@@ -5,52 +5,52 @@
         truncerror(; rtol=1.0e-13)
 
     defaults = SplitEnvironmentPolicy()
-    @test defaults.norm isa DenseTransferPolicy
+    @test defaults.normal isa DenseTransferPolicy
     @test defaults.mixed isa DenseTransferPolicy
 
     shared = SplitEnvironmentPolicy(;
-        norm=truncated_policy,
+        normal=truncated_policy,
         mixed=truncated_policy,
     )
-    @test shared.norm === truncated_policy
+    @test shared.normal === truncated_policy
     @test shared.mixed === truncated_policy
 
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
         environments=SplitEnvironmentPolicy(;
-            norm=dense_policy,
+            normal=dense_policy,
             mixed=dense_policy,
         ),
     )
-    @test algorithm.environments.norm isa DenseTransferPolicy
+    @test algorithm.environments.normal isa DenseTransferPolicy
     @test algorithm.environments.mixed isa DenseTransferPolicy
     @test dense_policy isa AbstractTransferPolicy
 end
 
 @testset "SplitContext — norm and mixed transfer policies are independent" begin
     mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
-    mpsA = pair_contraction(mpsB)
+    mpsA = contract_pairs(mpsB)
     dense_policy = DenseTransferPolicy()
     truncated_policy = TruncatedTransferPolicy(; trunc=TruncationStrategy())
 
     cases = (
-        (SplitEnvironmentPolicy(; norm=dense_policy, mixed=dense_policy),
+        (SplitEnvironmentPolicy(; normal=dense_policy, mixed=dense_policy),
          DenseTransferMatrix, DenseTransferMatrix),
-        (SplitEnvironmentPolicy(; norm=dense_policy, mixed=truncated_policy),
+        (SplitEnvironmentPolicy(; normal=dense_policy, mixed=truncated_policy),
          DenseTransferMatrix, TruncatedTransferMatrix),
-        (SplitEnvironmentPolicy(; norm=truncated_policy, mixed=dense_policy),
+        (SplitEnvironmentPolicy(; normal=truncated_policy, mixed=dense_policy),
          TruncatedTransferMatrix, DenseTransferMatrix),
-        (SplitEnvironmentPolicy(; norm=truncated_policy, mixed=truncated_policy),
+        (SplitEnvironmentPolicy(; normal=truncated_policy, mixed=truncated_policy),
          TruncatedTransferMatrix, TruncatedTransferMatrix),
     )
 
     for (environments, norm_type, mixed_type) in cases
         ctx = PMPSLab._build_split_context(mpsA, deepcopy(mpsB), environments)
         @test !hasproperty(ctx, :environments)
-        @test environment(ctx.cacheBB, 1) isa norm_type
-        @test environment(ctx.cacheAB, 1) isa mixed_type
+        @test environment(ctx.normal_cache, 1) isa norm_type
+        @test environment(ctx.mixed_cache, 1) isa mixed_type
     end
 end
 
@@ -64,7 +64,7 @@ end
     # The mixed environment only constructs W, so it may be factored while the
     # dense normal environment is handled by a direct solver.
     direct_environments = SplitEnvironmentPolicy(;
-        norm=dense_policy,
+        normal=dense_policy,
         mixed=truncated_policy,
     )
     direct_ctx = PMPSLab._build_split_context(
@@ -81,13 +81,13 @@ end
     # A factored normal environment supplies an action rather than a materialized
     # matrix and therefore composes with KrylovSolve.
     factored_environments = SplitEnvironmentPolicy(;
-        norm=truncated_policy,
+        normal=truncated_policy,
         mixed=truncated_policy,
     )
     krylov_ctx = PMPSLab._build_split_context(
         mpsA, deepcopy(mpsB), factored_environments
     )
-    krylov = KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12))
+    krylov = KrylovSolve(; algorithm=GMRES(; maxiter=100, tol=1e-12))
     _, krylov_cost = update!(
         krylov_ctx,
         krylov,
@@ -110,8 +110,8 @@ end
 
     direct_algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
         environments=factored_environments,
     )
     @test_nowarn initialize_run(mpsA, direct_algorithm)
@@ -122,24 +122,24 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     truncated = TruncatedTransferPolicy(; trunc=TruncationStrategy())
     policy = SplitEnvironmentPolicy(;
-        norm=truncated,
+        normal=truncated,
         mixed=truncated,
     )
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=2)),
-        sweep=CircularSweep(; N=4, maximal_sweep=2),
-        solve=KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12)),
+        sweep=CircularSweep(; site_count=4, max_sweeps=2),
+        solver=KrylovSolve(; algorithm=GMRES(; maxiter=100, tol=1e-12)),
         environments=policy,
     )
 
     run = initialize_run(mpsA, algorithm)
-    @test environment(run.context.cacheBB, 1) isa TruncatedTransferMatrix
-    @test environment(run.context.cacheAB, 1) isa TruncatedTransferMatrix
+    @test environment(run.context.normal_cache, 1) isa TruncatedTransferMatrix
+    @test environment(run.context.mixed_cache, 1) isa TruncatedTransferMatrix
 
     step!(run)
     run = restore_run(snapshot(run), mpsA, algorithm)
-    @test environment(run.context.cacheBB, 1) isa TruncatedTransferMatrix
-    @test environment(run.context.cacheAB, 1) isa TruncatedTransferMatrix
+    @test environment(run.context.normal_cache, 1) isa TruncatedTransferMatrix
+    @test environment(run.context.mixed_cache, 1) isa TruncatedTransferMatrix
 
     while !isfinished(run)
         step!(run)
@@ -149,5 +149,5 @@ end
     log = result.log
     @test length(mpsB) == 4
     @test length(log.site_logs) == 8
-    @test all(site_log -> isfinite(site_log.error), log.site_logs)
+    @test all(site_log -> isfinite(site_log.cost), log.site_logs)
 end

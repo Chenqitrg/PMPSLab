@@ -1,17 +1,19 @@
 # ------------------------------------------------------------------------------
-# 2-site → 1-site splitting — inverse of pair_contraction
+# Two-physical-leg → paired single-physical-leg splitting, inverse of
+# `contract_pairs`.
 # ------------------------------------------------------------------------------
 
-abstract type AbstractAnsatz <: AbstractAlgorithmConfig end   # initial ansatz for the 2-site → 1-site splitting
-abstract type AbstractSolve <: AbstractAlgorithmConfig end   # 每 site 更新规则
-abstract type AbstractSweep <: AbstractAlgorithmConfig end   # 扫描方案：Zigzag, Circular
-abstract type AbstractALSSplit <: AbstractAlgorithmConfig end  # alternating least-squares split
+abstract type AbstractAnsatz <: AbstractAlgorithmConfig end
+abstract type AbstractSolve <: AbstractAlgorithmConfig end
+abstract type AbstractSweep <: AbstractAlgorithmConfig end
+abstract type AbstractALSSplit <: AbstractAlgorithmConfig end
 
 """
-    SplitEnvironmentPolicy(; norm=DenseTransferPolicy(), mixed=DenseTransferPolicy())
+    SplitEnvironmentPolicy(; normal=DenseTransferPolicy(), mixed=DenseTransferPolicy())
 
 Choose the transfer representation independently for the split normal
-environment `⟨B|B⟩` and mixed environment `⟨B|A⟩`. Keeping these policies
+environment `⟨approximation|approximation⟩` and mixed environment
+`⟨approximation|target⟩`. Keeping these policies
 separate permits, for example, an exact normal equation with a compressed
 right-hand-side environment.
 """
@@ -19,7 +21,7 @@ right-hand-side environment.
         N<:AbstractTransferPolicy,
         M<:AbstractTransferPolicy,
     } <: AbstractAlgorithmConfig
-    norm::N = DenseTransferPolicy()
+    normal::N = DenseTransferPolicy()
     mixed::M = DenseTransferPolicy()
 end
 
@@ -27,12 +29,13 @@ end
     ALSSplit(;
         ansatz,
         sweep,
-        solve,
+        solver,
         environments=SplitEnvironmentPolicy(),
         stopping=NoStopping(),
     )
-Configure an alternating least-squares (ALS) periodic 2-to-1 split by composing
-its initial ansatz, sweep order, local solver, and normal/mixed transfer
+Configure an alternating least-squares (ALS) split from two-physical-leg target
+tensors to paired single-physical-leg approximation tensors. It composes the
+initial ansatz, sweep order, local solver, and normal/mixed transfer
 representations. An optional `stopping` criterion may end execution at a
 complete sweep boundary before the sweep iterator is exhausted.
 """
@@ -45,9 +48,10 @@ complete sweep boundary before the sweep iterator is exhausted.
     } <: AbstractALSSplit
     ansatz::A
     sweep::S
-    solve::V
+    solver::V
     environments::E = SplitEnvironmentPolicy()
     stopping::C = NoStopping()
 end
 
-# split(mps, alg) defined in run.jl — drives SplitRun to completion
+# `split(target, algorithm)` is defined in run.jl and drives `SplitRun` to
+# completion.

@@ -9,7 +9,7 @@ using PMPSLab:
     HalfInt,
     one_mps,
     random_cdl_mps,
-    pair_contraction,
+    contract_pairs,
     dense,
     assertconsistency,
     scalartype,
@@ -54,9 +54,9 @@ using PMPSLab:
     SVDAnsatz,
     PeriodicGaugeAnsatz,
     default_looptnr
-import PMPSLab: initial_approximation, split_site, diff_norm,
-                this_B, other_B, this_A, pa_from_pb, expectation,
-                ProjectorCanonical, gaugefix!
+import PMPSLab: initial_approximation, split_tensor,
+                current_approximation, paired_approximation, target_tensor, target_site_for, expectation,
+                ProjectorGaugeFix, gaugefix!
 using TensorKit
 using KrylovKit: GMRES
 using MPSKit: PeriodicVector, left_virtualspace, right_virtualspace,

@@ -12,20 +12,20 @@ end
 (`isfinite == true`), uses `PeriodicChainStyle`, and stores the tensors whose
 closed contraction defines the physical state. There is no
 `CanonicalPeriodicMPS`, `AL/AR/C` storage layer, cut closure, or finite-chain
-`canonicalize` API.
+public canonical-state API.
 
 ## Projector gauge fixing
 
 ```julia
-@kwdef struct ProjectorCanonical{T<:TruncationStrategy,O} <:
-        AbstractPeriodicCanonical
+@kwdef struct ProjectorGaugeFix{T<:TruncationStrategy,O} <:
+        AbstractGaugeFix
     tol::Float64 = 1e-12
     maxiter::Int = 100
     trunc::T = TruncationStrategy()
-    alg_orth::O = MPSKit.Defaults.alg_orth()
+    orthogonalization_algorithm::O = MPSKit.Defaults.alg_orth()
 end
 
-gaugefix!(mps, alg) -> mps
+gaugefix!(mps, algorithm) -> mps
 ```
 
 The algorithm reuses the mathematical regularization scheme of an InfiniteMPS
@@ -115,8 +115,8 @@ Paths use `/` from the root configuration to a leaf:
 
 ```julia
 updated = @setconfig algorithm begin
-    maximal_rg = 4
-    split/sweep/maximal_sweep = 60
+    max_rg_steps = 4
+    split/sweep/max_sweeps = 60
     split/stopping/atol = 1e-10
 end
 ```
@@ -125,16 +125,17 @@ Assignments are applied from top to bottom. Unmentioned branches are reused;
 the original configuration remains unchanged. Replacing a whole nested strategy
 is supported, for example `split/stopping = NoStopping()`.
 
-## 2-to-1 approximation
+## Two-physical-leg target approximation
 
 `PeriodicGaugeAnsatz` first performs its local SVD split and then calls
-`gaugefix!(mps, ProjectorCanonical(...))` in place. The later split/ALS machinery
+`gaugefix!(mps, ProjectorGaugeFix(...))` in place. The later split/ALS machinery
 continues to work exclusively with `PeriodicMPS` values.
 
 ### Split cost log and observer
 
-`split(mps, alg)` currently returns `(mpsB, log)`. Each `SiteLog.error` records
-the cheap local quantity produced by `solvenew`,
+`split(target, algorithm)` currently returns `(approximation, log)`. Each
+`SiteLog.cost` records
+the cheap local quantity produced by `_solve_local_update`,
 
 ```math
 c_{\mathrm{local}} = \operatorname{Re}
@@ -163,7 +164,7 @@ The public interface accepts an optional observer that receives each completed
 site event:
 
 ```julia
-split(mps, alg; observer = event -> println(event.log.error))
+split(target, algorithm; observer = event -> println(event.log.cost))
 ```
 
 Omitting `observer` selects the split progress observer in an interactive Julia
@@ -172,7 +173,7 @@ session and remains silent in a non-interactive script. Passing
 receives the same [`SplitSiteCompleted`](@ref) event emitted by [`step!`](@ref).
 It adds no contraction or MPS copy.
 
-The error in the last `SiteLog` is the cost after the most recent update,
+The cost in the last `SiteLog` is the objective value after the most recent update,
 
 ```math
 c = \langle A|A\rangle + \langle B|B\rangle

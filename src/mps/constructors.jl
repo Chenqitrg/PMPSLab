@@ -123,23 +123,37 @@ end
 
 """
     one_mps(elt, N, d, D) -> PeriodicMPS
+    one_mps(elt, N, physical_dimensions, D) -> PeriodicMPS
 
 Uniform periodic MPS whose tensors are all-ones matrices: physical space
-`ℂ^d`, virtual space `ℂ^D`.
+`ℂ^d`, virtual space `ℂ^D`. A tuple such as `(d₁, d₂)` creates multiple
+physical legs.
 
     one_mps(elt, N, P, V) -> PeriodicMPS
 
-Same with graded spaces `P` (physical) and `V` (virtual).
+Same with an elementary or product physical space `P` and virtual space `V`.
 """
 function one_mps(elt::Type{<:Number}, N::Int, d::Int, D::Int)
-    tensors = [ones(elt, ℂ^D ⊗ ℂ^d, ℂ^D) for _ in 1:N]
-    return PeriodicMPS(tensors)
+    return one_mps(elt, N, (d,), D)
 end
 
 function one_mps(
         elt::Type{<:Number},
         N::Int,
-        P::ElementarySpace,
+        physical_dimensions::Tuple{Vararg{Integer}},
+        D::Int,
+    )
+    isempty(physical_dimensions) && throw(ArgumentError(
+        "at least one physical dimension is required"
+    ))
+    physical_space = reduce(⊗, ℂ^d for d in physical_dimensions)
+    return one_mps(elt, N, physical_space, ℂ^D)
+end
+
+function one_mps(
+        elt::Type{<:Number},
+        N::Int,
+        P::Union{ElementarySpace,ProductSpace},
         V::ElementarySpace,
     )
     tensors = [ones(elt, V ⊗ P ← V) for _ in 1:N]
@@ -148,7 +162,7 @@ end
 
 function one_mps(
         elt::Type{<:Number},
-        P::PeriodicVector{<:ElementarySpace},
+        P::PeriodicVector{<:Union{ElementarySpace,ProductSpace}},
         V::HalfPeriodicVector{<:ElementarySpace},
     )
     tensors = [
@@ -161,19 +175,10 @@ function one_mps(
     return PeriodicMPS(tensors)
 end
 
-"""
-    one_mps2(elt, N, d, D) -> PeriodicMPS
-
-Uniform two-site periodic MPS whose tensors are all-ones matrices (two
-physical legs `ℂ^d` each, virtual space `ℂ^D`). Deterministic.
-
-    one_mps2(elt, N, P, V) -> PeriodicMPS
-
-Same with graded spaces `P` (physical) and `V` (virtual).
-"""
+# Compatibility wrappers for the former two-physical-leg-specific constructor.
 function one_mps2(elt::Type{<:Number}, N::Int, d::Int, D::Int)
-    tensors = [ones(elt, ℂ^D ⊗ ℂ^d ⊗ ℂ^d, ℂ^D) for _ in 1:N]
-    return PeriodicMPS(tensors)
+    Base.depwarn("use one_mps(elt, N, (d, d), D)", :one_mps2)
+    return one_mps(elt, N, (d, d), D)
 end
 
 function one_mps2(
@@ -182,21 +187,16 @@ function one_mps2(
         P::ElementarySpace,
         V::ElementarySpace,
     )
-    tensors = [ones(elt, V ⊗ P ⊗ P ← V) for _ in 1:N]
-    return PeriodicMPS(tensors)
+    Base.depwarn("use one_mps(elt, N, P ⊗ P, V)", :one_mps2)
+    return one_mps(elt, N, P ⊗ P, V)
 end
+
 
 function one_mps2(
         elt::Type{<:Number},
         P::PeriodicVector{<:ProductSpace},
         V::HalfPeriodicVector{<:ElementarySpace},
     )
-    tensors = [
-        ones(
-            elt,
-            V[half(2i - 1)] ⊗ P[i] ← V[half(2i + 1)],
-        )
-        for i in _check_matching_periods(P, V)
-    ]
-    return PeriodicMPS(tensors)
+    Base.depwarn("use one_mps(elt, P, V)", :one_mps2)
+    return one_mps(elt, P, V)
 end

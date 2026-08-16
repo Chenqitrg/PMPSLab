@@ -4,8 +4,8 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=1),
+        solver=CholeskySolve(),
     )
     run = initialize_run(mpsA, algorithm)
 
@@ -23,8 +23,8 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
     @test event isa SplitSiteCompleted
     @test event.log.state == SweepState{Forward}(1, 0)
     @test length(run.log.site_logs) == 1
-    @test run.context.cacheBB.left[2] ≈
-          DenseTransferMatrix(run.context.mpsB[1])
+    @test run.context.normal_cache.left[2] ≈
+          DenseTransferMatrix(run.context.approximation[1])
     @test first(run.pending_iteration) == SweepState{Forward}(2, 0)
     @test !isfinished(run)
 
@@ -33,20 +33,20 @@ struct DomainlessSweep <: PMPSLab.AbstractSweep end
     end
     result = run_result(run)
     @test result isa SplitResult
-    @test result.mps === run.context.mpsB
+    @test result.mps === run.context.approximation
     @test result.measurement_results === run.measurement_results
     @test result.log === run.log
     @test isempty(result.measurement_results)
     mpsB = result.mps
     log = result.log
     @test length(log.site_logs) == 4
-    @test log.sweep_time == sum(site_log -> site_log.time, log.site_logs)
+    @test log.duration == sum(site_log -> site_log.duration, log.site_logs)
     @test_throws ArgumentError step!(run)
 
     blocking_mps, blocking_log = split(mpsA, algorithm)
     @test dense(blocking_mps) ≈ dense(mpsB)
-    @test getfield.(blocking_log.site_logs, :error) ≈
-          getfield.(log.site_logs, :error)
+    @test getfield.(blocking_log.site_logs, :cost) ≈
+          getfield.(log.site_logs, :cost)
     @test_throws MethodError split(mpsA, algorithm; callback=nothing)
 end
 
@@ -54,8 +54,8 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=4, maximal_sweep=0),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=4, max_sweeps=0),
+        solver=CholeskySolve(),
     )
     run = initialize_run(mpsA, algorithm)
 
@@ -68,14 +68,14 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
 
     for sweep in (
-            CircularSweep(; N=1, maximal_sweep=1),
-            CircularSweep(; N=5, maximal_sweep=1),
-            ZigzagSweep(; N=3, maximal_sweep=0),
+            CircularSweep(; site_count=1, max_sweeps=1),
+            CircularSweep(; site_count=5, max_sweeps=1),
+            ZigzagSweep(; site_count=3, max_sweeps=0),
         )
         algorithm = ALSSplit(;
             ansatz=SVDAnsatz(),
             sweep,
-            solve=CholeskySolve(),
+            solver=CholeskySolve(),
         )
         @test_throws DimensionMismatch initialize_run(mpsA, algorithm)
         @test_throws DimensionMismatch split(mpsA, algorithm)
@@ -84,7 +84,7 @@ end
     domainless = ALSSplit(;
         ansatz=SVDAnsatz(),
         sweep=DomainlessSweep(),
-        solve=CholeskySolve(),
+        solver=CholeskySolve(),
     )
     @test_throws ArgumentError initialize_run(mpsA, domainless)
 end

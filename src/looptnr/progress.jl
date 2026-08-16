@@ -2,7 +2,7 @@ mutable struct LoopTNRProgressObserver
     progress_id::Union{Nothing,UUID}
     rg::Union{Nothing,Int}
     sweep::Union{Nothing,Int}
-    sweep_time::Float64
+    sweep_duration::Float64
     started::Bool
 end
 
@@ -48,7 +48,7 @@ function _observer_step!(
     )
     site_event = event.event
     state = site_event.log.state
-    sweep = state.n + 1
+    sweep = state.completed_sweeps + 1
     if observer.rg != event.rg
         _close_progress!(observer, "LoopTNR RG changed")
         observer.rg = event.rg
@@ -56,14 +56,14 @@ function _observer_step!(
     end
     if observer.sweep != sweep
         observer.sweep = sweep
-        observer.sweep_time = 0.0
+        observer.sweep_duration = 0.0
     end
 
-    observer.sweep_time += site_event.log.time
+    observer.sweep_duration += site_event.log.duration
     site_count = length(sweep_domain(run.algorithm.split.sweep))
-    progress_name = "LoopTNR RG $(event.rg)/$(run.algorithm.maximal_rg) · " *
+    progress_name = "LoopTNR RG $(event.rg)/$(run.algorithm.max_rg_steps) · " *
         "split sweep $sweep · site $(state.site)/$site_count · " *
-        "cost $(_progress_number(site_event.log.error))"
+        "cost $(_progress_number(site_event.log.cost))"
     active_split = something(run.active_split)
     completed_updates = length(active_split.log.site_logs)
     maximal_updates = length(active_split.algorithm.sweep)
@@ -72,30 +72,30 @@ function _observer_step!(
     _emit_progress!(observer, progress_name; fraction)
 
     if _completes_sweep(state, active_split.pending_iteration)
-        summary = "LoopTNR RG $(event.rg)/$(run.algorithm.maximal_rg) · " *
+        summary = "LoopTNR RG $(event.rg)/$(run.algorithm.max_rg_steps) · " *
             "split sweep $sweep completed · " *
-            "cost $(_progress_number(site_event.log.error)) · " *
-            "time $(_progress_number(observer.sweep_time)) s"
+            "cost $(_progress_number(site_event.log.cost)) · " *
+            "duration $(_progress_number(observer.sweep_duration)) s"
         @info summary
         isfinished(active_split) && _close_progress!(observer, progress_name)
         observer.sweep = nothing
-        observer.sweep_time = 0.0
+        observer.sweep_duration = 0.0
     end
     return nothing
 end
 
 function _rg_summary(event::LoopTNRCoarseGrained, run::LoopTNRRun)
-    prefix = "LoopTNR RG $(event.rg)/$(run.algorithm.maximal_rg)"
+    prefix = "LoopTNR RG $(event.rg)/$(run.algorithm.max_rg_steps)"
     scale = _progress_number(event.result.normalization.scale)
     event.rg == 0 && return "$prefix initialized · scale $scale"
 
     split_log = event.log.split_log
     parts = String[prefix * " completed"]
     if !isempty(split_log.site_logs)
-        push!(parts, "cost $(_progress_number(last(split_log.site_logs).error))")
+        push!(parts, "cost $(_progress_number(last(split_log.site_logs).cost))")
     end
-    push!(parts, "split $(_progress_number(split_log.sweep_time)) s")
-    push!(parts, "coarse grain $(_progress_number(event.log.coarse_grain_time)) s")
+    push!(parts, "split $(_progress_number(split_log.duration)) s")
+    push!(parts, "coarse grain $(_progress_number(event.log.coarse_grain_duration)) s")
     push!(parts, "scale $scale")
     return join(parts, " · ")
 end
@@ -108,7 +108,7 @@ function _observer_step!(
     _close_progress!(observer, "LoopTNR RG $(event.rg) completed")
     observer.rg = event.rg
     observer.sweep = nothing
-    observer.sweep_time = 0.0
+    observer.sweep_duration = 0.0
     @info _rg_summary(event, run)
     return nothing
 end
@@ -127,7 +127,7 @@ end
 
 function _observer_completed!(observer::LoopTNRProgressObserver, run::LoopTNRRun)
     _close_progress!(observer, "LoopTNR completed")
-    @info "LoopTNR completed · RG $(run.completed_rg)/$(run.algorithm.maximal_rg) · " *
+    @info "LoopTNR completed · RG $(run.completed_rg)/$(run.algorithm.max_rg_steps) · " *
         "$(length(run.measurement_results)) measurements"
     return nothing
 end

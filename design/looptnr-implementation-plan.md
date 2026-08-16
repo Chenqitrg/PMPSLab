@@ -12,12 +12,12 @@
 
 ```text
 TensorCell
-→ canonical PlaquetteGates
+→ standardized PlaquetteGates
 → U-shaped PeriodicMPS target
 → resumable ALSSplit child run
 → user-defined LoopTNR coarse graining
 → temporary CheckerboardGates
-→ canonical PlaquetteGates
+→ standardized PlaquetteGates
 → in-place normalization
 → fixed-point measurement
 → next RG step
@@ -41,12 +41,12 @@ conformal transfer matrix。
 1. LoopTNR 输入支持 `UniformGates`、`CheckerboardGates` 和
    `PlaquetteGates`；run 初始化时三者都复制并提升为由 run 独立持有的
    `PlaquetteGates`，此后 run、result 和 snapshot 中的 cell 始终为 Plaquette。
-2. canonical Plaquette 通过现有 `PeriodicMPS(cell)` 转为四个二物理腿 target
+2. standardized Plaquette 通过现有 `PeriodicMPS(cell)` 转为四个二物理腿 target
    tensor。
 3. TensorCell 到 PMPS 的顺序是 U-shape：
    `NW → SW → SE → NE → NW`。
 4. target 通过现有 `ALSSplit` 优化为八个单物理腿 PMPS tensor。
-5. coarse graining 不是 `pair_contraction`；标准路径将八个 optimized tensor
+5. coarse graining 不是 `contract_pairs`；标准路径将八个 optimized tensor
    收缩为两个四腿 tensor，kernel 自然输出临时 `CheckerboardGates`，outer run
    在 normalization、measurement 和 commit 前立即将其提升为 `PlaquetteGates`。
 6. 具体 coarse-graining contraction 由项目维护者亲自实现。其他 session 不得
@@ -55,19 +55,19 @@ conformal transfer matrix。
    `gaugefix!`。
 8. 默认 split ansatz 使用 `PeriodicGaugeAnsatz`：
    - SVD 初始化只使用 `truncerror(rtol=1e-13)`；
-   - `ProjectorCanonical` 使用
+   - `ProjectorGaugeFix` 使用
      `truncrank(maxrank) & truncerror(rtol=1e-13)`；
    - 普通 SVD 不限制 rank，low-rank 限制发生在 periodic projector gauge 中。
 9. `PeriodicGaugeAnsatz` 只是默认值。核心 `LoopTNR` 构造器允许调用者传入使用
    其他 ansatz、solver、environment policy 或 stopping criterion 的完整
    `ALSSplit`。
-10. 默认 sweep 是 `CircularSweep(8; maximal_sweep=40)`。
-11. `maximal_rg` 必须显式提供，表示最多执行多少次 coarse-graining RG
+10. 默认 sweep 是 `CircularSweep(8; max_sweeps=40)`。
+11. `max_rg_steps` 必须显式提供，表示最多执行多少次 coarse-graining RG
     transformation。
-12. `maximal_rg=0` 仍然执行 RG 0 normalization 和 measurement，因此最终
+12. `max_rg_steps=0` 仍然执行 RG 0 normalization 和 measurement，因此最终
     measurement history 长度为一。
 13. 未来可以加入 outer RG stopping criterion，但第一版只使用显式
-    `maximal_rg` hard cap，不预留无行为的 stopping 字段。
+    `max_rg_steps` hard cap，不预留无行为的 stopping 字段。
 14. RG 0 也必须执行 measurement。
 15. 每轮先原地 normalize 当前候选 TensorCell，再从 normalized tensor 计算
     fixed-point measurement。
@@ -77,7 +77,7 @@ conformal transfer matrix。
     第一版不实现。
 18. `LoopTNRLog` 只存控制和收敛数据，例如时间、cost 和 child `SplitLog`；
     不存 TensorCell，也不存 outer fixed-point measurement result。
-19. `SiteLog` 只存 `state`、`error` 和 `time` 等控制信息，不存任何
+19. `SiteLog` 只存 `state`、`cost` 和 `duration` 等控制信息，不存任何
     物理 measurement result。未来的 split/site measurement 应使用独立容器和
     snapshot ownership，不得塞入 `SplitLog`。
 20. outer `MeasurementHistory` 是 durable scientific result。历史 RG tensor
@@ -116,7 +116,7 @@ snapshot 和恢复。LoopTNR 应把这个测试模式落到真实 `SplitRun` 上
 
 ### RG 0
 
-`initialize_run` 将输入复制并 canonicalize 为 `PlaquetteGates`，然后建立 cursor，
+`initialize_run` 将输入复制并 standardize 为 `PlaquetteGates`，然后建立 cursor，
 不执行 normalization 或 measurement。
 第一次 outer `step!` 完成 RG 0：
 
@@ -133,7 +133,7 @@ copy internal input into a local candidate
 被 normalize 而 normalization result 尚未进入 history；否则重试时原始 scale 已
 丢失。
 
-### RG 1 到 `maximal_rg`
+### RG 1 到 `max_rg_steps`
 
 每轮流程为：
 
@@ -173,14 +173,14 @@ struct LoopTNR{
         O<:AbstractMeasurement,
     } <: AbstractAlgorithmConfig
     split::S
-    maximal_rg::Int
+    max_rg_steps::Int
     measurement::O
 end
 ```
 
 inner constructor 至少验证：
 
-- `maximal_rg >= 0`；
+- `max_rg_steps >= 0`；
 - `sweep_domain(split.sweep) == Base.OneTo(8)`。
 
 不要限制 `split.ansatz` 必须是 `PeriodicGaugeAnsatz`。自定义 split 是明确支持的
@@ -191,7 +191,7 @@ inner constructor 至少验证：
 ```julia
 LoopTNR(;
     split::ALSSplit,
-    maximal_rg::Integer,
+    max_rg_steps::Integer,
     measurement::AbstractMeasurement=TNRMeasurement(),
 )
 ```
@@ -199,7 +199,7 @@ LoopTNR(;
 ### 默认便利构造器
 
 ```julia
-default_looptnr(; maximal_rg::Integer, dcut::Integer)
+default_looptnr(; max_rg_steps::Integer, dcut::Integer)
 ```
 
 它应生成等价于以下配置的 `ALSSplit`：
@@ -210,8 +210,8 @@ svd_truncation = truncrank(2dcut) & numerical_truncation
 projector_truncation = truncrank(dcut) & numerical_truncation
 
 ansatz = PeriodicGaugeAnsatz(;
-    svd_pre=SVDAnsatz(; trunc=svd_truncation),
-    canonical=ProjectorCanonical(;
+    initial_split=SVDAnsatz(; trunc=svd_truncation),
+    gauge_fix=ProjectorGaugeFix(;
         tol=1e-13,
         maxiter=100,
         trunc=projector_truncation,
@@ -220,8 +220,8 @@ ansatz = PeriodicGaugeAnsatz(;
 
 split = ALSSplit(;
     ansatz,
-    sweep=CircularSweep(; N=8, maximal_sweep=40),
-    solve=LDLTSolve(),
+    sweep=CircularSweep(; site_count=8, max_sweeps=40),
+    solver=LDLTSolve(),
     environments=SplitEnvironmentPolicy(),
     stopping=CostTolerance(;
         atol=1e-9,
@@ -232,14 +232,14 @@ split = ALSSplit(;
 
 algorithm = LoopTNR(;
     split,
-    maximal_rg,
+    max_rg_steps,
     measurement=TNRMeasurement(),
 )
 ```
 
-`dcut` 必须为正整数，`maximal_rg` 表示最终 RG 标签。需要不同 solver、
+`dcut` 必须为正整数，`max_rg_steps` 表示最终 RG 标签。需要不同 solver、
 environment、sweep 或 stopping 的调用者应先构造 `ALSSplit`，再调用核心
-`LoopTNR` 构造器；默认工厂只暴露 `maximal_rg` 和 `dcut`。
+`LoopTNR` 构造器；默认工厂只暴露 `max_rg_steps` 和 `dcut`。
 
 ## Measurement 体系
 
@@ -414,7 +414,7 @@ _coarse_grain(mps)
 ```
 
 该方法接受由 LoopTNR active split 产生的八站点单物理腿 `PeriodicMPS`，返回临时
-`CheckerboardGates`。outer run 随即复制提升为 canonical `PlaquetteGates`；kernel
+`CheckerboardGates`。outer run 随即复制提升为 standardized `PlaquetteGates`；kernel
 与 outer run 共同负责结构检查：
 
 - 输入长度必须为八；
@@ -442,8 +442,8 @@ _coarse_grain(mps)
 
 ### 明确禁止
 
-- 不得用 `pair_contraction(optimized, 1)` 或
-  `pair_contraction(optimized, 2)` 代替 coarse graining；
+- 不得用 `contract_pairs(optimized, 1)` 或
+  `contract_pairs(optimized, 2)` 代替 coarse graining；
 - 不得把四个 pair contraction tensor 强行解释为 `PlaquetteGates`；
 - 不得在没有维护者确认的情况下照搬 TNRKit `ΨB_to_TATB`，因为本项目 PMPS
   arrow 和 U-shape convention 已重新选择。
@@ -464,7 +464,7 @@ _coarse_grain(mps)
 struct RGLog{S}
     rg::Int
     split_log::S
-    coarse_grain_time::Float64
+    coarse_grain_duration::Float64
 end
 
 mutable struct LoopTNRLog{L} <: ConvergenceLog
@@ -476,11 +476,11 @@ RG 0 使用：
 
 ```text
 split_log = nothing
-coarse_grain_time = 0
+coarse_grain_duration = 0
 ```
 
 后续 RG 的 `split_log` 保存完整 child `SplitLog`。final split cost 可从
-`last(split_log.site_logs).error` 读取，不必在 `RGLog` 中复制同一个数值。
+`last(split_log.site_logs).cost` 读取，不必在 `RGLog` 中复制同一个数值。
 
 如果自定义 split 有零个 site update，final cost 不存在，显示层必须允许
 `nothing`。
@@ -546,7 +546,7 @@ mutable struct LoopTNRRun{A,G,S,H} <: AbstractAlgorithmRun
 end
 ```
 
-`cell` 使用唯一 canonical Plaquette 表示，不保留旧的 Uniform/Checkerboard result
+`cell` 使用唯一 standardized Plaquette 表示，不保留旧的 Uniform/Checkerboard result
 兼容。`active_split` 是延迟初始化的 parent/child 边界；outer 只固定 split config
 类型，具体 child context 通过 function barrier 进入专门编译的方法。
 
@@ -565,10 +565,10 @@ log/history empty
 | Phase | `completed_rg` | `active_split` | 含义 |
 | --- | ---: | --- | --- |
 | `TNR_INITIALIZE` | `-1` | `nothing` | RG 0 尚未提交 |
-| `TNR_PREPARE_SPLIT` | `0:maximal_rg-1` | `nothing` | 下一轮 child 尚未建立 |
-| `TNR_OPTIMIZE` | `0:maximal_rg-1` | active, unfinished | 下一步委托一个 site |
-| `TNR_COARSE_GRAIN` | `0:maximal_rg-1` | complete | optimized PMPS 等待 RG commit |
-| `TNR_FINISHED` | `maximal_rg` | `nothing` | result 可读取 |
+| `TNR_PREPARE_SPLIT` | `0:max_rg_steps-1` | `nothing` | 下一轮 child 尚未建立 |
+| `TNR_OPTIMIZE` | `0:max_rg_steps-1` | active, unfinished | 下一步委托一个 site |
+| `TNR_COARSE_GRAIN` | `0:max_rg_steps-1` | complete | optimized PMPS 等待 RG commit |
+| `TNR_FINISHED` | `max_rg_steps` | `nothing` | result 可读取 |
 
 任意 snapshot 或 restore 都必须验证这些组合，而不是只相信 enum。
 
@@ -577,7 +577,7 @@ log/history empty
 #### `TNR_INITIALIZE`
 
 完成 RG 0 transaction，返回 `LoopTNRCoarseGrained`。若
-`maximal_rg == 0`，进入 `TNR_FINISHED`；否则进入
+`max_rg_steps == 0`，进入 `TNR_FINISHED`；否则进入
 `TNR_PREPARE_SPLIT`。
 
 #### `TNR_PREPARE_SPLIT`
@@ -783,13 +783,13 @@ restore 必须验证：
 
 - saved algorithm 与 supplied algorithm 值相等；
 - phase invariants；
-- `0 <= completed_rg <= maximal_rg`，初始化 phase 除外；
+- `0 <= completed_rg <= max_rg_steps`，初始化 phase 除外；
 - log/history 的 RG 序列连续且都从 0 开始；
 - log/history 长度等于 `completed_rg + 1`；
 - active split presence 和 completion status 与 phase 一致；
 - active split target spaces 与 saved cell 转换得到的 target 一致；
 - finished snapshot 没有 active split；
-- saved `completed_rg` 不超过 supplied `maximal_rg`。
+- saved `completed_rg` 不超过 supplied `max_rg_steps`。
 
 ### Checkpoint codec
 
@@ -818,7 +818,7 @@ src/
     interface.jl          # LoopTNR config and constructors
     normalization.jl      # InfinityNormNormalization
     measurement.jl        # TNRMeasurement and TNRMeasurementResult
-    coarsegrain.jl        # internal maintainer-provided contraction
+    coarse_grain.jl        # internal maintainer-provided contraction
     logs.jl               # RGLog and LoopTNRLog
     run.jl                # LoopTNRRun, phases, step!, result
     identity.jl           # snapshot identity validation
@@ -833,7 +833,7 @@ test/looptnr/
   normalization_test.jl
   measurement_test.jl
   interface_test.jl
-  coarsegrain_test.jl
+  coarse_grain_test.jl
   run_test.jl
   snapshot_test.jl
   progress_test.jl
@@ -914,11 +914,11 @@ LoopTNR-specific measurement。
 
 ### Phase 3：TNR measurement、config、log 与 RG 0
 
-**实现状态：已完成 RG 0 边界。** `maximal_rg=0` 可通过 resumable run 与
-blocking `renormalize` 执行；后续 Phase 5 已在此基础上接通 positive `maximal_rg`。
+**实现状态：已完成 RG 0 边界。** `max_rg_steps=0` 可通过 resumable run 与
+blocking `renormalize` 执行；后续 Phase 5 已在此基础上接通 positive `max_rg_steps`。
 
 **目标：** 在没有 coarse-grain contraction 的情况下交付一个完整可运行的
-`maximal_rg=0` LoopTNR。
+`max_rg_steps=0` LoopTNR。
 
 实现：
 
@@ -936,11 +936,11 @@ blocking `renormalize` 执行；后续 Phase 5 已在此基础上接通 positive
 
 - all three input TensorCells；
 - input object/tensors unchanged；
-- `maximal_rg=0` 在一次 `step!` 后完成；
+- `max_rg_steps=0` 在一次 `step!` 后完成；
 - history/log 都只含 RG 0；
 - default constructor 精确包含两级 truncation 和 circular 40 sweeps；
 - custom non-gauge `ALSSplit` 被允许；
-- wrong sweep domain 和负 `maximal_rg` 被拒绝；
+- wrong sweep domain 和负 `max_rg_steps` 被拒绝；
 - fixed-point failure 不提交 normalized candidate；
 - observer 收到 RG 0 event。
 
@@ -992,10 +992,10 @@ event、multi-RG、safe-boundary pause/resume 和事务式 coarse-grain commit�
 - 中间 site pause/resume；
 - final site 后 pause，再 coarse grain；
 - RG event 后 pause，再开始下一 child；
-- `maximal_rg=1` 与 `2`；
+- `max_rg_steps=1` 与 `2`；
 - custom zero-length split sweep；
 - coarse-grain/normalization/fixed-point injected failure 保持 commit invariants；
-- final result history 长度为 `maximal_rg + 1`。
+- final result history 长度为 `max_rg_steps + 1`。
 
 ### Phase 6：Snapshot 与 restore
 
@@ -1064,7 +1064,7 @@ measurement observer 和 checkpoint restore。
 - RG event 中 measurement result 的前端示例；
 - README 从 blocking 到 controllable run 的最小示例。
 
-默认 observer 不应直接依赖具体 conformal result fields；只显示通用 RG、cost、time
+默认 observer 不应直接依赖具体 conformal result fields；只显示通用 RG、cost、duration
 和 normalization scale。custom frontend observer 从 event 读取 future fixed-point
 payload 绘图。
 
@@ -1103,7 +1103,7 @@ payload 绘图。
 - 在 `SiteLog` 或 `SplitLog` 中存储物理 measurement result。
 
 future outer stopping 应在完整 RG measurement result commit 后检查
-`MeasurementHistory`，同时保留 `maximal_rg` hard cap。不要让它在 child sweep 中间停止
+`MeasurementHistory`，同时保留 `max_rg_steps` hard cap。不要让它在 child sweep 中间停止
 outer RG。
 
 ## 后续 session 操作规范

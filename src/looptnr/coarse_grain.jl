@@ -4,7 +4,7 @@
 Contract the eight-site, one-physical-leg periodic MPS produced by the LoopTNR
 split into the next checkerboard tensor cell. The site ordering is the U-shaped
 ordering established by `PeriodicMPS(::AbstractTensorCell)` followed by the
-two-to-one split.
+two-physical-leg tensor split.
 """
 function _coarse_grain(
         mps::PeriodicMPS{<:AbstractTensorMap{E,S,2,1}},

@@ -1,7 +1,8 @@
 # PMPSLab
 
 Experimental tools for finite periodic matrix-product states, projector-based
-periodic gauge fixing, 2-to-1 splitting, and resumable local execution.
+periodic gauge fixing, two-physical-leg tensor splitting, and resumable local
+execution.
 
 ## Credits and upstream foundations
 
@@ -52,18 +53,18 @@ Create a period-five MPS whose tensors each have two physical legs. Its virtual
 bond dimension is four and each physical leg has dimension two:
 
 ```julia
-A = rand(PeriodicMPS, ComplexF64, 5, (2, 2), 4)
+target = rand(PeriodicMPS, ComplexF64, 5, (2, 2), 4)
 
-physicalspaces(A)
-@show length(A)
-@show assertconsistency(A)
+physicalspaces(target)
+@show length(target)
+@show assertconsistency(target)
 ```
 
 Expected output:
 
 ```text
-length(A) = 5
-assertconsistency(A) = nothing
+length(target) = 5
+assertconsistency(target) = nothing
 ```
 
 A one-physical-leg periodic MPS can be generated with `rand`:
@@ -95,7 +96,7 @@ gates = rand(UniformGates, ComplexF64, gate_space)
 into the finite MPS in place:
 
 ```julia
-gaugefix!(mps, ProjectorCanonical())
+gaugefix!(mps, ProjectorGaugeFix())
 @show assertconsistency(mps)
 ```
 
@@ -108,28 +109,28 @@ assertconsistency(mps) = nothing
 PMPSLab keeps the original finite `PeriodicMPS` representation; it does not
 introduce a separate canonical periodic-MPS storage type.
 
-## 3. Run a basic 2-to-1 split
+## 3. Split two-physical-leg target tensors
 
 `ALSSplit` performs an alternating least-squares split, approximating every
-two-physical-leg tensor in `A` by two one-physical-leg tensors. The
+two-physical-leg tensor in `target` by two single-physical-leg tensors. The
 approximation therefore contains
-`2 * length(A)` sites:
+`2 * length(target)` tensors:
 
 ```julia
 algorithm = ALSSplit(;
     ansatz=SVDAnsatz(),
-    sweep=CircularSweep(; N=2 * length(A), maximal_sweep=4),
-    solve=CholeskySolve(),
+    sweep=CircularSweep(; site_count=2 * length(target), max_sweeps=4),
+    solver=CholeskySolve(),
 )
 
-B, log = split(A, algorithm)
+approximation, log = split(target, algorithm)
 
-@show length(B)
+@show length(approximation)
 @show length(log.site_logs)
 @show log.converged
 cost_matches = isapprox(
-    last(log.site_logs).error,
-    squared_distance(A, B);
+    last(log.site_logs).cost,
+    squared_distance(target, approximation);
     rtol=1e-10,
     atol=1e-10,
 )
@@ -139,37 +140,37 @@ cost_matches = isapprox(
 Expected output:
 
 ```text
-length(B) = 10
+length(approximation) = 10
 length(log.site_logs) = 40
 log.converged = false
 cost_matches = true
 ```
 
 `split` is the simplest blocking API. Internally it uses the same `SplitRun`
-and one-site `step!` implementation as controllable execution.
+and single-tensor `step!` implementation as controllable execution.
 
 ## 4. Truncate the initial approximation
 
 Pass a `TruncationStrategy` to `SVDAnsatz` to limit the virtual spaces generated
-by the initial two-to-one tensor decompositions:
+by the initial two-physical-leg tensor decompositions:
 
 ```julia
 algorithm = ALSSplit(;
     ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=3)),
-    sweep=CircularSweep(; N=2 * length(A), maximal_sweep=20),
-    solve=CholeskySolve(),
+    sweep=CircularSweep(; site_count=2 * length(target), max_sweeps=20),
+    solver=CholeskySolve(),
 )
 
-B, log = split(A, algorithm)
+approximation, log = split(target, algorithm)
 
-@show length(B)
+@show length(approximation)
 @show length(log.site_logs)
 ```
 
 Expected output:
 
 ```text
-length(B) = 10
+length(approximation) = 10
 length(log.site_logs) = 200
 ```
 
@@ -178,15 +179,15 @@ transfer environments used during each local solve.
 
 ## 5. Stop when the cost stabilizes
 
-`maximal_sweep` is always a hard upper bound. Add `CostConvergence` to stop at a
+`max_sweeps` is always a hard upper bound. Add `CostConvergence` to stop at a
 complete circular lap or zigzag round trip when consecutive sweep-end costs are
 approximately equal:
 
 ```julia
 algorithm = ALSSplit(;
     ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=3)),
-    sweep=CircularSweep(; N=2 * length(A), maximal_sweep=500),
-    solve=CholeskySolve(),
+    sweep=CircularSweep(; site_count=2 * length(target), max_sweeps=500),
+    solver=CholeskySolve(),
     stopping=CostConvergence(;
         rtol=1e-8,
         atol=1e-12,
@@ -195,9 +196,9 @@ algorithm = ALSSplit(;
     ),
 )
 
-B, log = split(A, algorithm)
+approximation, log = split(target, algorithm)
 
-completed_sweeps = last(log.site_logs).state.n + 1
+completed_sweeps = last(log.site_logs).state.completed_sweeps + 1
 @show completed_sweeps
 @show log.converged
 ```
@@ -224,15 +225,15 @@ may choose their own rendering.
 The simplest usage needs no logging configuration:
 
 ```julia
-B, log = split(A, algorithm)
+approximation, log = split(target, algorithm)
 ```
 
 While the blocking split runs, the REPL reports sweep summaries such as:
 
 ```text
 [ Info: ALS split started
-[ Info: ALS split sweep 1 completed: cost=<Float64>, time=<Float64>s
-[ Info: ALS split sweep 2 completed: cost=<Float64>, time=<Float64>s
+[ Info: ALS split sweep 1 completed: cost=<Float64>, duration=<Float64>s
+[ Info: ALS split sweep 2 completed: cost=<Float64>, duration=<Float64>s
 ...
 [ Info: ALS split completed after <integer> site updates
 ```
@@ -241,8 +242,8 @@ For asynchronous execution, initialize a run and place it inside a
 `LocalRunSession`:
 
 ```julia
-session = start_run(initialize_run(A, algorithm))
-B, log = fetch(session)
+session = start_run(initialize_run(target, algorithm))
+approximation, log = fetch(session)
 ```
 
 The asynchronous run uses the same default observer and log format.
@@ -251,22 +252,22 @@ Non-interactive scripts remain silent by default. Pass `observer=nothing` to
 disable the default observer explicitly in a REPL:
 
 ```julia
-session = start_run(initialize_run(A, algorithm); observer=nothing)
+session = start_run(initialize_run(target, algorithm); observer=nothing)
 ```
 
 A custom observer replaces the default output completely:
 
 ```julia
 session = start_run(
-    initialize_run(A, algorithm);
+    initialize_run(target, algorithm);
     observer = event -> println(
-        "sweep=$(event.log.state.n + 1) ",
+        "sweep=$(event.log.state.completed_sweeps + 1) ",
         "site=$(event.log.state.site) ",
-        "cost=$(event.log.error)",
+        "cost=$(event.log.cost)",
     ),
 )
 
-B, log = fetch(session)
+approximation, log = fetch(session)
 ```
 
 The custom observer above prints one line per completed site, for example:
@@ -277,7 +278,7 @@ sweep=1 site=2 cost=<Float64>
 ...
 ```
 
-The exact costs depend on `A`; the sweep and site fields follow the configured
+The exact costs depend on `target`; the sweep and site fields follow the configured
 iterator exactly.
 
 `fetch(session)` waits for completion, returns the algorithm result, and
@@ -299,7 +300,7 @@ observer = event -> begin
     event.log.state == SweepState{Forward}(1, 0) && pause!(session_ref[])
     nothing
 end
-session = LocalRunSession(initialize_run(A, algorithm); observer)
+session = LocalRunSession(initialize_run(target, algorithm); observer)
 session_ref[] = session
 
 start_run!(session)
@@ -308,7 +309,7 @@ run_status(session) == PMPSLab.LOCAL_PAUSED || error("run did not pause")
 @show run_status(session)
 
 resume!(session)  # continues the same SplitRun and keeps its caches
-B, log = fetch(session)
+approximation, log = fetch(session)
 @show run_status(session)
 ```
 
@@ -329,16 +330,16 @@ and then atomically publishes a checkpoint. If the final step completes first,
 it reports that no checkpoint was needed:
 
 ```julia
-session = start_run(initialize_run(A, algorithm))
+session = start_run(initialize_run(target, algorithm))
 outcome = cancel_and_checkpoint!(session, "split.jld2")
 @show outcome
 
 if outcome == PMPSLab.LOCAL_CHECKPOINT_WRITTEN
     saved = read_checkpoint("split.jld2")
-    restored = restore_run(saved, A, algorithm)
-    B, log = fetch(start_run(restored))
+    restored = restore_run(saved, target, algorithm)
+    approximation, log = fetch(start_run(restored))
 else
-    B, log = fetch(session)
+    approximation, log = fetch(session)
 end
 ```
 
@@ -351,7 +352,7 @@ outcome = PMPSLab.LOCAL_CHECKPOINT_WRITTEN
 If the run completes first, the output is
 `PMPSLab.LOCAL_CHECKPOINT_SKIPPED_COMPLETED` and no file is created.
 
-After an actual process restart, reconstruct the original target values `A` and
+After an actual process restart, reconstruct the original `target` values and
 the complete `algorithm` configuration before calling `restore_run`. Restore
 checks target tensor spaces, ansatz, sweep, solver, transfer policies, stopping
 criterion, cursor history, and convergence history. It cannot detect different
@@ -364,7 +365,7 @@ process, the blocking durable-pause helper combines the request, wait, snapshot,
 and file publication:
 
 ```julia
-pause_session = start_run(initialize_run(A, algorithm))
+pause_session = start_run(initialize_run(target, algorithm))
 pause_and_checkpoint!(pause_session, "paused-split.jld2")
 resume!(pause_session)
 ```
@@ -382,14 +383,14 @@ truncated = TruncatedTransferPolicy(;
     trunc=TruncationStrategy(maxrank=8),
 )
 environments = SplitEnvironmentPolicy(;
-    norm=truncated,
+    normal=truncated,
     mixed=truncated,
 )
 
 algorithm = ALSSplit(;
     ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=3)),
-    sweep=CircularSweep(; N=2 * length(A), maximal_sweep=500),
-    solve=KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-10)),
+    sweep=CircularSweep(; site_count=2 * length(target), max_sweeps=500),
+    solver=KrylovSolve(; algorithm=GMRES(; maxiter=100, tol=1e-10)),
     environments,
     stopping=CostConvergence(;
         rtol=1e-8,
@@ -399,14 +400,14 @@ algorithm = ALSSplit(;
     ),
 )
 
-@show algorithm.environments.norm isa TruncatedTransferPolicy
+@show algorithm.environments.normal isa TruncatedTransferPolicy
 @show algorithm.environments.mixed isa TruncatedTransferPolicy
 ```
 
 Expected output:
 
 ```text
-algorithm.environments.norm isa TruncatedTransferPolicy = true
+algorithm.environments.normal isa TruncatedTransferPolicy = true
 algorithm.environments.mixed isa TruncatedTransferPolicy = true
 ```
 
@@ -425,7 +426,7 @@ canonical `PlaquetteGates`; run, snapshot, and result cells therefore always
 use that representation:
 
 ```julia
-tnr = default_looptnr(; maximal_rg=2, dcut=8)
+tnr = default_looptnr(; max_rg_steps=2, dcut=8)
 result = renormalize(gates, tnr)
 
 @show result.cell
@@ -436,7 +437,7 @@ result = renormalize(gates, tnr)
 The default uses an eight-site circular ALS split with at most 40 sweeps,
 dense normal and mixed environments, an LDLT local solve, and a periodic-gauge
 ansatz. Its preliminary SVD retains at most `2dcut` states before projector
-canonicalization reduces the universal bond dimension to `dcut`. After five
+projector gauge fixing reduces the universal bond dimension to `dcut`. After five
 complete sweeps it stops when both `abs(cost) < 1e-9` and the relative
 sweep-to-sweep cost change is below `1e-2`. Every RG boundary is normalized by
 the coefficient infinity norm; fixed-point transfer measurements remain
@@ -448,8 +449,8 @@ configuration tree from root to leaf:
 
 ```julia
 tnr = @setconfig tnr begin
-    maximal_rg = 4
-    split/sweep/maximal_sweep = 60
+    max_rg_steps = 4
+    split/sweep/max_sweeps = 60
     split/stopping/atol = 1e-10
 end
 ```
@@ -469,7 +470,7 @@ concise sweep and RG summaries behind:
 ```text
 [ Info: LoopTNR started · RG 0/2 normalization pending
 [ Info: LoopTNR RG 0/2 initialized · scale <Real>
-[ Info: LoopTNR RG 1/2 · split sweep 1 completed · cost <Float64> · time <Float64> s
+[ Info: LoopTNR RG 1/2 · split sweep 1 completed · cost <Float64> · duration <Float64> s
 [ Info: LoopTNR RG 1/2 completed · cost <Float64> · split <Float64> s · coarse grain <Float64> s · scale <Real>
 ...
 [ Info: LoopTNR completed · RG 2/2 · 3 measurements
@@ -552,20 +553,20 @@ end
 
 ## Cost and progress semantics
 
-With dense environments and an exact local solver, each `SiteLog.error` agrees
+With dense environments and an exact local solver, each `SiteLog.cost` agrees
 with the complete finite-period cost up to numerical roundoff:
 
 ```math
-\lVert A-B\rVert^2 = \langle A|A\rangle + \langle B|B\rangle
-                     - 2\operatorname{Re}\langle B|A\rangle.
+\lVert T-X\rVert^2 = \langle T|T\rangle + \langle X|X\rangle
+                     - 2\operatorname{Re}\langle X|T\rangle,
 ```
 
-With truncated working environments, `SiteLog.error` is the corresponding
-approximate local cost. `squared_distance(A, B)` always performs the exact dense
-finite-period check.
+With truncated working environments, `SiteLog.cost` is the corresponding
+approximate local cost. `squared_distance(target, approximation)` always
+performs the exact dense finite-period check.
 
-`SiteLog.state.site` is the updated site, `SiteLog.state.n` is the zero-based
-sweep number, and `log.sweep_time` accumulates time spent inside completed site
+`SiteLog.state.site` is the updated site, `SiteLog.state.completed_sweeps` is the zero-based
+sweep number, and `log.duration` accumulates time spent inside completed site
 updates. Time spent paused is excluded.
 
 ## Design documents

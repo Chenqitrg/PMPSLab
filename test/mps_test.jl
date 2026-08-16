@@ -12,7 +12,6 @@ using PMPSLab:
     physicalspace,
     physicalspaces,
     one_mps,
-    one_mps2,
     random_cdl,
     random_cdl_mps,
     lift,
@@ -205,7 +204,7 @@ end
     @test_throws ArgumentError rand(PeriodicMPS, ComplexF64, 0, 2, 3)
     @test_throws ArgumentError one_mps(ComplexF64, 0, 2, 3)
     @test_throws ArgumentError rand(PeriodicMPS, ComplexF64, 0, (2, 2), 3)
-    @test_throws ArgumentError one_mps2(ComplexF64, 0, 2, 3)
+    @test_throws ArgumentError one_mps(ComplexF64, 0, (2, 2), 3)
 end
 
 @testset "PeriodicMPS — space queries" begin
@@ -324,7 +323,7 @@ end
     )
 end
 
-@testset "multi-leg rand / one_mps2 — periodic spaces" begin
+@testset "multi-physical-leg rand / one_mps — periodic spaces" begin
     P = PeriodicVector([ℂ^2 ⊗ ℂ^2, ℂ^2 ⊗ ℂ^2])
     V = HalfPeriodicVector(PeriodicVector([ℂ^3, ℂ^3]))
 
@@ -336,7 +335,7 @@ end
     @test codomain(mps[1])[2] == ℂ^2
     @test codomain(mps[1])[3] == ℂ^2
 
-    mps1 = one_mps2(ComplexF64, P, V)
+    mps1 = one_mps(ComplexF64, P, V)
     @test length(mps1) == 2
     @test assertconsistency(mps1) === nothing
     @test all(all(mps1[i][a, b, c, d] == 1 for a in 1:3, b in 1:2, c in 1:2, d in 1:3) for i in 1:2)
@@ -381,7 +380,7 @@ end
     # fold=1 is the identity
     @test collect(lift(mps, 1)) == collect(mps)
 
-    # works for 2-site MPS as well
+    # Works for two-physical-leg tensors as well.
     mps2 = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     m2 = lift(mps2, 2)
     @test length(m2) == 4

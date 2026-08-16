@@ -1,7 +1,7 @@
 mutable struct SplitProgressObserver
     progress_id::Union{Nothing,UUID}
     sweep::Union{Nothing,Int}
-    sweep_time::Float64
+    sweep_duration::Float64
     started::Bool
 end
 
@@ -43,25 +43,25 @@ function _observer_step!(
         run::SplitRun,
     )
     state = event.log.state
-    sweep = state.n + 1
+    sweep = state.completed_sweeps + 1
     if observer.sweep != sweep
         _close_progress!(observer, "ALS split sweep changed")
         observer.sweep = sweep
-        observer.sweep_time = 0.0
+        observer.sweep_duration = 0.0
     end
 
-    observer.sweep_time += event.log.time
+    observer.sweep_duration += event.log.duration
     progress_name =
-        "ALS split: sweep=$sweep site=$(state.site) cost=$(event.log.error)"
+        "ALS split: sweep=$sweep site=$(state.site) cost=$(event.log.cost)"
     _emit_progress!(observer, progress_name)
 
     if _completes_sweep(state, run.pending_iteration)
         _close_progress!(observer, progress_name)
         summary = "ALS split sweep $sweep completed: " *
-            "cost=$(event.log.error), time=$(observer.sweep_time)s"
+            "cost=$(event.log.cost), duration=$(observer.sweep_duration)s"
         @info summary
         observer.sweep = nothing
-        observer.sweep_time = 0.0
+        observer.sweep_duration = 0.0
     end
     return nothing
 end

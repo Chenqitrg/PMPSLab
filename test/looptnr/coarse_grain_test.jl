@@ -16,7 +16,7 @@ end
 
 @testset "LoopTNR coarse graining — input contract" begin
     short = one_mps(ComplexF64, 4, 2, 2)
-    wrong_rank = one_mps2(ComplexF64, 8, 2, 2)
+    wrong_rank = one_mps(ComplexF64, 8, (2, 2), 2)
 
     @test_throws DimensionMismatch PMPSLab._coarse_grain(short)
     @test_throws MethodError PMPSLab._coarse_grain(wrong_rank)

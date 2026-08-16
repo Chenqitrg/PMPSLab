@@ -4,7 +4,7 @@
 # Each scheme is an iterator yielding `SweepState` values:
 #   site — the position to update next
 #   type — the scan direction after the update
-#   n    — completed lap count (internal stop-check)
+#   completed_sweeps — completed lap count (internal stop-check)
 #
 # Iteration state is a monotonic integer cursor. A yielded `SweepState` is
 # derived from that cursor and never reused as mutable control state.
@@ -30,44 +30,45 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    ZigzagSweep(; N, maximal_sweep)
+    ZigzagSweep(; site_count, max_sweeps)
 
-Yields sites `1, 2, …, N, N-1, …, 2` per round trip, repeating up to
-`maximal_sweep` trips. At least two sites are required; a one-site system has
-no zigzag direction and should use [`CircularSweep`](@ref).
+Yields sites `1, 2, …, site_count, site_count-1, …, 2` per round trip,
+repeating up to `max_sweeps` trips. At least two sites are required; a
+single-site system has no zigzag direction and should use
+[`CircularSweep`](@ref).
 """
 @kwdef struct ZigzagSweep <: AbstractSweep
-    N::Int
-    maximal_sweep::Int
-    function ZigzagSweep(N::Int, maximal_sweep::Int)
-        N >= 2 || throw(ArgumentError(
-            "ZigzagSweep requires at least two sites, got $N; " *
-            "use CircularSweep for a one-site sweep"
+    site_count::Int
+    max_sweeps::Int
+    function ZigzagSweep(site_count::Int, max_sweeps::Int)
+        site_count >= 2 || throw(ArgumentError(
+            "ZigzagSweep requires at least two sites, got $site_count; " *
+            "use CircularSweep for a single-site sweep"
         ))
-        maximal_sweep >= 0 || throw(ArgumentError(
-            "maximal_sweep must be non-negative, got $maximal_sweep"
+        max_sweeps >= 0 || throw(ArgumentError(
+            "max_sweeps must be non-negative, got $max_sweeps"
         ))
-        return new(N, maximal_sweep)
+        return new(site_count, max_sweeps)
     end
 end
 
-sweep_domain(z::ZigzagSweep) = Base.OneTo(z.N)
+sweep_domain(z::ZigzagSweep) = Base.OneTo(z.site_count)
 
 Base.IteratorSize(::Type{<:ZigzagSweep}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:ZigzagSweep}) = Base.HasEltype()
 Base.eltype(::Type{<:ZigzagSweep}) = SweepState
 
-Base.length(z::ZigzagSweep) = (2z.N - 2) * z.maximal_sweep
+Base.length(z::ZigzagSweep) = (2z.site_count - 2) * z.max_sweeps
 
 Base.iterate(z::ZigzagSweep) = iterate(z, 0)
 
 function Base.iterate(z::ZigzagSweep, step::Int)
     step == length(z) && return nothing
-    period = 2z.N - 2
-    n, phase = divrem(step, period)
-    state = phase < z.N - 1 ?
-        SweepState{Forward}(phase + 1, n) :
-        SweepState{Backward}(period - phase + 1, n)
+    period = 2z.site_count - 2
+    completed_sweeps, phase = divrem(step, period)
+    state = phase < z.site_count - 1 ?
+        SweepState{Forward}(phase + 1, completed_sweeps) :
+        SweepState{Backward}(period - phase + 1, completed_sweeps)
     return state, step + 1
 end
 
@@ -76,34 +77,36 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    CircularSweep(; N, maximal_sweep)
+    CircularSweep(; site_count, max_sweeps)
 
-Yields sites `1, 2, …, N` repeatedly, `maximal_sweep` laps in total.
-`dir` is always +1.
+Yields sites `1, 2, …, site_count` repeatedly, `max_sweeps` laps in total. The
+direction encoded in every yielded [`SweepState`](@ref) is [`Forward`](@ref).
 """
 @kwdef struct CircularSweep <: AbstractSweep
-    N::Int
-    maximal_sweep::Int
-    function CircularSweep(N::Int, maximal_sweep::Int)
-        N > 0 || throw(ArgumentError("sweep length must be positive, got $N"))
-        maximal_sweep >= 0 || throw(ArgumentError(
-            "maximal_sweep must be non-negative, got $maximal_sweep"
+    site_count::Int
+    max_sweeps::Int
+    function CircularSweep(site_count::Int, max_sweeps::Int)
+        site_count > 0 || throw(ArgumentError(
+            "sweep site_count must be positive, got $site_count"
         ))
-        return new(N, maximal_sweep)
+        max_sweeps >= 0 || throw(ArgumentError(
+            "max_sweeps must be non-negative, got $max_sweeps"
+        ))
+        return new(site_count, max_sweeps)
     end
 end
 
-sweep_domain(cs::CircularSweep) = Base.OneTo(cs.N)
+sweep_domain(cs::CircularSweep) = Base.OneTo(cs.site_count)
 
 Base.IteratorSize(::Type{<:CircularSweep}) = Base.HasLength()
 Base.IteratorEltype(::Type{<:CircularSweep}) = Base.HasEltype()
 Base.eltype(::Type{<:CircularSweep}) = SweepState
-Base.length(cs::CircularSweep) = cs.N * cs.maximal_sweep
+Base.length(cs::CircularSweep) = cs.site_count * cs.max_sweeps
 
 Base.iterate(cs::CircularSweep) = iterate(cs, 0)
 
 function Base.iterate(cs::CircularSweep, step::Int)
     step == length(cs) && return nothing
-    n, phase = divrem(step, cs.N)
-    return SweepState{Forward}(phase + 1, n), step + 1
+    completed_sweeps, phase = divrem(step, cs.site_count)
+    return SweepState{Forward}(phase + 1, completed_sweeps), step + 1
 end

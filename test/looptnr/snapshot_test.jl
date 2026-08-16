@@ -8,16 +8,16 @@ PMPSLab.measure(
 ) = SnapshotPayloadResult([length(cell)])
 
 function snapshot_loop_algorithm(
-        maximal_rg::Int;
-        maximal_sweep::Int = 1,
+        max_rg_steps::Int;
+        max_sweeps::Int = 1,
         measurement::TNRMeasurement = TNRMeasurement(),
     )
     split_algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=8, maximal_sweep),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=8, max_sweeps),
+        solver=CholeskySolve(),
     )
-    return LoopTNR(; split=split_algorithm, maximal_rg, measurement)
+    return LoopTNR(; split=split_algorithm, max_rg_steps, measurement)
 end
 
 snapshot_loop_cell() = UniformGates(
@@ -30,7 +30,7 @@ end
 
 function loop_event_signature(event::LoopTNRSplitStepCompleted)
     state = event.event.log.state
-    return (:split, event.rg, state.n, state.site)
+    return (:split, event.rg, state.completed_sweeps, state.site)
 end
 
 function finish_loop_run!(run::LoopTNRRun)
@@ -142,7 +142,7 @@ end
     @test saved.measurement_results[1].fixed_point !==
           run.measurement_results[1].fixed_point
     @test saved.active_split !== nothing
-    @test saved.active_split.mpsB !== something(run.active_split).context.mpsB
+    @test saved.active_split.approximation !== something(run.active_split).context.approximation
 
     push!(run.measurement_results[1].fixed_point.payload, 99)
     @test saved.measurement_results[1].fixed_point.payload == [4]

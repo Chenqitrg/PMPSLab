@@ -8,7 +8,9 @@ split run, nested LoopTNR run, snapshots, checkpoint codec, local durable-contro
 helpers, and parent-child composition tests are implemented. The platform adapter
 remains deferred until its hosting interfaces are known.
 
-The first implementation target was the 2-to-1 periodic MPS `split` algorithm.
+The first implementation target was the periodic MPS `split` algorithm from
+two-physical-leg target tensors to paired single-physical-leg approximation
+tensors.
 The same protocol now drives LoopTNR runs whose renormalization-group steps
 contain nested `SplitRun` values.
 
@@ -63,7 +65,7 @@ HTTP API, job registry, authentication, or storage service.
    handles must never be part of a checkpoint.
 4. Derived contraction caches may be rebuilt on restore when this only changes
    results within machine precision.
-5. The blocking `split(mps, alg)` API remains available as a convenience
+5. The blocking `split(target, algorithm)` API remains available as a convenience
    wrapper around the same run protocol; progress is reported through events.
 
 ## Non-goals
@@ -225,7 +227,7 @@ updated in place.
 `SplitRun.pending_iteration` is therefore the single source of the resumable
 execution cursor; `SplitRun` also owns reporting state.
 
-`log.sweep_time` accumulates the completed site timings and therefore excludes
+`log.duration` accumulates the completed site timings and therefore excludes
 time spent paused between safe steps. Pause timestamps and total paused time
 belong to the execution adapter rather than the numerical run.
 
@@ -238,11 +240,11 @@ function step!(run::SplitRun)
     state, next_iterator_state = run.pending_iteration
     following_iteration = iterate(run.algorithm.sweep, next_iterator_state)
     started_at = time()
-    _, cost = update!(run.context, run.algorithm.solve, state)
+    _, cost = update!(run.context, run.algorithm.solver, state)
 
     site_log = SiteLog(state, cost, time() - started_at)
     push!(run.log.site_logs, site_log)
-    run.log.sweep_time += site_log.time
+    run.log.duration += site_log.duration
 
     if completes_sweep(state, following_iteration) &&
             should_stop(run.algorithm.stopping, run.log.site_logs)
@@ -266,14 +268,14 @@ sweep boundary. It compares only complete-sweep endpoint costs and requires a
 configurable minimum sweep count and number of consecutive stable comparisons.
 Without a stopping policy, the sweep iterator remains the sole completion
 condition. `SplitLog.converged` is true only when the cost policy stopped the
-run; exhausting `maximal_sweep` leaves it false.
+run; exhausting `max_sweeps` leaves it false.
 
 `pending_iteration` stores the unmodified result of Julia's `iterate`: the next
 `SweepState` to execute and the opaque iterator state for the call after it.
 Persisting only the just-completed `SweepState` would cause duplicate work
 after restore, especially at a zigzag turn.
 
-The blocking `split(mps, algorithm)` function initializes a `SplitRun`, drives
+The blocking `split(target, algorithm)` function initializes a `SplitRun`, drives
 it to completion, and returns `run_result(run)`. Controllable execution uses an
 observer on the execution adapter rather than a numerical-core callback.
 
@@ -281,7 +283,7 @@ observer on the execution adapter rather than a numerical-core callback.
 
 ```julia
 struct SplitSnapshot{M,P,L} <: AbstractAlgorithmSnapshot
-    mpsB::M
+    approximation::M
     pending_iteration::P
     log::L
 end
@@ -318,12 +320,12 @@ end
 
 struct SweepCompleted <: AlgorithmEvent
     sweep::Int
-    error::Float64
-    compute_time::Float64
+    cost::Float64
+    duration::Float64
 end
 
 struct AlgorithmCompleted <: AlgorithmEvent
-    compute_time::Float64
+    duration::Float64
 end
 ```
 
@@ -558,7 +560,7 @@ supplied inputs and configuration. Cursor validation replays complete sweep
 boundaries and verifies that the stored convergence flag agrees with the saved
 cost history.
 
-Random initial approximations are stored through `mpsB`; they are never
+Random initial approximations are stored through `approximation`; they are never
 regenerated during restore. Any future algorithm that uses randomness after a
 safe boundary must also snapshot its RNG state.
 
@@ -566,7 +568,7 @@ safe boundary must also snapshot its RNG state.
 
 ### Blocking API tests
 
-- The public `split(mps, alg)` result matches manually driving `SplitRun`.
+- The public `split(target, algorithm)` result matches manually driving `SplitRun`.
 - Passing the removed `callback` keyword is rejected.
 - Existing circular and zigzag update-cost tests continue to pass.
 
@@ -617,7 +619,7 @@ A synthetic parent run with a resumable child verifies that:
 
 1. Add the abstract run/snapshot/event interfaces.
 2. Introduce `SplitRun` with a `SplitContext` numerical workspace.
-3. Move one-site loop behavior into `step!`.
+3. Move one-tensor update behavior into `step!`.
 4. Reimplement `split` as a synchronous compatibility wrapper.
 5. Verify that all existing tests remain green.
 

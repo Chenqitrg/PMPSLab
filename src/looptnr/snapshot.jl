@@ -91,20 +91,20 @@ function _validate_looptnr_state(
         )
     end
 
-    0 <= completed_rg <= algorithm.maximal_rg || throw(ArgumentError(
-        "LoopTNR completed_rg=$completed_rg is outside 0:$(algorithm.maximal_rg)"
+    0 <= completed_rg <= algorithm.max_rg_steps || throw(ArgumentError(
+        "LoopTNR completed_rg=$completed_rg is outside 0:$(algorithm.max_rg_steps)"
     ))
     _validate_looptnr_records(completed_rg, log, measurement_results)
 
     if phase == TNR_PREPARE_SPLIT
-        completed_rg < algorithm.maximal_rg || throw(ArgumentError(
+        completed_rg < algorithm.max_rg_steps || throw(ArgumentError(
             "LoopTNR prepare-split phase requires another RG step"
         ))
         isnothing(active_split) || throw(ArgumentError(
             "LoopTNR prepare-split phase cannot contain an active split"
         ))
     elseif phase == TNR_OPTIMIZE
-        completed_rg < algorithm.maximal_rg || throw(ArgumentError(
+        completed_rg < algorithm.max_rg_steps || throw(ArgumentError(
             "LoopTNR optimize phase requires another RG step"
         ))
         isnothing(active_split) && throw(ArgumentError(
@@ -114,7 +114,7 @@ function _validate_looptnr_state(
             "LoopTNR optimize phase requires an unfinished active split"
         ))
     elseif phase == TNR_COARSE_GRAIN
-        completed_rg < algorithm.maximal_rg || throw(ArgumentError(
+        completed_rg < algorithm.max_rg_steps || throw(ArgumentError(
             "LoopTNR coarse-grain phase requires another RG step"
         ))
         isnothing(active_split) && throw(ArgumentError(
@@ -124,8 +124,8 @@ function _validate_looptnr_state(
             "LoopTNR coarse-grain phase requires a completed active split"
         ))
     elseif phase == TNR_FINISHED
-        completed_rg == algorithm.maximal_rg || throw(ArgumentError(
-            "LoopTNR finished phase requires completed_rg=$(algorithm.maximal_rg)"
+        completed_rg == algorithm.max_rg_steps || throw(ArgumentError(
+            "LoopTNR finished phase requires completed_rg=$(algorithm.max_rg_steps)"
         ))
         isnothing(active_split) || throw(ArgumentError(
             "LoopTNR finished phase cannot contain an active split"

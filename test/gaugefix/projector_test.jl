@@ -28,7 +28,7 @@ end
 @testset "rank-deficient projectors compress the unsupported virtual subspace" begin
     mps = one_mps(ComplexF64, 4, 2, 3)
     dense_before = dense(mps)
-    PR, PL = find_projectors(mps, ProjectorCanonical(; tol=1e-12, maxiter=100))
+    PR, PL = find_projectors(mps, ProjectorGaugeFix(; tol=1e-12, maxiter=100))
 
     for bond in 1:length(mps)
         pos = half(2bond + 1)
@@ -37,7 +37,7 @@ end
         @test !(support_projector ≈ id(domain(PR[pos])))
     end
 
-    gaugefix!(mps, ProjectorCanonical(; tol=1e-12, maxiter=100))
+    gaugefix!(mps, ProjectorGaugeFix(; tol=1e-12, maxiter=100))
     @test dense(mps) ≈ dense_before atol=1e-10
 end
 
@@ -51,19 +51,19 @@ function structurally_rank_deficient_mps()
 end
 
 @testset "structural rank cleanup precedes projector gauge fixing" begin
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
+    algorithm = ProjectorGaugeFix(; tol=1e-12, maxiter=100)
 
     # `find_projectors` is non-mutating and therefore cannot repair invalid
     # local bond dimensions. It should reject them before entering MPSKit's
     # fixed-workspace orthogonalization.
     direct = structurally_rank_deficient_mps()
-    @test_throws ArgumentError find_projectors(direct, alg)
+    @test_throws ArgumentError find_projectors(direct, algorithm)
 
     # The mutating workflow may repair those dimensions exactly before finding
     # projectors. This is the preprocessing performed by InfiniteMPS as well.
     mps = structurally_rank_deficient_mps()
     dense_before = dense(mps)
-    @test gaugefix!(mps, alg) === mps
+    @test gaugefix!(mps, algorithm) === mps
     @test all(MPSKit.isfullrank, mps)
     @test [dim(right_virtualspace(tensor)) for tensor in mps] == [1, 2, 1, 2]
     @test norm(dense(mps) - dense_before) / norm(dense_before) < 1e-12

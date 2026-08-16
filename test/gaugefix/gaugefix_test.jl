@@ -2,8 +2,8 @@
     N, d, D = 4, 2, 3
     mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     tvec = [copy(mps[i]) for i in 1:N]
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
-    @test gaugefix!(mps, alg) === mps
+    algorithm = ProjectorGaugeFix(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
+    @test gaugefix!(mps, algorithm) === mps
     # After canonicalization, consistency should still hold
     @test assertconsistency(mps) === nothing
     # Tensors should have been modified
@@ -18,8 +18,8 @@ end
     P = Z2Space(0 => 2)
     mps = rand(PeriodicMPS, ComplexF64, N, P, V)
     tvec = [copy(mps[i]) for i in 1:N]
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
-    @test gaugefix!(mps, alg) === mps
+    algorithm = ProjectorGaugeFix(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
+    @test gaugefix!(mps, algorithm) === mps
     @test assertconsistency(mps) === nothing
     for i in 1:N
         @test !(mps[i] ≈ tvec[i])
@@ -30,8 +30,8 @@ end
     N, d, D = 4, 2, 2
     mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     dense_before = dense(mps)
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
-    gaugefix!(mps, alg)
+    algorithm = ProjectorGaugeFix(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
+    gaugefix!(mps, algorithm)
     dense_after = dense(mps)
     @test norm(dense_before - dense_after) < 1e-10
 end
@@ -39,8 +39,8 @@ end
 @testset "gaugefix! — mixed spectrum is split symmetrically" begin
     Random.seed!(20260810)
     mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
-    L, R = PMPSLab._mpskit_gauges(mps, alg)
+    algorithm = ProjectorGaugeFix(; tol=1e-12, maxiter=100)
+    L, R = PMPSLab._mpskit_gauges(mps, algorithm)
 
     # At every bond, C = L * R = U * S * V† is the mixed-canonical gauge.
     # Construct the Vidal center tensor Gamma explicitly, then distribute the
@@ -51,7 +51,7 @@ end
     # This must reproduce the projector update performed by gaugefix!.
     mixed = map(eachindex(mps)) do bond
         pos = half(2bond + 1)
-        U, S, Vh, _ = PMPSLab.svd_trunc(L[pos] * R[pos]; trunc=alg.trunc)
+        U, S, Vh, _ = PMPSLab.svd_trunc(L[pos] * R[pos]; trunc=algorithm.trunc)
         return (; U, S, Vh)
     end
 
@@ -72,7 +72,7 @@ end
     end
 
     gauge_fixed = deepcopy(mps)
-    gaugefix!(gauge_fixed, alg)
+    gaugefix!(gauge_fixed, algorithm)
     for i in eachindex(mps)
         @test gauge_fixed[i] ≈ symmetric_tensors[i] atol=1e-10 rtol=1e-10
     end
@@ -99,13 +99,13 @@ end
         rand(PeriodicMPS, ComplexF64, 4, (2, 2), 3),
         rand(PeriodicMPS, ComplexF64, 4, P, V),
     )
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100)
+    algorithm = ProjectorGaugeFix(; tol=1e-12, maxiter=100)
 
     for original in cases
         once = deepcopy(original)
-        gaugefix!(once, alg)
+        gaugefix!(once, algorithm)
         twice = deepcopy(once)
-        gaugefix!(twice, alg)
+        gaugefix!(twice, algorithm)
 
         @test tensor_relative_distance(once, twice) < 1e-10
         @test state_relative_distance(once, twice) < 1e-12
@@ -115,17 +115,17 @@ end
 @testset "gaugefix! — truncation is physically idempotent" begin
     Random.seed!(20260808)
     original = rand(PeriodicMPS, ComplexF64, 6, 2, 6)
-    alg = ProjectorCanonical(
+    algorithm = ProjectorGaugeFix(
         ; tol=1e-12, maxiter=100,
         trunc=MPSKit.TruncationStrategy(maxrank=2),
     )
 
     once = deepcopy(original)
-    gaugefix!(once, alg)
+    gaugefix!(once, algorithm)
     twice = deepcopy(once)
-    gaugefix!(twice, alg)
+    gaugefix!(twice, algorithm)
     thrice = deepcopy(twice)
-    gaugefix!(thrice, alg)
+    gaugefix!(thrice, algorithm)
 
     # The first pass may both compress and change gauge. Do not require its raw
     # tensors to equal the second pass: only the represented state and retained

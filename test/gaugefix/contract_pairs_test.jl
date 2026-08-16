@@ -1,8 +1,8 @@
-@testset "pair_contraction" begin
-    @testset "structure — N=4 gives N/2 two-site tensors" begin
+@testset "contract_pairs" begin
+    @testset "structure — four inputs give two contracted tensors" begin
         D, d, N = 2, 2, 4
         mps = rand(PeriodicMPS, ComplexF64, N, d, D)
-        paired = pair_contraction(mps)
+        paired = contract_pairs(mps)
 
         @test length(paired) == N ÷ 2
         for T in paired
@@ -18,7 +18,7 @@
     @testset "pair matches manual @plansor" begin
         D, d = 2, 2
         mps = rand(PeriodicMPS, ComplexF64, 2, d, D)
-        paired = pair_contraction(mps)
+        paired = contract_pairs(mps)
 
         @test length(paired) == 1
         @plansor manual[-1 -2 -3; -4] := mps[1][-1 -2; 1] * mps[2][1 -3; -4]
@@ -28,7 +28,7 @@
     @testset "start site selects the periodic pairing" begin
         D, d, N = 2, 2, 4
         mps = rand(PeriodicMPS, ComplexF64, N, d, D)
-        paired = pair_contraction(mps, 2)
+        paired = contract_pairs(mps, 2)
 
         @plansor first_pair[-1 -2 -3; -4] :=
             mps[2][-1 -2; 1] * mps[3][1 -3; -4]
@@ -39,7 +39,7 @@
         @test paired[2] ≈ wrapped_pair
         @test dense(paired) ≈ dense(circshift(mps, -1))
         @test all(
-            pair_contraction(mps, N + 2)[site] ≈ paired[site]
+            contract_pairs(mps, N + 2)[site] ≈ paired[site]
             for site in eachindex(paired)
         )
     end
@@ -49,14 +49,14 @@
         for N in [2, 4, 6]
             mps = rand(PeriodicMPS, ComplexF64, N, d, D)
             # Same physical leg order as dense(mps); the periodic product is preserved.
-            @test dense(pair_contraction(mps)) ≈ dense(mps)
+            @test dense(contract_pairs(mps)) ≈ dense(mps)
         end
     end
 
     @testset "odd number of sites throws" begin
         D, d = 2, 2
         mps = rand(PeriodicMPS, ComplexF64, 3, d, D)
-        @test_throws ArgumentError pair_contraction(mps)
+        @test_throws ArgumentError contract_pairs(mps)
     end
 
     @testset "Z2Irrep — dense invariant and structure" begin
@@ -64,7 +64,7 @@
         V = Z2Space(0 => 2, 1 => 2)
         P = Z2Space(0 => 2)
         mps = rand(PeriodicMPS, ComplexF64, N, P, V)
-        paired = pair_contraction(mps)
+        paired = contract_pairs(mps)
 
         @test length(paired) == 2
         @test codomain(paired[1]) == V ⊗ P ⊗ P
@@ -74,7 +74,7 @@
     @testset "Float64 element type" begin
         D, d, N = 2, 2, 4
         mps = rand(PeriodicMPS, Float64, N, d, D)
-        paired = pair_contraction(mps)
+        paired = contract_pairs(mps)
         @test scalartype(paired[1]) == Float64
         @test dense(paired) ≈ dense(mps)
     end

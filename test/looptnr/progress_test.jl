@@ -1,14 +1,14 @@
 using Logging
 import ProgressLogging
 
-function looptnr_progress_fixture(; maximal_rg::Int=1)
+function looptnr_progress_fixture(; max_rg_steps::Int=1)
     gate = ones(ComplexF64, ℂ^1 ⊗ ℂ^1, ℂ^1 ⊗ ℂ^1)
     split_algorithm = ALSSplit(;
         ansatz=SVDAnsatz(),
-        sweep=CircularSweep(; N=8, maximal_sweep=1),
-        solve=CholeskySolve(),
+        sweep=CircularSweep(; site_count=8, max_sweeps=1),
+        solver=CholeskySolve(),
     )
-    return UniformGates(gate), LoopTNR(; split=split_algorithm, maximal_rg)
+    return UniformGates(gate), LoopTNR(; split=split_algorithm, max_rg_steps)
 end
 
 function captured_looptnr_logs(f)
@@ -150,7 +150,7 @@ end
     )
     failing_algorithm = LoopTNR(;
         split=algorithm.split,
-        maximal_rg=0,
+        max_rg_steps=0,
         measurement=failing_measurement,
     )
     failing_run = initialize_run(cell, failing_algorithm)

@@ -1,5 +1,5 @@
 """
-    LoopTNR(; split, maximal_rg, measurement=TNRMeasurement())
+    LoopTNR(; split, max_rg_steps, measurement=TNRMeasurement())
 
 Configuration for Loop tensor-network renormalization.
 """
@@ -8,17 +8,17 @@ Configuration for Loop tensor-network renormalization.
         M<:TNRMeasurement,
     } <: AbstractAlgorithmConfig
     split::S
-    maximal_rg::Int
+    max_rg_steps::Int
     measurement::M = TNRMeasurement()
 
     function LoopTNR(
             split::S,
-            maximal_rg::Integer,
+            max_rg_steps::Integer,
             measurement::M,
         ) where {S<:ALSSplit,M<:TNRMeasurement}
-        rg_count = Int(maximal_rg)
+        rg_count = Int(max_rg_steps)
         rg_count >= 0 || throw(ArgumentError(
-            "maximal_rg must be non-negative, got $maximal_rg"
+            "max_rg_steps must be non-negative, got $max_rg_steps"
         ))
         domain = sweep_domain(split.sweep)
         domain == Base.OneTo(8) || throw(DimensionMismatch(
@@ -30,13 +30,13 @@ Configuration for Loop tensor-network renormalization.
 end
 
 """
-    default_looptnr(; maximal_rg, dcut)
+    default_looptnr(; max_rg_steps, dcut)
 
 Build the standard dense-environment [`LoopTNR`](@ref) configuration. The
-preliminary SVD retains at most `2dcut` states and periodic canonicalization
-then reduces the universal bond dimension to `dcut`.
+preliminary SVD retains at most `2dcut` states and periodic projector gauge
+fixing then reduces the universal bond dimension to `dcut`.
 """
-function default_looptnr(; maximal_rg::Integer, dcut::Integer)
+function default_looptnr(; max_rg_steps::Integer, dcut::Integer)
     dcut > 0 || throw(ArgumentError(
         "dcut must be positive, got $dcut"
     ))
@@ -44,19 +44,19 @@ function default_looptnr(; maximal_rg::Integer, dcut::Integer)
     numerical_truncation = truncerror(; rtol=1.0e-13)
     split = ALSSplit(;
         ansatz=PeriodicGaugeAnsatz(;
-            svd_pre=SVDAnsatz(;
+            initial_split=SVDAnsatz(;
                 trunc=truncrank(preliminary_rank) & numerical_truncation,
             ),
-            canonical=ProjectorCanonical(;
+            gauge_fix=ProjectorGaugeFix(;
                 tol=1.0e-13,
                 maxiter=100,
                 trunc=truncrank(dcut) & numerical_truncation,
             ),
         ),
-        sweep=CircularSweep(; N=8, maximal_sweep=40),
-        solve=LDLTSolve(),
+        sweep=CircularSweep(; site_count=8, max_sweeps=40),
+        solver=LDLTSolve(),
         environments=SplitEnvironmentPolicy(;
-            norm=DenseTransferPolicy(),
+            normal=DenseTransferPolicy(),
             mixed=DenseTransferPolicy(),
         ),
         stopping=CostTolerance(;
@@ -69,5 +69,5 @@ function default_looptnr(; maximal_rg::Integer, dcut::Integer)
         normalization=InfinityNormNormalization(),
         fixed_point=NoFixedPointMeasurement(),
     )
-    return LoopTNR(; split, maximal_rg, measurement)
+    return LoopTNR(; split, max_rg_steps, measurement)
 end

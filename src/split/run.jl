@@ -52,7 +52,7 @@ struct SplitSnapshot{
         H<:MeasurementHistory,
         I<:SplitProblemIdentity,
     } <: AbstractAlgorithmSnapshot
-    mpsB::M
+    approximation::M
     pending_iteration::P
     log::L
     measurement_results::H
@@ -77,10 +77,10 @@ function _validate_split_sweep(sweep::AbstractSweep, site_count::Int)
     return nothing
 end
 
-function initialize_run(mps::PeriodicMPS, algorithm::ALSSplit)
-    approximation = initial_approximation(mps, algorithm.ansatz)
+function initialize_run(target::PeriodicMPS, algorithm::ALSSplit)
+    approximation = initial_approximation(target, algorithm.ansatz)
     _validate_split_sweep(algorithm.sweep, length(approximation))
-    context = _build_split_context(mps, approximation, algorithm.environments)
+    context = _build_split_context(target, approximation, algorithm.environments)
     pending_iteration = iterate(algorithm.sweep)
     measurement_results = MeasurementHistory()
     return SplitRun{
@@ -100,7 +100,7 @@ end
 isfinished(run::SplitRun) = isnothing(run.pending_iteration)
 
 function _copy_split_log(log::SplitLog)
-    return SplitLog(copy(log.site_logs), log.sweep_time, log.converged)
+    return SplitLog(copy(log.site_logs), log.duration, log.converged)
 end
 
 function _completes_sweep(
@@ -108,17 +108,19 @@ function _completes_sweep(
         following_iteration::SplitPendingIteration,
     )
     return isnothing(following_iteration) ||
-           first(following_iteration).n > state.n
+           first(following_iteration).completed_sweeps > state.completed_sweeps
 end
 
 function snapshot(run::SplitRun)
     # A snapshot must remain unchanged if the run continues. Copy every tensor,
     # rather than only copying the PeriodicMPS container, and detach the mutable
     # log vector from the live run.
-    mpsB = PeriodicMPS([copy(tensor) for tensor in run.context.mpsB])
-    identity = _split_problem_identity(run.context.mpsA, run.algorithm)
+    approximation = PeriodicMPS([
+        copy(tensor) for tensor in run.context.approximation
+    ])
+    identity = _split_problem_identity(run.context.target, run.algorithm)
     return SplitSnapshot(
-        mpsB,
+        approximation,
         run.pending_iteration,
         _copy_split_log(run.log),
         deepcopy(run.measurement_results),
@@ -176,31 +178,36 @@ function _validate_split_cursor(
 end
 
 """
-    restore_run(saved::SplitSnapshot, mpsA::PeriodicMPS, algorithm::ALSSplit)
+    restore_run(saved::SplitSnapshot, target::PeriodicMPS, algorithm::ALSSplit)
 
 Reconstruct a split run at the safe boundary captured by `saved`. Transfer
 matrices and contraction caches are derived again from the immutable target
-`mpsA` and a private copy of the saved approximation.
+`target` and a private copy of the saved approximation.
 """
 function restore_run(
         saved::SplitSnapshot,
-        mpsA::PeriodicMPS,
+        target::PeriodicMPS,
         algorithm::ALSSplit,
     )
-    length(saved.mpsB) == 2 * length(mpsA) || throw(DimensionMismatch(
-        "snapshot approximation has $(length(saved.mpsB)) sites but target has " *
-        "$(length(mpsA)) two-site tensors (expected $(2 * length(mpsA)))"
+    length(saved.approximation) == 2 * length(target) || throw(DimensionMismatch(
+        "snapshot approximation has $(length(saved.approximation)) tensors " *
+        "but the target has $(length(target)) two-physical-leg tensors " *
+        "(expected $(2 * length(target)) approximation tensors)"
     ))
-    _validate_split_sweep(algorithm.sweep, length(saved.mpsB))
-    _matches_split_problem(saved.identity, mpsA, algorithm) || throw(
+    _validate_split_sweep(algorithm.sweep, length(saved.approximation))
+    _matches_split_problem(saved.identity, target, algorithm) || throw(
         ArgumentError(
             "snapshot does not match the supplied split target or algorithm configuration"
         )
     )
     _validate_split_cursor(saved, algorithm.sweep, algorithm.stopping)
 
-    mpsB = PeriodicMPS([copy(tensor) for tensor in saved.mpsB])
-    context = _build_split_context(mpsA, mpsB, algorithm.environments)
+    approximation = PeriodicMPS([
+        copy(tensor) for tensor in saved.approximation
+    ])
+    context = _build_split_context(
+        target, approximation, algorithm.environments
+    )
     pending_iteration = saved.pending_iteration
     measurement_results = deepcopy(saved.measurement_results)
     return SplitRun{
@@ -226,14 +233,14 @@ function step!(run::SplitRun)
     started_at = time()
     _, cost = update!(
         run.context,
-        run.algorithm.solve,
+        run.algorithm.solver,
         run.algorithm.environments,
         state,
     )
     site_log = SiteLog(state, cost, time() - started_at)
     push!(run.log.site_logs, site_log)
 
-    run.log.sweep_time += site_log.time
+    run.log.duration += site_log.duration
     run.pending_iteration = following_iteration
     if _completes_sweep(state, following_iteration) &&
             should_stop(run.algorithm.stopping, run.log.site_logs)
@@ -246,7 +253,7 @@ end
 function run_result(run::SplitRun)
     isfinished(run) || throw(ArgumentError("split run is not complete"))
     return SplitResult(
-        run.context.mpsB,
+        run.context.approximation,
         run.measurement_results,
         run.log,
     )
@@ -254,15 +261,15 @@ end
 
 """
     split(
-        mps::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
-        alg::ALSSplit;
+        target::PeriodicMPS{<:AbstractTensorMap{E,S,3,1}},
+        algorithm::ALSSplit;
         observer,
     )
 
-Given a periodic MPS with 2 physical legs per site (3 codim legs), produce a
-periodic MPS with 1 physical leg per site (2 codim legs) that best approximates
-the periodic state. Returns `(mps_1site, log)` where `log` is a [`SplitLog`](@ref)
-with one `SiteLog` per update. This blocking convenience API uses the same
+Given a periodic MPS with two physical legs per tensor, produce a periodic MPS
+with one physical leg per tensor that best approximates the periodic state.
+Returns `(approximation, log)` where `log` is a [`SplitLog`](@ref) with one
+`SiteLog` per update. This blocking convenience API uses the same
 [`SplitRun`](@ref) stepper as controllable local and platform execution.
 
 Interactive sessions use the default split progress observer when `observer`
@@ -270,11 +277,11 @@ is omitted. Pass `observer=nothing` to disable output or supply a callable to
 replace the default observer.
 """
 function split(
-        mps::PeriodicMPS,
+        target::PeriodicMPS,
         algorithm::ALSSplit;
         observer = _DEFAULT_OBSERVER,
     )
-    run = initialize_run(mps, algorithm)
+    run = initialize_run(target, algorithm)
     resolved_observer = _resolve_observer(run, observer)
     try
         _observer_running!(resolved_observer, run)

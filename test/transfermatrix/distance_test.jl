@@ -27,7 +27,7 @@ end
     @test_throws DomainError PMPSLab._nonnegative_squared(-1.0, 1.0, "test quantity")
 end
 
-@testset "norm — 2-site MPS" begin
+@testset "norm — two-physical-leg tensors" begin
     N, d, D = 2, 2, 2
     mps = rand(PeriodicMPS, ComplexF64, N, (d, d), D)
     @test norm(mps)^2 ≈ expectation(PeriodicTransferMatrix(mps))
@@ -151,22 +151,21 @@ end
     @test norm(in_place) ≈ 1
 end
 
-@testset "diff_norm — zero for identical, positive for distinct" begin
+@testset "squared_distance — zero for identical, positive for distinct" begin
     N, d, D = 3, 2, 2
     mps1 = rand(PeriodicMPS, ComplexF64, N, d, D)
     mps2 = rand(PeriodicMPS, ComplexF64, N, d, D)
 
-    @test diff_norm(mps1, mps1) ≈ 0 atol=1e-12
-    @test diff_norm(mps1, mps2) > 0
-    @test diff_norm(mps1, mps2) ≈ diff_norm(mps2, mps1)
-    @test squared_distance(mps1, mps2) ≈ diff_norm(mps1, mps2)
+    @test squared_distance(mps1, mps1) ≈ 0 atol=1e-12
+    @test squared_distance(mps1, mps2) > 0
+    @test squared_distance(mps1, mps2) ≈ squared_distance(mps2, mps1)
 end
 
 @testset "isapprox — gauge-equivalent states tolerate contraction roundoff" begin
     Random.seed!(310)
     mps = rand(PeriodicMPS, ComplexF64, 4, 2, 3)
     gauged = PeriodicMPS(copy.(mps.tensors))
-    gaugefix!(gauged, ProjectorCanonical(; tol=1e-12, maxiter=100))
+    gaugefix!(gauged, ProjectorGaugeFix(; tol=1e-12, maxiter=100))
 
     @test squared_distance(mps, gauged) >= 0
     @test isapprox(mps, gauged)
@@ -176,17 +175,17 @@ end
     @test !isapprox(mps, different)
 end
 
-@testset "diff_norm — with Z2-graded spaces" begin
+@testset "squared_distance — with Z2-graded spaces" begin
     N = 3
     V = Z2Space(0 => 2, 1 => 1)
     P = Z2Space(0 => 2)
     mps1 = rand(PeriodicMPS, ComplexF64, N, P, V)
     mps2 = rand(PeriodicMPS, ComplexF64, N, P, V)
 
-    @test diff_norm(mps1, mps1) ≈ 0 atol=1e-12
-    @test diff_norm(mps1, mps2) > 0
-    @test diff_norm(mps1, mps2) ≈ diff_norm(mps2, mps1)
+    @test squared_distance(mps1, mps1) ≈ 0 atol=1e-12
+    @test squared_distance(mps1, mps2) > 0
+    @test squared_distance(mps1, mps2) ≈ squared_distance(mps2, mps1)
 
     d12 = norm(dense(mps1) - dense(mps2))
-    @test d12^2 ≈ diff_norm(mps1, mps2) rtol=1e-10
+    @test d12^2 ≈ squared_distance(mps1, mps2) rtol=1e-10
 end
