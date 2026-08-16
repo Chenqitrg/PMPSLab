@@ -1,7 +1,7 @@
 @testset "split transfer policies — construction and defaults" begin
     dense_policy = DenseTransferPolicy()
-    truncated_policy = TruncatedTransferPolicy(; truncation=TruncationStrategy(maxrank=2))
-    @test TruncatedTransferPolicy().truncation ==
+    truncated_policy = TruncatedTransferPolicy(; trunc=TruncationStrategy(maxrank=2))
+    @test TruncatedTransferPolicy().trunc ==
         truncerror(; rtol=1.0e-13)
 
     defaults = SplitEnvironmentPolicy()
@@ -33,7 +33,7 @@ end
     mpsB = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     mpsA = pair_contraction(mpsB)
     dense_policy = DenseTransferPolicy()
-    truncated_policy = TruncatedTransferPolicy(; truncation=TruncationStrategy())
+    truncated_policy = TruncatedTransferPolicy(; trunc=TruncationStrategy())
 
     cases = (
         (SplitEnvironmentPolicy(; norm=dense_policy, mixed=dense_policy),
@@ -59,7 +59,7 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     mpsB = initial_approximation(mpsA, SVDAnsatz())
     dense_policy = DenseTransferPolicy()
-    truncated_policy = TruncatedTransferPolicy(; truncation=TruncationStrategy())
+    truncated_policy = TruncatedTransferPolicy(; trunc=TruncationStrategy())
 
     # The mixed environment only constructs W, so it may be factored while the
     # dense normal environment is handled by a direct solver.
@@ -120,13 +120,13 @@ end
 @testset "split — truncated transfer policy is wired through a complete run" begin
     Random.seed!(20260811)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
-    truncated = TruncatedTransferPolicy(; truncation=TruncationStrategy())
+    truncated = TruncatedTransferPolicy(; trunc=TruncationStrategy())
     policy = SplitEnvironmentPolicy(;
         norm=truncated,
         mixed=truncated,
     )
     algorithm = ALSSplit(;
-        ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=2)),
+        ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=2)),
         sweep=CircularSweep(; N=4, maximal_sweep=2),
         solve=KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-12)),
         environments=policy,

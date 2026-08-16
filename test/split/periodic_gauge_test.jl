@@ -30,7 +30,7 @@ end
     Random.seed!(20260809)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 3)
     ansatz = PeriodicGaugeAnsatz(;
-        svd_pre=SVDAnsatz(; truncation=TruncationStrategy(maxrank=2)),
+        svd_pre=SVDAnsatz(; trunc=TruncationStrategy(maxrank=2)),
         canonical=ProjectorCanonical(; tol=1e-12, maxiter=100),
     )
     test_end_to_end_cost(mpsA, ansatz)
@@ -38,10 +38,10 @@ end
     Random.seed!(20260810)
     mpsA_truncated = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 3)
     truncated_ansatz = PeriodicGaugeAnsatz(;
-        svd_pre=SVDAnsatz(; truncation=TruncationStrategy(maxrank=2)),
+        svd_pre=SVDAnsatz(; trunc=TruncationStrategy(maxrank=2)),
         canonical=ProjectorCanonical(
             ; tol=1e-12, maxiter=100,
-            trscheme=TruncationStrategy(maxrank=2),
+            trunc=TruncationStrategy(maxrank=2),
         ),
     )
     test_end_to_end_cost(mpsA_truncated, truncated_ansatz)
@@ -57,10 +57,10 @@ end
     Random.seed!(20260812)
     χ = 2
     mpsA = random_cdl_mps(ComplexF64, 2, χ)
-    svd_ansatz = SVDAnsatz(; truncation=TruncationStrategy())
+    svd_ansatz = SVDAnsatz(; trunc=TruncationStrategy())
     canonical = ProjectorCanonical(
         ; tol=1e-12, maxiter=100,
-        trscheme=TruncationStrategy(atol=1e-10),
+        trunc=TruncationStrategy(atol=1e-10),
     )
     periodic_ansatz = PeriodicGaugeAnsatz(; svd_pre=svd_ansatz, canonical)
 
@@ -92,7 +92,7 @@ end
     B0 = rand(PeriodicMPS, ComplexF64, 4, d, D)
     A = pair_contraction(B0)
     ansatz = PeriodicGaugeAnsatz(;
-        svd_pre=SVDAnsatz(; truncation=TruncationStrategy()),
+        svd_pre=SVDAnsatz(; trunc=TruncationStrategy()),
         canonical=ProjectorCanonical(),
     )
     mpsB = initial_approximation(A, ansatz)
@@ -108,7 +108,7 @@ end
     P = Z2Space(0 => 2)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, P ⊗ P, V)
     ansatz = PeriodicGaugeAnsatz(;
-        svd_pre=SVDAnsatz(; truncation=TruncationStrategy()),
+        svd_pre=SVDAnsatz(; trunc=TruncationStrategy()),
         canonical=ProjectorCanonical(),
     )
     mpsB = initial_approximation(mpsA, ansatz)

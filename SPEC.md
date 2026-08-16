@@ -21,7 +21,7 @@ closed contraction defines the physical state. There is no
         AbstractPeriodicCanonical
     tol::Float64 = 1e-12
     maxiter::Int = 100
-    trscheme::T = TruncationStrategy()
+    trunc::T = TruncationStrategy()
     alg_orth::O = MPSKit.Defaults.alg_orth()
 end
 
@@ -102,6 +102,28 @@ canonical storage constructor.
 objects only. In particular, MPSKit normalizes its boundary gauge during
 InfiniteMPS regularization, so its returned unit-cell tensors cannot directly
 replace the finite-periodic tensors or preserve their amplitude.
+
+## Algorithm configuration values
+
+Algorithm configurations subtype `AbstractAlgorithmConfig` and have value
+semantics. Their fields are not mutated after construction. `@setconfig` derives
+a new configuration by rebuilding every affected node through its keyword
+constructor, so constructor validation still applies and a replacement may
+change a field's concrete strategy type.
+
+Paths use `/` from the root configuration to a leaf:
+
+```julia
+updated = @setconfig algorithm begin
+    maximal_rg = 4
+    split/sweep/maximal_sweep = 60
+    split/stopping/atol = 1e-10
+end
+```
+
+Assignments are applied from top to bottom. Unmentioned branches are reused;
+the original configuration remains unchanged. Replacing a whole nested strategy
+is supported, for example `split/stopping = NoStopping()`.
 
 ## 2-to-1 approximation
 
@@ -184,4 +206,4 @@ squared_distance(a, b) =
 - With truncation, errors are measured from a complete finite-period contraction.
 - For `split` with an exact local solver, compare the local update against the
   complete periodic cost after every site and require non-increase before enabling
-  the sweep callback.
+  the sweep observer.

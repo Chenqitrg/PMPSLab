@@ -45,12 +45,12 @@ function default_looptnr(; maximal_rg::Integer, dcut::Integer)
     split = ALSSplit(;
         ansatz=PeriodicGaugeAnsatz(;
             svd_pre=SVDAnsatz(;
-                truncation=truncrank(preliminary_rank) & numerical_truncation,
+                trunc=truncrank(preliminary_rank) & numerical_truncation,
             ),
             canonical=ProjectorCanonical(;
                 tol=1.0e-13,
                 maxiter=100,
-                trscheme=truncrank(dcut) & numerical_truncation,
+                trunc=truncrank(dcut) & numerical_truncation,
             ),
         ),
         sweep=CircularSweep(; N=8, maximal_sweep=40),

@@ -155,7 +155,7 @@ by the initial two-to-one tensor decompositions:
 
 ```julia
 algorithm = ALSSplit(;
-    ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=3)),
+    ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=3)),
     sweep=CircularSweep(; N=2 * length(A), maximal_sweep=20),
     solve=CholeskySolve(),
 )
@@ -184,7 +184,7 @@ approximately equal:
 
 ```julia
 algorithm = ALSSplit(;
-    ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=3)),
+    ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=3)),
     sweep=CircularSweep(; N=2 * length(A), maximal_sweep=500),
     solve=CholeskySolve(),
     stopping=CostConvergence(;
@@ -379,7 +379,7 @@ mixed environments can independently use truncated factored products:
 
 ```julia
 truncated = TruncatedTransferPolicy(;
-    truncation=TruncationStrategy(maxrank=8),
+    trunc=TruncationStrategy(maxrank=8),
 )
 environments = SplitEnvironmentPolicy(;
     norm=truncated,
@@ -387,7 +387,7 @@ environments = SplitEnvironmentPolicy(;
 )
 
 algorithm = ALSSplit(;
-    ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=3)),
+    ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=3)),
     sweep=CircularSweep(; N=2 * length(A), maximal_sweep=500),
     solve=KrylovSolve(; alg=GMRES(; maxiter=100, tol=1e-10)),
     environments,
@@ -441,6 +441,26 @@ complete sweeps it stops when both `abs(cost) < 1e-9` and the relative
 sweep-to-sweep cost change is below `1e-2`. Every RG boundary is normalized by
 the coefficient infinity norm; fixed-point transfer measurements remain
 disabled until their eigensolver is available.
+
+Algorithm configurations are immutable values. Use `@setconfig` to derive a
+modified configuration. Its `/`-separated paths follow the displayed
+configuration tree from root to leaf:
+
+```julia
+tnr = @setconfig tnr begin
+    maximal_rg = 4
+    split/sweep/maximal_sweep = 60
+    split/stopping/atol = 1e-10
+end
+```
+
+The original `tnr` is unchanged unless the returned value is assigned back to
+it. A whole strategy can also be replaced, even when that changes the concrete
+configuration type:
+
+```julia
+tnr = @setconfig tnr split/stopping = NoStopping()
+```
 
 In an interactive session the default observer uses one replaceable progress
 entry for the current RG split, spanning all of its split sweeps, and leaves

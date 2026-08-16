@@ -18,7 +18,7 @@ import MPSKit
 import MPSKit: left_virtualspace, right_virtualspace, physicalspace
 
 # Algorithm configuration and execution
-export AbstractAlgorithmConfig
+export AbstractAlgorithmConfig, @setconfig
 export AbstractMeasurement, AbstractMeasurementResult, MeasurementHistory, measure
 export AbstractNormalization, InfinityNormNormalization, NormalizationResult
 export AbstractFixedPointMeasurement, NoFixedPointMeasurement
@@ -87,6 +87,7 @@ export LUSolve, LDLTSolve, CholeskySolve, KrylovSolve, ldiv, rdiv
 export one_mps, one_mps2, random_cdl, random_cdl_mps, lift
 
 include("algorithm_config.jl")
+include("setconfig.jl")
 include("measurement/interface.jl")
 include("measurement/history.jl")
 include("tensorcell/container.jl")

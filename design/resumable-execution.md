@@ -4,13 +4,13 @@
 
 This document records the platform-independent execution model for pausing,
 checkpointing, restoring, and cancelling long-running PMPSLab algorithms. The
-split run, snapshots, checkpoint codec, and synthetic parent-child composition
-proof are implemented. The platform adapter remains deferred until its hosting
-interfaces are known.
+split run, nested LoopTNR run, snapshots, checkpoint codec, local durable-control
+helpers, and parent-child composition tests are implemented. The platform adapter
+remains deferred until its hosting interfaces are known.
 
-The first implementation target is the existing 2-to-1 periodic MPS `split`
-algorithm. The design must also compose with future algorithms, especially a
-LoopTNR run whose renormalization-group steps may contain nested `split` runs.
+The first implementation target was the 2-to-1 periodic MPS `split` algorithm.
+The same protocol now drives LoopTNR runs whose renormalization-group steps
+contain nested `SplitRun` values.
 
 ## Motivation
 
@@ -361,39 +361,46 @@ The exact JSON representation remains a platform-adapter decision.
 
 ## Nested LoopTNR execution
 
-A future LoopTNR run should expose its phase and current child run explicitly:
+The implemented LoopTNR run exposes its phase and current child run explicitly:
 
 ```julia
 @enum LoopTNRPhase begin
-    PREPARE_RG
-    OPTIMIZE
-    COARSE_GRAIN
-    FINISH_RG
+    TNR_INITIALIZE
+    TNR_PREPARE_SPLIT
+    TNR_OPTIMIZE
+    TNR_COARSE_GRAIN
+    TNR_FINISHED
 end
 
-mutable struct LoopTNRRun{I,A,S,C} <: AbstractAlgorithmRun
-    input::I
+mutable struct LoopTNRRun{
+        A<:LoopTNR,
+        G<:GenericGateTensor,
+        S<:ALSSplit,
+        H<:MeasurementHistory,
+    } <: AbstractAlgorithmRun
     algorithm::A
-    state::S
-    rg_index::Int
+    cell::PlaquetteGates{G}
+    completed_rg::Int
     phase::LoopTNRPhase
-    child::C
-    completed::Bool
+    active_split::Union{Nothing,SplitRun{S}}
+    log::LoopTNRLog
+    measurement_results::H
 end
 ```
 
-When `phase == OPTIMIZE`, `step!(run::LoopTNRRun)` delegates one step to the
-child. When the child completes, the parent commits its result and advances to
-the next phase. The outer cursor must advance only after the child result has
-been committed successfully.
+When `phase == TNR_OPTIMIZE`, `step!(run::LoopTNRRun)` delegates one step to the
+active split. When the child completes, the parent moves to coarse graining and
+commits the normalized cell, RG log, and measurement result together before
+advancing `completed_rg`.
 
 A root LoopTNR snapshot contains a snapshot of its active child, so a pause may
 occur inside a split site sequence or between RG steps without special handling
 by the platform.
 
-The first implementation should include a small synthetic composite run test
-before the real LoopTNR implementation exists. This will verify that events,
-snapshots, and restore compose through a parent-child boundary.
+A synthetic composite-run test first established the protocol. The real
+`LoopTNRRun` test suite now verifies nested events, safe-boundary pauses,
+snapshot isolation, restore across every phase, and active-child checkpoint
+round trips.
 
 ## Checkpoint encoding
 
@@ -606,7 +613,7 @@ A synthetic parent run with a resumable child verifies that:
 
 ## Implementation plan
 
-### Phase 1: Explicit split execution
+### Phase 1: Explicit split execution — implemented
 
 1. Add the abstract run/snapshot/event interfaces.
 2. Introduce `SplitRun` with a `SplitContext` numerical workspace.
@@ -614,14 +621,14 @@ A synthetic parent run with a resumable child verifies that:
 4. Reimplement `split` as a synchronous compatibility wrapper.
 5. Verify that all existing tests remain green.
 
-### Phase 2: Split snapshots
+### Phase 2: Split snapshots — implemented
 
 1. Add `SplitSnapshot`.
 2. Rebuild `SplitContext` from immutable input and snapshot state.
 3. Add per-boundary restore tests.
 4. Verify numerical agreement within machine precision.
 
-### Phase 3: Checkpoint codec
+### Phase 3: Checkpoint codec — implemented
 
 1. Add the versioned checkpoint header.
 2. Implement JLD2 path-based encoding and decoding with temporary-file

@@ -2,7 +2,7 @@
     N, d, D = 4, 2, 3
     mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     tvec = [copy(mps[i]) for i in 1:N]
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
     @test gaugefix!(mps, alg) === mps
     # After canonicalization, consistency should still hold
     @test assertconsistency(mps) === nothing
@@ -18,7 +18,7 @@ end
     P = Z2Space(0 => 2)
     mps = rand(PeriodicMPS, ComplexF64, N, P, V)
     tvec = [copy(mps[i]) for i in 1:N]
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
     @test gaugefix!(mps, alg) === mps
     @test assertconsistency(mps) === nothing
     for i in 1:N
@@ -30,7 +30,7 @@ end
     N, d, D = 4, 2, 2
     mps = rand(PeriodicMPS, ComplexF64, N, d, D)
     dense_before = dense(mps)
-    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trscheme=MPSKit.TruncationStrategy())
+    alg = ProjectorCanonical(; tol=1e-12, maxiter=100, trunc=MPSKit.TruncationStrategy())
     gaugefix!(mps, alg)
     dense_after = dense(mps)
     @test norm(dense_before - dense_after) < 1e-10
@@ -51,7 +51,7 @@ end
     # This must reproduce the projector update performed by gaugefix!.
     mixed = map(eachindex(mps)) do bond
         pos = half(2bond + 1)
-        U, S, Vh, _ = PMPSLab.svd_trunc(L[pos] * R[pos]; trunc=alg.trscheme)
+        U, S, Vh, _ = PMPSLab.svd_trunc(L[pos] * R[pos]; trunc=alg.trunc)
         return (; U, S, Vh)
     end
 
@@ -117,7 +117,7 @@ end
     original = rand(PeriodicMPS, ComplexF64, 6, 2, 6)
     alg = ProjectorCanonical(
         ; tol=1e-12, maxiter=100,
-        trscheme=MPSKit.TruncationStrategy(maxrank=2),
+        trunc=MPSKit.TruncationStrategy(maxrank=2),
     )
 
     once = deepcopy(original)

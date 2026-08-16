@@ -210,11 +210,11 @@ svd_truncation = truncrank(2dcut) & numerical_truncation
 projector_truncation = truncrank(dcut) & numerical_truncation
 
 ansatz = PeriodicGaugeAnsatz(;
-    svd_pre=SVDAnsatz(; truncation=svd_truncation),
+    svd_pre=SVDAnsatz(; trunc=svd_truncation),
     canonical=ProjectorCanonical(;
         tol=1e-13,
         maxiter=100,
-        trscheme=projector_truncation,
+        trunc=projector_truncation,
     ),
 )
 

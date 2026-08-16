@@ -47,13 +47,13 @@ function initial_approximation(
 end
 
 """
-    SVDAnsatz(; truncation=TruncationStrategy())
+    SVDAnsatz(; trunc=TruncationStrategy())
 
 Initialize each pair of split tensors from a local singular-value
-decomposition using `truncation`.
+decomposition using `trunc`.
 """
 @kwdef struct SVDAnsatz{T<:TruncationStrategy} <: AbstractAnsatz
-    truncation::T = TruncationStrategy()
+    trunc::T = TruncationStrategy()
 end
 
 function split_site(T::AbstractTensorMap{E, S, 3, 1}, trunc::TruncationStrategy) where {E, S}
@@ -64,7 +64,7 @@ function split_site(T::AbstractTensorMap{E, S, 3, 1}, trunc::TruncationStrategy)
 end
 
 function initial_approximation(mps::PeriodicMPS{<:AbstractTensorMap{E, S, 3, 1}}, ansatz::SVDAnsatz) where {E, S}
-    tensors = [tensor for site in mps for tensor in split_site(site, ansatz.truncation)]
+    tensors = [tensor for site in mps for tensor in split_site(site, ansatz.trunc)]
     return PeriodicMPS(tensors)
 end
 

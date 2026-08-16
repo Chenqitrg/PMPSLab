@@ -36,10 +36,10 @@ end
 
     @test algorithm.maximal_rg == 3
     @test algorithm.split.ansatz isa PeriodicGaugeAnsatz
-    @test algorithm.split.ansatz.svd_pre.truncation == expected_svd
+    @test algorithm.split.ansatz.svd_pre.trunc == expected_svd
     @test algorithm.split.ansatz.canonical.tol == 1.0e-13
     @test algorithm.split.ansatz.canonical.maxiter == 100
-    @test algorithm.split.ansatz.canonical.trscheme == expected_projector
+    @test algorithm.split.ansatz.canonical.trunc == expected_projector
     @test algorithm.split.sweep == CircularSweep(; N=8, maximal_sweep=40)
     @test algorithm.split.solve == LDLTSolve()
     @test algorithm.split.environments.norm isa DenseTransferPolicy

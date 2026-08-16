@@ -15,21 +15,10 @@ _algorithm_config_name(config::AbstractAlgorithmConfig) =
 _show_algorithm_config_value(io::IO, value) =
     show(IOContext(io, :compact => true), value)
 
-function _show_keyword_arguments(io::IO, arguments)
-    print(io, "(")
-    for (index, (name, value)) in enumerate(arguments)
-        index > 1 && print(io, ", ")
-        print(io, name, "=")
-        show(IOContext(io, :compact => true), value)
-    end
-    print(io, ")")
-    return nothing
-end
+_show_algorithm_config_value(io::IO, value::TruncationStrategy) =
+    print(io, nameof(typeof(value)), "(...)")
 
-function _show_algorithm_config_value(
-        io::IO,
-        strategy::MatrixAlgebraKit.NoTruncation,
-    )
+function _show_algorithm_config_value(io::IO, ::MatrixAlgebraKit.NoTruncation)
     print(io, "notrunc()")
     return nothing
 end
@@ -38,13 +27,11 @@ function _show_algorithm_config_value(
         io::IO,
         strategy::MatrixAlgebraKit.TruncationByOrder,
     )
-    print(io, "truncrank(", strategy.howmany)
-    strategy.by === abs || begin
-        print(io, "; by=")
-        show(IOContext(io, :compact => true), strategy.by)
+    if strategy.by === abs && strategy.rev
+        print(io, "truncrank(", strategy.howmany, ")")
+    else
+        print(io, "TruncationByOrder(...)")
     end
-    strategy.rev || print(io, strategy.by === abs ? "; rev=false" : ", rev=false")
-    print(io, ")")
     return nothing
 end
 
@@ -52,50 +39,14 @@ function _show_algorithm_config_value(
         io::IO,
         strategy::MatrixAlgebraKit.TruncationByError,
     )
-    arguments = Pair{Symbol,Any}[]
-    iszero(strategy.atol) || push!(arguments, :atol => strategy.atol)
-    iszero(strategy.rtol) || push!(arguments, :rtol => strategy.rtol)
-    strategy.p == 2 || push!(arguments, :p => strategy.p)
-    print(io, "truncerror")
-    _show_keyword_arguments(io, arguments)
-    return nothing
-end
-
-function _show_algorithm_config_value(
-        io::IO,
-        strategy::MatrixAlgebraKit.TruncationByValue,
-    )
-    arguments = Pair{Symbol,Any}[]
-    iszero(strategy.atol) || push!(arguments, :atol => strategy.atol)
-    iszero(strategy.rtol) || push!(arguments, :rtol => strategy.rtol)
-    strategy.p == 2 || push!(arguments, :p => strategy.p)
-    strategy.by === abs || push!(arguments, :by => strategy.by)
-    strategy.keep_below && push!(arguments, :keep_below => true)
-    print(io, "trunctol")
-    _show_keyword_arguments(io, arguments)
-    return nothing
-end
-
-function _show_algorithm_config_value(
-        io::IO,
-        strategy::MatrixAlgebraKit.TruncationByFilter,
-    )
-    print(io, "truncfilter(")
-    show(IOContext(io, :compact => true), strategy.filter)
-    print(io, ")")
-    return nothing
-end
-
-function _show_composite_truncation(io::IO, components, operator::AbstractString)
-    for (index, component) in enumerate(components)
-        index > 1 && print(io, " ", operator, " ")
-        nested = component isa Union{
-            MatrixAlgebraKit.TruncationIntersection,
-            MatrixAlgebraKit.TruncationUnion,
-        }
-        nested && print(io, "(")
-        _show_algorithm_config_value(io, component)
-        nested && print(io, ")")
+    if strategy.p != 2 || (!iszero(strategy.atol) && !iszero(strategy.rtol))
+        print(io, "TruncationByError(...)")
+    elseif iszero(strategy.atol) && iszero(strategy.rtol)
+        print(io, "truncerror()")
+    elseif iszero(strategy.atol)
+        print(io, "truncerror(rtol=", strategy.rtol, ")")
+    else
+        print(io, "truncerror(atol=", strategy.atol, ")")
     end
     return nothing
 end
@@ -104,26 +55,18 @@ function _show_algorithm_config_value(
         io::IO,
         strategy::MatrixAlgebraKit.TruncationIntersection,
     )
-    return _show_composite_truncation(io, strategy.components, "&")
-end
-
-function _show_algorithm_config_value(
-        io::IO,
-        strategy::MatrixAlgebraKit.TruncationUnion,
-    )
-    return _show_composite_truncation(io, strategy.components, "|")
-end
-
-function _show_algorithm_config_value(
-        io::IO,
-        algorithm::MatrixAlgebraKit.AbstractAlgorithm,
-    )
-    algorithm_type = typeof(algorithm)
-    name = algorithm_type <: MatrixAlgebraKit.Algorithm ?
-        algorithm_type.parameters[1] : nameof(algorithm_type)
-    print(io, name)
+    for (index, component) in enumerate(strategy.components)
+        index > 1 && print(io, " & ")
+        _show_algorithm_config_value(io, component)
+    end
     return nothing
 end
+
+_show_algorithm_config_value(io::IO, algorithm::MatrixAlgebraKit.Algorithm) =
+    print(io, MatrixAlgebraKit.name(algorithm))
+
+_show_algorithm_config_value(io::IO, algorithm::MatrixAlgebraKit.AbstractAlgorithm) =
+    print(io, nameof(typeof(algorithm)))
 
 function _show_algorithm_config_fields(
         io::IO,
@@ -160,19 +103,24 @@ function Base.show(
         ::MIME"text/plain",
         config::AbstractAlgorithmConfig,
     )
-    name = _algorithm_config_name(config)
     if get(io, :compact, false)::Bool
-        print(io, name, "(...)")
+        show(io, config)
         return nothing
     end
 
     fields = fieldnames(typeof(config))
     if isempty(fields)
-        print(io, name, "()")
+        show(io, config)
     else
-        println(io, name, ":")
+        println(io, _algorithm_config_name(config), ":")
         _show_algorithm_config_fields(io, config, "")
     end
+    return nothing
+end
+
+function Base.show(io::IO, config::AbstractAlgorithmConfig)
+    print(io, _algorithm_config_name(config))
+    print(io, isempty(fieldnames(typeof(config))) ? "()" : "(...)")
     return nothing
 end
 

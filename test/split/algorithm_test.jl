@@ -3,9 +3,9 @@
     configurations = (
         RandomAnsatz(; virtual_space=fill(virtual_space, 4)),
         OneAnsatz(; virtual_space=fill(virtual_space, 4)),
-        SVDAnsatz(; truncation=TruncationStrategy()),
+        SVDAnsatz(; trunc=TruncationStrategy()),
         PeriodicGaugeAnsatz(;
-            svd_pre=SVDAnsatz(; truncation=TruncationStrategy()),
+            svd_pre=SVDAnsatz(; trunc=TruncationStrategy()),
             canonical=ProjectorCanonical(),
         ),
         CircularSweep(; N=4, maximal_sweep=2),
@@ -18,10 +18,10 @@
         SplitEnvironmentPolicy(),
         SplitEnvironmentPolicy(;
             norm=TruncatedTransferPolicy(;
-                truncation=TruncationStrategy()
+                trunc=TruncationStrategy()
             ),
             mixed=TruncatedTransferPolicy(;
-                truncation=TruncationStrategy()
+                trunc=TruncationStrategy()
             ),
         ),
     )
@@ -49,21 +49,23 @@ end
 
     @test startswith(ansatz_text, "PeriodicGaugeAnsatz:\n")
     @test occursin(
-        "├─ svd_pre: SVDAnsatz\n│  └─ truncation: ",
+        "├─ svd_pre: SVDAnsatz\n│  └─ trunc: ",
         ansatz_text,
     )
     @test occursin(
         "└─ canonical: ProjectorCanonical\n" *
             "   ├─ tol: 1.0e-12\n" *
             "   ├─ maxiter: 100\n" *
-            "   ├─ trscheme: ",
+            "   ├─ trunc: ",
         ansatz_text,
     )
-    @test occursin("└─ truncation: notrunc()", ansatz_text)
-    @test occursin("├─ trscheme: notrunc()", ansatz_text)
+    @test occursin("└─ trunc: notrunc()", ansatz_text)
+    @test occursin("├─ trunc: notrunc()", ansatz_text)
     @test occursin("└─ alg_orth: Householder", ansatz_text)
     @test !occursin("DefaultDriver", ansatz_text)
     @test !occursin("svd_pre: SVDAnsatz{", ansatz_text)
+    @test sprint(show, ansatz) == "PeriodicGaugeAnsatz(...)"
+    @test sprint(show, LUSolve()) == "LUSolve()"
     @test sprint(
         show,
         MIME"text/plain"(),
@@ -80,7 +82,7 @@ end
     @test occursin(
         "├─ ansatz: PeriodicGaugeAnsatz\n" *
             "│  ├─ svd_pre: SVDAnsatz\n" *
-            "│  │  └─ truncation: ",
+            "│  │  └─ trunc: ",
         split_text,
     )
     @test occursin("├─ solve: CholeskySolve()\n", split_text)
@@ -98,23 +100,35 @@ end
         default_looptnr(; maximal_rg=4, dcut=16),
     )
     @test occursin(
-        "truncation: truncrank(32) & truncerror(rtol=1.0e-13)",
+        "trunc: truncrank(32) & truncerror(rtol=1.0e-13)",
         looptnr_text,
     )
     @test occursin(
-        "trscheme: truncrank(16) & truncerror(rtol=1.0e-13)",
+        "trunc: truncrank(16) & truncerror(rtol=1.0e-13)",
         looptnr_text,
     )
     @test occursin("alg_orth: Householder", looptnr_text)
     @test !occursin("TruncationIntersection", looptnr_text)
     @test !occursin("DefaultDriver", looptnr_text)
+    @test sprint(
+        show,
+        default_looptnr(; maximal_rg=4, dcut=16),
+    ) == "LoopTNR(...)"
+
+    uncommon_truncation = SVDAnsatz(;
+        trunc=truncrank(2) | truncerror(; rtol=1e-8),
+    )
+    @test occursin(
+        "trunc: TruncationUnion(...)",
+        sprint(show, MIME"text/plain"(), uncommon_truncation),
+    )
 end
 
 @testset "split — SVDAnsatz, circular sweep, exact solve" begin
     B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
     alg = ALSSplit(;
-        ansatz=SVDAnsatz(; truncation=TruncationStrategy()),
+        ansatz=SVDAnsatz(; trunc=TruncationStrategy()),
         sweep=CircularSweep(; N=4, maximal_sweep=1),
         solve=CholeskySolve(),
     )
@@ -155,7 +169,7 @@ end
 @testset "update! — exact periodic cost descends for both sweep orders" begin
     Random.seed!(1234)
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
-    ansatz = SVDAnsatz(; truncation=TruncationStrategy(maxrank=1))
+    ansatz = SVDAnsatz(; trunc=TruncationStrategy(maxrank=1))
 
     for sweep in (
             CircularSweep(; N=4, maximal_sweep=2),
@@ -179,7 +193,7 @@ end
     mpsA = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 2)
     nsweeps = 3
     alg = ALSSplit(;
-        ansatz=SVDAnsatz(; truncation=TruncationStrategy(maxrank=1)),
+        ansatz=SVDAnsatz(; trunc=TruncationStrategy(maxrank=1)),
         sweep=CircularSweep(; N=4, maximal_sweep=nsweeps),
         solve=LUSolve(),
     )

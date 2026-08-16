@@ -6,7 +6,7 @@
         :DenseTransferPolicy, :TruncatedTransferPolicy,
         :SplitEnvironmentPolicy,
     ))
-    @test SVDAnsatz().truncation isa TruncationStrategy
+    @test SVDAnsatz().trunc isa TruncationStrategy
     @test PeriodicGaugeAnsatz().svd_pre isa SVDAnsatz
 end
 
@@ -62,7 +62,7 @@ end
 @testset "SVDAnsatz — initial approximation preserves periodic density" begin
     B0 = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
     A = pair_contraction(B0)
-    mpsB = initial_approximation(A, SVDAnsatz(; truncation=TruncationStrategy()))
+    mpsB = initial_approximation(A, SVDAnsatz(; trunc=TruncationStrategy()))
 
     @test length(mpsB) == 4
     @test assertconsistency(mpsB) === nothing

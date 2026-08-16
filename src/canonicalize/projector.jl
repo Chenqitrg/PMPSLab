@@ -8,7 +8,7 @@ abstract type AbstractPeriodicCanonical <: AbstractAlgorithmConfig end
     ProjectorCanonical(;
         tol=1e-12,
         maxiter=100,
-        trscheme=TruncationStrategy(),
+        trunc=TruncationStrategy(),
         alg_orth=MPSKit.Defaults.alg_orth(),
     )
 
@@ -20,7 +20,7 @@ construct the resulting bond projectors.
     } <: AbstractPeriodicCanonical
     tol::Float64 = 1e-12
     maxiter::Int = 100
-    trscheme::T = TruncationStrategy()
+    trunc::T = TruncationStrategy()
     alg_orth::O = MPSKit.Defaults.alg_orth()
 end
 
@@ -124,7 +124,7 @@ function find_projectors(
 
     projectors = map(eachindex(mps)) do bond
         pos = half(2bond + 1)
-        P_decomp(R[pos], L[pos], alg.trscheme)
+        P_decomp(R[pos], L[pos], alg.trunc)
     end
     return HalfPeriodicVector(first.(projectors)), HalfPeriodicVector(last.(projectors))
 end

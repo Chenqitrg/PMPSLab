@@ -8,6 +8,24 @@
 - 审查方式：静态阅读、完整测试套件、针对不变量的最小反例
 - 本报告只记录审查结论，不包含源码修复
 
+### 后续处理状态（2026-08-16）
+
+本报告的反例和分析保留为历史依据；其中的“当前代码”均指审查基线，而不是现有
+工作区。后续处理结果如下：
+
+| 编号 | 当前状态 | 后续实现 |
+|---|---|---|
+| R1 | 已修复 | 初始化和恢复都会用 `sweep_domain` 验证实际 approximation 长度。 |
+| R2 | 已修复 | `PeriodicMPS` 的构造、`setindex!` 和 `copyto!` 都在写入前验证环闭合，失败写入保持原子性。 |
+| R3 | 已修复 | `PeriodicCache` 记录左右有效边界；乱序、重复或跳跃更新不能再静默返回陈旧 environment，而会抛出 `StaleCacheError` 或要求显式 rebuild。 |
+| R4 | 已修复 | 空乘积由 `FormalIdentity` 表示，不再构造带伪截断元数据的满秩 identity transfer。 |
+| R5 | 未修复 | Krylov 未收敛仍只记录 warning 并返回最后 iterate；仍需显式 solver outcome 和原子提交策略。 |
+| R6 | 已修复 | `SPEC.md`、README 和实现统一使用 execution observer；旧 `callback` 关键字已明确移除。 |
+
+此外，`SplitEnvironmentPolicy` 已把 dense/truncated transfer policy 接入完整
+`ALSSplit` 运行路径，LoopTNR v1 的嵌套执行、snapshot、checkpoint 与 observer
+也已经完成。下文“建议实施顺序”是审查当时的建议，不再是当前路线图。
+
 本报告采用以下判断标准：
 
 1. 尽量让非法状态无法构造，而不是依靠后续检查发现。

@@ -20,15 +20,15 @@ Construct exact, materialized [`DenseTransferMatrix`](@ref) values.
 struct DenseTransferPolicy <: AbstractTransferPolicy end
 
 """
-    TruncatedTransferPolicy(; truncation=truncerror(rtol=1e-13))
+    TruncatedTransferPolicy(; trunc=truncerror(rtol=1e-13))
 
 Construct factored [`TruncatedTransferMatrix`](@ref) site values and apply
-`truncation` again whenever transfer products are accumulated.
+`trunc` again whenever transfer products are accumulated.
 """
 @kwdef struct TruncatedTransferPolicy{
         T<:TruncationStrategy
     } <: AbstractTransferPolicy
-    truncation::T = truncerror(; rtol=1.0e-13)
+    trunc::T = truncerror(; rtol=1.0e-13)
 end
 
 transfer_at(
@@ -40,14 +40,14 @@ transfer_at(
 transfer_at(
     bra::PeriodicMPS, ket::PeriodicMPS, site::Int,
     policy::TruncatedTransferPolicy,
-) = transfer_at(bra, ket, site, policy.truncation)
+) = transfer_at(bra, ket, site, policy.trunc)
 
 build_cache(
     bra::PeriodicMPS, ket::PeriodicMPS, ::DenseTransferPolicy
 ) = build_cache(bra, ket)
 build_cache(
     bra::PeriodicMPS, ket::PeriodicMPS, policy::TruncatedTransferPolicy
-) = build_cache(bra, ket, policy.truncation)
+) = build_cache(bra, ket, policy.trunc)
 
 function rebuild_left!(
         cache::PeriodicCache,
@@ -63,7 +63,7 @@ function rebuild_left!(
         ket::PeriodicMPS,
         policy::TruncatedTransferPolicy,
     )
-    return rebuild_left!(cache, bra, ket, policy.truncation)
+    return rebuild_left!(cache, bra, ket, policy.trunc)
 end
 
 function rebuild_right!(
@@ -80,7 +80,7 @@ function rebuild_right!(
         ket::PeriodicMPS,
         policy::TruncatedTransferPolicy,
     )
-    return rebuild_right!(cache, bra, ket, policy.truncation)
+    return rebuild_right!(cache, bra, ket, policy.trunc)
 end
 
 function rebuild!(
@@ -97,5 +97,5 @@ function rebuild!(
         ket::PeriodicMPS,
         policy::TruncatedTransferPolicy,
     )
-    return rebuild!(cache, bra, ket, policy.truncation)
+    return rebuild!(cache, bra, ket, policy.trunc)
 end

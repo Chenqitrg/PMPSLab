@@ -188,7 +188,7 @@ end
     )
     @test_throws ArgumentError restore_run(saved, mpsA, different_ansatz)
 
-    truncated = TruncatedTransferPolicy(; truncation=TruncationStrategy())
+    truncated = TruncatedTransferPolicy(; trunc=TruncationStrategy())
     different_environments = ALSSplit(;
         ansatz=algorithm.ansatz,
         sweep=algorithm.sweep,

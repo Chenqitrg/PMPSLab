@@ -52,7 +52,8 @@ using PMPSLab:
     RandomAnsatz,
     OneAnsatz,
     SVDAnsatz,
-    PeriodicGaugeAnsatz
+    PeriodicGaugeAnsatz,
+    default_looptnr
 import PMPSLab: initial_approximation, split_site, diff_norm,
                 this_B, other_B, this_A, pa_from_pb, expectation,
                 ProjectorCanonical, gaugefix!
