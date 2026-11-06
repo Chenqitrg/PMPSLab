@@ -21,17 +21,19 @@ claims to control updates; Julia properties and positional construction do.
 
 ## Adopted: standard logging composition
 
-AlgorithmLogLab now contains event schemas, field codecs and registry inspection.
+AlgorithmLogLab was reduced to event schemas, field codecs and registry inspection,
+then migrated into ExperimentLab. The standalone local package is now retired.
 Applications use `event_record(registry, event)` to obtain plain `event`/`data`
 keywords, then use Julia Logging, LoggingExtras and LoggingFormats directly.
-The custom logger, sink, file wrapper and Julia-internal exception routing are
-removed. JSON uses LoggingFormats' standard layout, with recursive values and
-optionally flattened keyword fields. Logging libraries belong to example/test
-and application environments; the schema core has no hard dependencies.
+The old custom logger, sink, file wrapper and Julia-internal exception routing
+were removed. ExperimentLab now adds record-bound log scopes using LoggingExtras
+and LoggingFormats, with append, flush, ownership fields, and propagated write
+errors. These libraries are runtime dependencies of ExperimentLab.
 
-Accept standard filtering and exception behavior. Validate outside logging macros
-when errors must propagate. The package no longer promises damaged-tail checks,
-failed-sink state, generated record UUIDs or custom logger descriptions.
+Direct library composition retains standard filtering and exception behavior.
+ExperimentLab's bound scopes explicitly propagate logging output failures.
+Neither interface promises the old damaged-tail checks, failed-sink state,
+generated log-record UUIDs, or custom logger descriptions.
 
 ## Evaluated: direct MLflow tracking
 
@@ -88,6 +90,10 @@ Configuration source and extensions decreased from 972 to 576 lines. The six
 scientific/update packages now define options directly and no longer maintain
 duplicate registration/default tables. Storage examples use plain configuration
 metadata while native Julia restoration remains unchanged.
+
+Configuration ownership has since moved into `ExperimentLab/src/config/`, with
+all domain callers updated. AlgorithmConfigLab is retired. Configurations.jl and
+Accessors remain the upstream providers; MatrixAlgebraKit support stays optional.
 
 ## Deferred candidates
 
