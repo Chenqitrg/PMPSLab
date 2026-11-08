@@ -8,32 +8,46 @@ Configurations = "5218b696-f38b-4ac9-8b61-a12ec717816d"
 ExperimentLab = "29f77e63-5c80-4c5a-8fc3-cbf639322b6d"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PeriodicProductsLab = "9b7f73d1-02d3-4223-9533-f823f86a6b11"
-TransferMatricesLab = "32740eca-525e-449a-9a92-5b9caafb409d"
 MPSKit = "bb1c41ca-d63c-52ed-829e-0820dda26502"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 TensorKit = "07d1fe3e-3e46-537d-9eac-e9e13d0d4cec"
+ResumableFunctions = "c5292f4c-5179-55e1-98c5-05642aab7184"
+LatticeIteratorLab = "fe9b439f-8eb6-4306-8b6e-a4fd64b7a696"
+TensorLinearSolveLab = "1edcf5f3-8d72-4caf-b59c-7140f702ee01"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+MatrixAlgebraKit = "6c742aac-3347-4629-af66-fc926824e5e4"
 
 [sources]
 ExperimentLab = {path = "../ExperimentLab"}
 PeriodicProductsLab = {path = "../PeriodicProductsLab"}
-TransferMatricesLab = {path = "../TransferMatricesLab"}
+LatticeIteratorLab = {path = "../LatticeIteratorLab"}
+TensorLinearSolveLab = {path = "../TensorLinearSolveLab"}
 
 [compat]
 Configurations = "0.17.6"
 ExperimentLab = "0.1"
-LinearAlgebra = "1.12.0"
+LinearAlgebra = "1.12"
 PeriodicProductsLab = "0.1"
-TransferMatricesLab = "0.1"
 julia = "1.12"
 CategoryData = "0.4"
 MPSKit = "0.13.13"
 Random = "1.11"
 TensorKit = "0.17.1"
 Test = "1.11"
+ResumableFunctions = "1.0.8"
+Accessors = "0.1.44"
+LatticeIteratorLab = "0.1"
+TensorLinearSolveLab = "0.1"
+JLD2 = "0.6"
+KrylovKit = "0.10.4"
+MatrixAlgebraKit = "0.6.9"
 
 [extras]
 CategoryData = "8fccf25a-f50e-468c-8fba-3cb130506274"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
+KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 
 [targets]
-test = ["Test", "CategoryData"]
+test = ["CategoryData", "Test", "Accessors", "KrylovKit", "JLD2"]

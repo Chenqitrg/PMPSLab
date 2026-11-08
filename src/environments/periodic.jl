@@ -57,13 +57,13 @@ otherwise the result is dense.
 transfer_at(mps::PeriodicMPS, site::Int) = transfer_at(mps, mps, site)
 
 transfer_at(bra::PeriodicMPS, ket::PeriodicMPS, site::Int) =
-    TransferMatricesLab.DenseTransferMatrix(bra[site], ket[site])
+    DenseTransferMatrix(bra[site], ket[site])
 
 transfer_at(
         target::PeriodicMPS{<:TensorKit.AbstractTensorMap{E,S,3,1}},
         approximation::PeriodicMPS{<:TensorKit.AbstractTensorMap{E,S,2,1}},
         site::Int,
-    ) where {E,S} = TransferMatricesLab.DenseTransferMatrix(
+    ) where {E,S} = DenseTransferMatrix(
         target[site], approximation[2site - 1], approximation[2site]
     )
 
@@ -71,7 +71,7 @@ transfer_at(
         approximation::PeriodicMPS{<:TensorKit.AbstractTensorMap{E,S,2,1}},
         target::PeriodicMPS{<:TensorKit.AbstractTensorMap{E,S,3,1}},
         site::Int,
-    ) where {E,S} = TransferMatricesLab.DenseTransferMatrix(
+    ) where {E,S} = DenseTransferMatrix(
         approximation[2site - 1], approximation[2site], target[site]
     )
 
@@ -86,14 +86,14 @@ transfer_at(
         ket::PeriodicMPS,
         site::Int,
         trunc::MPSKit.TruncationStrategy,
-    ) = TransferMatricesLab.TruncatedTransferMatrix(bra[site], ket[site], trunc)
+    ) = TruncatedTransferMatrix(bra[site], ket[site], trunc)
 
 transfer_at(
         target::PeriodicMPS{<:TensorKit.AbstractTensorMap{E,S,3,1}},
         approximation::PeriodicMPS{<:TensorKit.AbstractTensorMap{E,S,2,1}},
         site::Int,
         trunc::MPSKit.TruncationStrategy,
-    ) where {E,S} = TransferMatricesLab.TruncatedTransferMatrix(
+    ) where {E,S} = TruncatedTransferMatrix(
         target[site], approximation[2site - 1], approximation[2site], trunc
     )
 
@@ -102,7 +102,7 @@ transfer_at(
         target::PeriodicMPS{<:TensorKit.AbstractTensorMap{E,S,3,1}},
         site::Int,
         trunc::MPSKit.TruncationStrategy,
-    ) where {E,S} = TransferMatricesLab.TruncatedTransferMatrix(
+    ) where {E,S} = TruncatedTransferMatrix(
         approximation[2site - 1], approximation[2site], target[site], trunc
     )
 

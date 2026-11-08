@@ -1,6 +1,6 @@
 # PMPSLab
 
-Periodic MPS representations and numerical operations: construction, contraction, transfer environments, norms, gauge fixing, and conversion to MPSKit representations.
+Periodic MPS construction, contraction, transfer matrices, gauge fixing and optimization in Julia. ALS splitting supports nuclear-norm regularization, per-site progress, pause/resume and numerical snapshots through ExperimentLab.
 
 ## Use
 
@@ -11,6 +11,26 @@ mps = one_mps(ComplexF64, 4, 2, 1)
 state = dense(mps)
 paired = contract_pairs(mps)
 ```
+
+## Optimize
+
+```julia
+using PMPSLab
+import LatticeIteratorLab, TensorLinearSolveLab
+
+target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
+algorithm = ALSSplit(
+    initialization=PMPSLab.SVDInitialization(),
+    sweep=LatticeIteratorLab.CircularSweep(max_sweeps=2),
+    solver=TensorLinearSolveLab.CholeskySolve())
+result = split(target, algorithm)
+result.mps       # Optimized MPS with paired single-physical-leg sites.
+result.progress  # Last completed site update.
+```
+
+Use `PMPSLab.split_steps(PMPSLab.initialize_split(target, algorithm))` with
+ExperimentLab when you need callbacks, pause/resume, recorded logs or snapshots.
+The blocking `split` entry point uses the same generator.
 
 ## Review order
 
@@ -27,7 +47,9 @@ julia --project=. examples/01_construction.jl
 3. `contractions/contraction.jl`: direct contraction and pairing.
 4. `representation/lift.jl`: MPSKit conversion.
 5. `gauge/`: projector construction and in-place gauge fixing.
-6. `environments/`: periodic transfers, caches, overlaps and normalization.
+6. `transfers/` and `environments/`: local operators, periodic caches, overlaps and norms.
+7. `optimization/`: split policies, local equations and site updates.
+8. `execution/`: ExperimentLab integration and numerical restart.
 
 All source files are in `src/`; focused regression tests live in `test/`.
 
@@ -61,7 +83,11 @@ remain unchanged.
 
 ## Dependencies and local tests
 
-Uses TensorKit and MPSKit for tensors and canonicalization, TransferMatricesLab for local transfer operators, PeriodicProductsLab for cached products, and ExperimentLab for numerical configuration interchange. Gauge fixing and transfer environments are part of PMPSLab; no additional package is needed to use them.
+Uses TensorKit and MPSKit for tensors and canonicalization, MatrixAlgebraKit for
+factorizations, PeriodicProductsLab for cached products, LatticeIteratorLab for sweep
+ordering, TensorLinearSolveLab for local solves, and ExperimentLab for
+configuration, execution, persistence and logging. Keep the Lab dependencies
+as sibling checkouts. Julia 1.12 or later is required.
 
 From this repository:
 
@@ -69,33 +95,23 @@ From this repository:
 julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
 ```
 
-## Consolidation
+## Package boundary
 
-GaugeFixingLab and TransferEnvironmentsLab are now part of PMPSLab. Their
-numerical methods, configuration identities, tests and examples use the PMPSLab
-namespace. No compatibility aliases are provided. The original local Git
-repositories are preserved in `../.retired-labs/`, including pending changes;
-active consumers no longer depend on them.
+GaugeFixingLab, TransferEnvironmentsLab, TransferMatricesLab and MPSSplitLab
+are consolidated into PMPSLab. Their implementations, configuration identities,
+tests and examples use the PMPSLab namespace. The original local Git repositories
+are preserved in `../.retired-labs/`; active environments do not load them.
+No compatibility aliases or serialized-checkpoint migration are provided.
 
-## Ownership and package rename
+LoopTNRLab remains responsible for lattice operations and RG. ExperimentLab
+remains independent of tensor algorithms. See [the architecture](docs/architecture.md)
+and [the example index](examples/README.md) for review paths.
 
-This package owns `PeriodicMPS`, its indexing and constructors, tensor-space
-queries, contractions, transfer environments, norms, gauge fixing, and MPSKit conversion. Optimization
-belongs to [MPSSplitLab](../MPSSplitLab); load both for splitting workflows.
-See the [package architecture](../MPSSplitLab/docs/architecture.md).
-
-Formerly named `MPSRepresentationsLab`, it retains UUID
-`671cd7e2-a4a1-40fd-ad7d-501014e12597`. The former optimizer called PMPSLab is now
-MPSSplitLab and retains its own UUID. This package does not expose split algorithms
-or execution controls. Version remains `0.1.0`.
-
-Checkpoints created before the rename require their original package environment;
-no automatic migration of serialized module paths is provided.
+PMPSLab retains UUID `671cd7e2-a4a1-40fd-ad7d-501014e12597` and version `0.1.0`.
 
 ## Origin
 
-Extracted from the earlier PMPSLab umbrella package without changing tensor equations.
-
 This research code builds on TensorKit.jl and MPSKit.jl; the numerical work also
 draws on TNRKit.jl where applicable. Credit remains with those projects and their
-authors and contributors. See the sibling MPSSplitLab README for the original attribution.
+authors and contributors. Earlier standalone package history is preserved in the
+retired repositories.

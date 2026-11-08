@@ -1,3 +1,4 @@
+using PMPSLab: DenseTransferMatrix, TruncatedTransferMatrix
 @testset "PeriodicTransferMatrix — construction from one MPS" begin
     N, d, D = 4, 2, 2
     mps = rand(PeriodicMPS, ComplexF64, N, d, D)

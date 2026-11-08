@@ -34,10 +34,8 @@ but the checked relationships remain the same.
 
 ## Interface ownership
 
-- `PMPSLab`: MPS data, construction, and full-state contraction.
-- `TransferMatricesLab`: individual dense/factored transfers and multiplication.
-- `PeriodicProductsLab`: generic cache interfaces such as `build_cache`, `environment`, `invalidate!`, and `rebuild!`.
-- `PMPSLab`: PMPS-specific `build_transfer_cache`, `rebuild_transfer_cache!`, and directional rebuild adapters, plus `transfer_at`, representation policies, overlaps, and norms.
+- `PMPSLab`: MPS data, local transfers, periodic environments, norms, and PMPS-specific cache adapters.
+- `PeriodicProductsLab`: generic cache operations such as `build_cache`, `environment`, `invalidate!`, and `rebuild!`.
 
 `environment(cache, site)` is the ordered transfer product excluding the current
 site, starting at the next site. `expectation(bra, ket)` means `<bra|ket>` here;

@@ -1,7 +1,7 @@
 # Run from PMPSLab: julia --project=. examples/environments/08_paired_mps.jl
+using PMPSLab: DenseTransferMatrix
 # Advanced: contract a two-physical-leg target with pairs of single-leg sites.
 using PMPSLab: PeriodicMPS, contract_pairs
-using TransferMatricesLab: DenseTransferMatrix
 using PMPSLab: PeriodicTransferMatrix, transfer_at, expectation, squared_norm
 using Test: @test
 

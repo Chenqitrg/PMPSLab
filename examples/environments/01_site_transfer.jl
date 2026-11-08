@@ -1,7 +1,7 @@
 # Run from PMPSLab: julia --project=. examples/environments/01_site_transfer.jl
+using PMPSLab: DenseTransferMatrix
 # Construct a transfer matrix from one MPS site.
 using PMPSLab: PeriodicMPS
-using TransferMatricesLab: DenseTransferMatrix
 using PMPSLab: transfer_at
 using Test: @test
 
@@ -9,7 +9,7 @@ using Test: @test
 mps = rand(PeriodicMPS, ComplexF64, 4, 2, 2)
 site = 2
 
-# Choose the site tensor, then let TransferMatricesLab perform the contraction.
+# Choose the site tensor, then let PMPSLab perform the contraction.
 E = transfer_at(mps, site)
 @test E ≈ DenseTransferMatrix(mps[site])
 @test E ≈ transfer_at(mps, mps, site)

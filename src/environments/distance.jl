@@ -12,17 +12,17 @@ function _scaled_self_transfer(mps::PeriodicMPS, site::Int)
     isfinite(tensor_scale) || throw(DomainError(
         tensor_scale, "cannot normalize an MPS with non-finite tensor norms"
     ))
-    transfer = TransferMatricesLab.DenseTransferMatrix(tensor / tensor_scale)
+    transfer = DenseTransferMatrix(tensor / tensor_scale)
     return transfer, 2 * log(tensor_scale)
 end
 
-function _rescale_transfer(transfer::TransferMatricesLab.DenseTransferMatrix)
+function _rescale_transfer(transfer::DenseTransferMatrix)
     transfer_scale = LinearAlgebra.norm(TensorKit.TensorMap(transfer))
     iszero(transfer_scale) && return nothing
     isfinite(transfer_scale) || throw(DomainError(
         transfer_scale, "non-finite intermediate while normalizing an MPS"
     ))
-    scaled = TransferMatricesLab.DenseTransferMatrix(TensorKit.TensorMap(transfer) / transfer_scale)
+    scaled = DenseTransferMatrix(TensorKit.TensorMap(transfer) / transfer_scale)
     return scaled, log(transfer_scale)
 end
 
@@ -112,7 +112,7 @@ distributed evenly over all site tensors.
 """
 function LinearAlgebra.normalize(mps::PeriodicMPS)
     inverse_site_scale = _inverse_normalization_site_scale(mps)
-    return PMPSLab.map_tensors(tensor -> tensor * inverse_site_scale, mps)
+    return map_tensors(tensor -> tensor * inverse_site_scale, mps)
 end
 
 """

@@ -10,7 +10,7 @@ include("dense_two_physical_legs_test.jl")
 
 @testset "datatype ownership and legacy datatype helpers" begin
     @test parentmodule(PeriodicMPS) === PMPSLab
-    @test !isdefined(PMPSLab, :ALSSplit)
+    @test parentmodule(ALSSplit) === PMPSLab
     @test !isdefined(PMPSLab, :start_run)
     @test !isdefined(PMPSLab, :build_cache)
     @test dense(PMPSLab.one_mps2(ComplexF64, 2, 2, 1)) ==
@@ -21,3 +21,11 @@ end
 
 include("gauge/runtests.jl")
 include("environments/runtests.jl")
+
+module TransferTests
+include("transfers/runtests.jl")
+end
+
+module OptimizationTests
+include("optimization/runtests.jl")
+end

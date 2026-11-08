@@ -41,3 +41,13 @@ julia --project=. examples/review_pmps.jl
 After the representation examples, review [gauge fixing](gauge/README.md) and
 [transfer environments](environments/README.md). Each example runs independently
 from the PMPSLab project and can be evaluated at the REPL.
+
+## Transfers and optimization
+
+- [Local transfers](transfers/README.md): construction, composition and truncation.
+- [Optimization](optimization/README.md): initialization, site updates, convergence,
+  nuclear-norm regularization, and ExperimentLab-controlled execution.
+
+All examples use this repository's root environment. No retired sibling package
+is needed. Start the optimization review with
+[01_simple_split.jl](optimization/01_simple_split.jl).
