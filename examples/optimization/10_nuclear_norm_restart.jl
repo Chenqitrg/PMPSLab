@@ -15,7 +15,7 @@ store = ExperimentLab.DataStore(mktempdir())
 config = ExperimentLab.record_algorithm!(store, algorithm)
 
 # This is the ordinary ExperimentLab path: there is no NNR-specific session.
-session = ExperimentLab.start_run(store, config, PMPSLab.split_steps(state);
+session = ExperimentLab.start_run(store, config, ExperimentLab.algorithm_steps(state);
     threaded=false,
     onstep=(session, progress) -> begin
         if progress.completed_updates == 3
@@ -30,7 +30,7 @@ result = fetch(session)
 snapshot_ref = only(ExperimentLab.records(store, :snapshot))
 saved = ExperimentLab.load_snapshot(store, snapshot_ref)
 restored = PMPSLab.restore_split(saved, target)
-recovered = fetch(ExperimentLab.start_run(PMPSLab.split_steps(restored); threaded=false))
+recovered = fetch(ExperimentLab.start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
 @test dense(recovered.mps) ≈ dense(result.mps)
 @test recovered.progress.penalty == result.progress.penalty
 

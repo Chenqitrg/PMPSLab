@@ -45,7 +45,7 @@ for (label, regularization) in cases
     config = ExperimentLab.record_algorithm!(store, algorithm; label,
         metadata=(; fixture=ExperimentLab.describe(input_state), role="comparison"))
     state = PMPSLab.initialize_split(target, initial, algorithm)
-    session = ExperimentLab.start_run(store, config, PMPSLab.split_steps(state);
+    session = ExperimentLab.start_run(store, config, ExperimentLab.algorithm_steps(state);
         label, initial_state=input_state, threaded=false,
         provenance=(; seed=fixture.seed, numerical_threads=Threads.nthreads(),
             blas_threads=LinearAlgebra.BLAS.get_num_threads()),
@@ -102,7 +102,7 @@ restart_state = only(ref for ref in ExperimentLab.children(store, original_execu
 restart_snapshot = only(ref for ref in ExperimentLab.children(store, restart_state)
     if ExperimentLab.describe(ref).kind == "snapshot")
 restored = PMPSLab.restore_split(ExperimentLab.load_snapshot(store, restart_snapshot), target)
-restarted = ExperimentLab.start_run(store, original_config, PMPSLab.split_steps(restored);
+restarted = ExperimentLab.start_run(store, original_config, ExperimentLab.algorithm_steps(restored);
     label="nnr_resumed", initial_state=restart_state, threaded=false,
     onstep=(session, progress) -> begin
         if progress.completed_updates == 800

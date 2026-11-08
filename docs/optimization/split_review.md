@@ -36,7 +36,7 @@ Read these three files in order:
 | [iteration.jl](../../src/optimization/als/iteration.jl) | How does ALS iterate, check convergence and yield between sites? |
 | [update.jl](../../src/optimization/als/update.jl) | How is the tensor solved, replaced, and its cache refreshed? |
 
-`split_steps` directly implements the ALS loop. It updates a site, refreshes
+`algorithm_steps` directly implements the ALS loop. It updates a site, refreshes
 caches, checks sweep-boundary convergence, logs a `SplitProgress` and yields it.
 In the same file, `_exact_error` measures at sweep boundaries and
 `_finish_update!` updates stopping-rule memory and constructs the progress value.

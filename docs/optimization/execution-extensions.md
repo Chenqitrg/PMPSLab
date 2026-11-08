@@ -1,22 +1,23 @@
 # Execution integration
 
-Both `split` and `start_run(split_steps(state))` use ExperimentLab's driver.
-PMPSLab expresses ALS directly as a generator; it has no separate stepping protocol,
-session state machine,
-observer protocol, diagnostic history container or filesystem implementation.
+Both `split` and `start_run(algorithm_steps(state))` use ExperimentLab's driver.
+PMPSLab implements ExperimentLab's state-to-generator protocol for ALS.
+`AbstractSplitState` subtypes `ExperimentLab.AbstractAlgorithmState`; the generic
+`algorithm_steps` is owned by ExperimentLab. PMPSLab has no separate Session state
+machine, observer protocol, diagnostic history container or filesystem implementation.
 
 Other optimizers implement the [split interface](../../src/optimization/interface.jl): an
 `AbstractSplit` configuration, an `AbstractSplitState`, initialization, a generator,
 and snapshot restoration. Their events need not have ALS site/sweep fields; their
 final result must contain `mps`. Implement `ExperimentLab.copy_state` when restart
 requires a smaller representation than the default deep copy. When extending a
-generator, first `import PMPSLab: split_steps`, then define
-`@resumable function split_steps(...)`; the macro requires an unqualified name.
+generator, first `import ExperimentLab: algorithm_steps`, then define
+`@resumable function algorithm_steps(...)`; the macro requires an unqualified name.
 The details below describe the current ALS implementation.
 
-`split_steps` updates one site, refreshes caches, records numerical progress,
+`algorithm_steps` updates one site, refreshes caches, records numerical progress,
 logs a `SplitProgress` through Julia Logging, then yields it. At termination it returns `(mps=..., progress=...)`. The recorded entry point
-`start_run(store, algorithm_ref, split_steps(state))` owns execution records and
+`start_run(store, algorithm_ref, algorithm_steps(state))` owns execution records and
 JSONL logs. Use `onstep(session, update)` to capture numerical state or request a
 pause. ExperimentLab handles failures and finalization.
 

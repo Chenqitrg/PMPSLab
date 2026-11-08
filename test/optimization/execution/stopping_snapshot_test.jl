@@ -6,7 +6,7 @@ using PMPSLab: CostConvergence
         algorithm = ALSSplit(sweep=sweep, solver=CholeskySolve(),
             stopping=CostConvergence(atol=1e-10, rtol=0, min_sweeps=4, consecutive_sweeps=2))
         run = initialize_split(target, algorithm)
-        session = start_run(PMPSLab.split_steps(run); threaded=false,
+        session = start_run(ExperimentLab.algorithm_steps(run); threaded=false,
             onstep=(s, event) -> begin
                 if event.sweep_completed && run.progress.completed_sweeps == 2
                     pause!(s)
@@ -17,14 +17,14 @@ using PMPSLab: CostConvergence
         restored = restore_split(saved, target)
         resume!(session)
         expected = fetch(session)
-        actual = fetch(start_run(PMPSLab.split_steps(restored); threaded=false))
+        actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
         @test actual.progress.converged
         @test actual.progress.completed_sweeps == expected.progress.completed_sweeps == 4
         @test restored.stable_comparisons == run.stable_comparisons
         @test dense(actual.mps) ≈ dense(expected.mps)
         finished = restore_split(ExperimentLab.copy_state(restored), target)
         repeated_events = PMPSLab.SplitProgress[]
-        result = fetch(start_run(PMPSLab.split_steps(finished); threaded=false,
+        result = fetch(start_run(ExperimentLab.algorithm_steps(finished); threaded=false,
             onstep=(_, event) -> push!(repeated_events, event)))
         @test isempty(repeated_events)
         @test result.progress.converged

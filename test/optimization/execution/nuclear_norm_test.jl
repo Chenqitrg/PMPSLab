@@ -13,7 +13,7 @@ import LatticeIteratorLab, TensorLinearSolveLab
         state = PMPSLab.initialize_split(target, algorithm)
         saved = [ExperimentLab.copy_state(state)]
         events = PMPSLab.SplitProgress[]
-        expected = fetch(start_run(PMPSLab.split_steps(state); threaded=false,
+        expected = fetch(start_run(ExperimentLab.algorithm_steps(state); threaded=false,
             onstep=(_, event) -> begin
                 push!(saved, ExperimentLab.copy_state(state))
                 push!(events, event)
@@ -23,7 +23,7 @@ import LatticeIteratorLab, TensorLinearSolveLab
             @test all(snapshot.regularization.auxiliary[i] !== state.regularization.auxiliary[i] for i in 1:4)
             restored = PMPSLab.restore_split(snapshot, target)
             recovered_events = PMPSLab.SplitProgress[]
-            actual = fetch(start_run(PMPSLab.split_steps(restored); threaded=false,
+            actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
                 onstep=(_, event) -> push!(recovered_events, event)))
             @test dense(actual.mps) ≈ dense(expected.mps) atol=1e-10
             @test getfield.(recovered_events, :penalty) == getfield.(events[snapshot.progress.completed_updates+1:end], :penalty)
@@ -40,7 +40,7 @@ end
     mktempdir() do path
         store = DataStore(path)
         config = ExperimentLab.record_algorithm!(store, algorithm)
-        session = start_run(store, config, PMPSLab.split_steps(state); threaded=false,
+        session = start_run(store, config, ExperimentLab.algorithm_steps(state); threaded=false,
             onstep=(session, progress) -> begin
                 if progress.completed_updates == 3
                     ref = record_state!(store, session.execution; step=3)
@@ -50,7 +50,7 @@ end
         expected = fetch(session)
         snapshot = load_snapshot(store, only(ExperimentLab.records(store, :snapshot)))
         restored = PMPSLab.restore_split(snapshot, target)
-        actual = fetch(start_run(PMPSLab.split_steps(restored); threaded=false))
+        actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
         @test dense(actual.mps) ≈ dense(expected.mps)
         rows = ExperimentLab.JSON.parse.(readlines(joinpath(path, ExperimentLab.info(store, session.execution)["log_path"])))
         @test all(row["data"]["cost_scale"] ≈ real(state.target_squared_norm) for row in rows)
@@ -67,9 +67,9 @@ end
             stopping=CostConvergence(atol=1e6, min_sweeps=2, consecutive_sweeps=1))
         state = PMPSLab.initialize_split(target, algorithm)
         initial = deepcopy(state.approximation)
-        expected = fetch(start_run(PMPSLab.split_steps(state); threaded=false))
+        expected = fetch(start_run(ExperimentLab.algorithm_steps(state); threaded=false))
         restored = PMPSLab.restore_split(ExperimentLab.copy_state(state), target)
-        actual = fetch(start_run(PMPSLab.split_steps(restored); threaded=false,
+        actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
             onstep=(_, _) -> error("completed snapshot must not emit another update")))
         @test all(space(actual.mps[i]) == space(initial[i]) for i in eachindex(initial))
         @test dense(actual.mps) ≈ dense(expected.mps)

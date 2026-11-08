@@ -7,7 +7,7 @@ using PMPSLab: RandomInitialization, SVDInitialization
             initialization=SVDInitialization(trunc=truncrank(1)))
         run = initialize_split(target, algorithm)
         snapshots = [ExperimentLab.copy_state(run)]
-        expected = fetch(start_run(PMPSLab.split_steps(run); threaded=false,
+        expected = fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
             onstep=(_, _) -> push!(snapshots, ExperimentLab.copy_state(run))))
         for (index, saved) in enumerate(snapshots)
             boundary = index - 1
@@ -15,7 +15,7 @@ using PMPSLab: RandomInitialization, SVDInitialization
             @test all(saved.approximation[i] !== run.approximation[i] for i in 1:4)
             restored = restore_split(saved, target)
             visited_updates = Int[]
-            actual = fetch(start_run(PMPSLab.split_steps(restored); threaded=false,
+            actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
                 onstep=(_, event) -> push!(visited_updates, event.completed_updates)))
             @test visited_updates == collect(boundary+1:expected.progress.completed_updates)
             @test dense(actual.mps) ≈ dense(expected.mps)
@@ -31,7 +31,7 @@ end
     algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=1), solver=CholeskySolve())
     run = initialize_split(target, algorithm)
     snapshots = [ExperimentLab.copy_state(run)]
-    fetch(start_run(PMPSLab.split_steps(run); threaded=false,
+    fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
         onstep=(_, event) -> event.completed_updates == 1 && push!(snapshots, ExperimentLab.copy_state(run))))
     saved = snapshots[end]
     before = copy(saved.approximation[1])
@@ -67,7 +67,7 @@ end
     saved = ExperimentLab.copy_state(state)
     @test !hasproperty(saved, :pending_iteration)
     @test restore_split(saved, target).progress === saved.progress
-    fetch(start_run(PMPSLab.split_steps(state); threaded=false))
+    fetch(start_run(ExperimentLab.algorithm_steps(state); threaded=false))
     saved = ExperimentLab.copy_state(state)
     for bad in (
         (@set saved.progress.completed_updates = -1),
@@ -103,11 +103,11 @@ end
     algorithm = ALSSplit(sweep=SpacedCursorSweep(), solver=CholeskySolve())
     state = initialize_split(target, algorithm)
     snapshots = [ExperimentLab.copy_state(state)]
-    expected = fetch(start_run(PMPSLab.split_steps(state); threaded=false,
+    expected = fetch(start_run(ExperimentLab.algorithm_steps(state); threaded=false,
         onstep=(_, _) -> push!(snapshots, ExperimentLab.copy_state(state))))
     for saved in snapshots
         restored = restore_split(saved, target)
-        actual = fetch(start_run(PMPSLab.split_steps(restored); threaded=false))
+        actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
         @test actual.progress.completed_updates == 4
         @test dense(actual.mps) ≈ dense(expected.mps)
     end
@@ -119,7 +119,7 @@ end
     state = initialize_split(target, algorithm)
     restored = restore_split(ExperimentLab.copy_state(state), target)
     events = PMPSLab.SplitProgress[]
-    result = fetch(start_run(PMPSLab.split_steps(restored); threaded=false,
+    result = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
         onstep=(_, event) -> push!(events, event)))
     @test result isa NamedTuple{(:mps, :progress)}
     @test result.mps === restored.approximation

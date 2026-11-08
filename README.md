@@ -28,9 +28,11 @@ result.mps       # Optimized MPS with paired single-physical-leg sites.
 result.progress  # Last completed site update.
 ```
 
-Use `PMPSLab.split_steps(PMPSLab.initialize_split(target, algorithm))` with
+Use `ExperimentLab.algorithm_steps(PMPSLab.initialize_split(target, algorithm))` with
 ExperimentLab when you need callbacks, pause/resume, recorded logs or snapshots.
 The blocking `split` entry point uses the same generator.
+`AbstractSplitState` subtypes `ExperimentLab.AbstractAlgorithmState`; custom split
+implementations extend the same `ExperimentLab.algorithm_steps` generic.
 
 ## Review order
 

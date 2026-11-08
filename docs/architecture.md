@@ -45,4 +45,4 @@ For algorithm code, read [the split review guide](optimization/split_review.md).
 The default exports cover common MPS operations and `split`/`ALSSplit`.
 Specialized transfer representations, initialization policies, regularization,
 and generator/recovery APIs are public qualified names, such as
-`PMPSLab.SVDInitialization` and `PMPSLab.split_steps`.
+`PMPSLab.SVDInitialization` and `ExperimentLab.algorithm_steps`.

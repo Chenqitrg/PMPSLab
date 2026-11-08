@@ -11,7 +11,7 @@ Read `src/optimization/algorithm/config.jl`, then
 `src/execution/snapshot.jl` captures numerical state and rebuilds caches.
 
 The generator is driven by ExperimentLab. `split(target, algorithm)` waits for
-completion. `start_run(split_steps(state))` adds pause/resume control;
-`start_run(store, algorithm_ref, split_steps(state))` also associates logs with
+completion. `start_run(algorithm_steps(state))` adds pause/resume control;
+`start_run(store, algorithm_ref, algorithm_steps(state))` also associates logs with
 an execution. Snapshot capture remains an explicit callback choice.
 See [execution integration](execution-extensions.md).

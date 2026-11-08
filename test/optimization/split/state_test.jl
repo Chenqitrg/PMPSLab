@@ -6,7 +6,7 @@ struct DomainlessSweep <: LatticeIteratorLab.AbstractSweep end
     algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=1), solver=CholeskySolve())
     run = PMPSLab.initialize_split(target, algorithm)
     @test run.progress.completed_updates == 0
-    session = start_run(PMPSLab.split_steps(run); threaded=false,
+    session = start_run(ExperimentLab.algorithm_steps(run); threaded=false,
         onstep=(_, event) -> begin
             if event.completed_updates == 1
                 @test (event.site, event.sweep, event.direction) == (1, 1, "forward")

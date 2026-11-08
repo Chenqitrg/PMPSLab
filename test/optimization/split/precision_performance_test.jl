@@ -14,7 +14,7 @@ import ExperimentLab, LatticeIteratorLab, TensorLinearSolveLab, PeriodicProducts
         @test scalartype(tensor) === T
         @test isfinite(cost)
         result = with_logger(NullLogger()) do
-            fetch(ExperimentLab.start_run(PMPSLab.split_steps(state); threaded=false))
+            fetch(ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false))
         end
         @test all(scalartype(t) === T for t in result.mps)
         @test all(scalartype(t) === T for t in state.regularization.auxiliary)

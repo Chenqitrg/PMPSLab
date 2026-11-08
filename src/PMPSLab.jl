@@ -4,6 +4,7 @@ using TensorKit, LinearAlgebra
 using Configurations: @option
 using MPSKit: GenericMPSTensor, PeriodicVector, TruncationStrategy
 using ExperimentLab: ExperimentLab, AbstractAlgorithmConfig
+import ExperimentLab: algorithm_steps
 using ResumableFunctions: ResumableFunctions, @resumable, @yield
 import Base: split
 import TensorKit: scalartype
@@ -34,7 +35,7 @@ public NoStopping, CostTolerance, CostConvergence
 public AbstractSplit, AbstractSplitState, AbstractInitialization
 public AbstractStoppingCriterion, check_convergence
 public SplitState, initialize_split, SplitProgress
-public split_steps, SplitSnapshot, restore_split
+public SplitSnapshot, restore_split
 
 include("representation/container.jl")
 include("representation/show.jl")

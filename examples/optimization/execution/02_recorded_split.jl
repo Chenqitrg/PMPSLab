@@ -7,7 +7,7 @@ algorithm = ALSSplit(sweep=LatticeIteratorLab.CircularSweep(max_sweeps=1), solve
 state = PMPSLab.initialize_split(target, algorithm)
 store = ExperimentLab.DataStore(mktempdir())
 config = ExperimentLab.record_algorithm!(store, algorithm)
-session = ExperimentLab.start_run(store, config, PMPSLab.split_steps(state); threaded=false,
+session = ExperimentLab.start_run(store, config, ExperimentLab.algorithm_steps(state); threaded=false,
     onstep=(session, event) -> begin
         if event.completed_updates == 2
             ref = ExperimentLab.record_state!(store, session.execution; step=event.completed_updates)
@@ -29,6 +29,6 @@ saved_ref = only(ExperimentLab.records(store, :snapshot))
 saved = ExperimentLab.load_snapshot(store, saved_ref)
 restored = PMPSLab.restore_split(saved, target)
 @show restored.progress.completed_updates # 2
-recovered = fetch(ExperimentLab.start_run(PMPSLab.split_steps(restored); threaded=false))
+recovered = fetch(ExperimentLab.start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
 @assert dense(recovered.mps) ≈ dense(result.mps)
 nothing

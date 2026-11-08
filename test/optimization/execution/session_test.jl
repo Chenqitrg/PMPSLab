@@ -7,7 +7,7 @@ using Test, ExperimentLab, PMPSLab, TensorKit, LatticeIteratorLab, TensorLinearS
     state = PMPSLab.initialize_split(target, algorithm)
     untouched = [copy(state.approximation[i]) for i in 3:4]
     visited = Int[]
-    session = start_run(PMPSLab.split_steps(state); threaded=false,
+    session = start_run(ExperimentLab.algorithm_steps(state); threaded=false,
         onstep=(session, event) -> begin
             push!(visited, event.site)
             if event.sweep == 1 && event.site == 2
@@ -38,7 +38,7 @@ end
     mktempdir() do path
         store = DataStore(path)
         config = ExperimentLab.record_algorithm!(store, algorithm)
-        session = start_run(store, config, PMPSLab.split_steps(state); threaded=false,
+        session = start_run(store, config, ExperimentLab.algorithm_steps(state); threaded=false,
             onstep=(s, entry) -> begin
                 if entry.site == 1
                     ref = record_state!(store, s.execution; step=1)
@@ -55,7 +55,7 @@ end
         saved = only(ExperimentLab.records(store, :snapshot))
         restored = PMPSLab.restore_split(load_snapshot(store, saved), target)
         @test restored.progress.completed_updates == 1
-        recovered = fetch(start_run(PMPSLab.split_steps(restored); threaded=false))
+        recovered = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
         @test dense(recovered.mps) ≈ dense(result.mps)
         @test ExperimentLab.info(store, session.execution)["status"] == "completed"
     end

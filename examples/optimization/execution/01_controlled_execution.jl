@@ -13,7 +13,7 @@ state = PMPSLab.initialize_split(target, algorithm)
 # the split algorithm performs one complete site update per yield. ExperimentLab decides
 # whether the generator may continue to the next site.
 stop_after_site = 2
-session = ExperimentLab.start_run(PMPSLab.split_steps(state); threaded=false,
+session = ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false,
     onstep=(session, entry) -> begin
         @assert entry === state.progress # The callback sees the same progress value.
         println("Completed site ", entry.site, ", cost = ", entry.local_cost)

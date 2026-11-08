@@ -36,7 +36,7 @@ normal_environment = PeriodicProductsLab.environment(normal_cache, 1)
 # solve to TensorLinearSolveLab, then refreshes the affected caches itself.
 # ExperimentLab invokes onstep after the generator yields a completed update.
 initial_error = PMPSLab.squared_distance(target, before)
-session = ExperimentLab.start_run(PMPSLab.split_steps(state); threaded=false,
+session = ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false,
     onstep=(_, entry) -> begin
         if entry.completed_updates == 1
             updated = state.approximation

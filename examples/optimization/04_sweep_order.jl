@@ -24,7 +24,7 @@ algorithm = ALSSplit(sweep=LatticeIteratorLab.ZigzagSweep(max_sweeps=2),
     solver=TensorLinearSolveLab.CholeskySolve())
 state = PMPSLab.initialize_split(target, algorithm)
 visited_sites = Int[]
-session = ExperimentLab.start_run(PMPSLab.split_steps(state); threaded=false,
+session = ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false,
     onstep=(_, event) -> push!(visited_sites, event.site))
 result = fetch(session)
 @test visited_sites == [position.site for position in zigzag]

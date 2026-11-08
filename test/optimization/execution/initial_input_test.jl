@@ -14,7 +14,7 @@ using PMPSLab: squared_distance, TruncatedTransferPolicy
     @test length(run.sweep) == 4
     @test run.approximation !== initial
     @test all(run.approximation[i] !== initial[i] for i in eachindex(initial))
-    fetch(start_run(PMPSLab.split_steps(run); threaded=false,
+    fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
         onstep=(_, event) -> begin
             if event.completed_updates == 1
                 @test dense(initial) == dense(original)
@@ -26,7 +26,7 @@ using PMPSLab: squared_distance, TruncatedTransferPolicy
     borrowed = initialize_split(target, inplace, algorithm; copy_initial=false)
     @test borrowed.approximation === inplace
     first_tensor = inplace[1]
-    borrowed_result = fetch(start_run(PMPSLab.split_steps(borrowed); threaded=false,
+    borrowed_result = fetch(start_run(ExperimentLab.algorithm_steps(borrowed); threaded=false,
         onstep=(_, event) -> begin
             event.completed_updates == 1 && @test inplace[1] !== first_tensor
         end))
@@ -73,13 +73,13 @@ end
                 end
             end
         end
-        expected = fetch(start_run(PMPSLab.split_steps(run); threaded=false,
+        expected = fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
             onstep=(_, event) -> begin
                 check_error(run, event)
                 event.completed_updates == 3 && push!(snapshots, ExperimentLab.copy_state(run))
             end))
         restored = restore_split(snapshots[end], target)
-        actual = fetch(start_run(PMPSLab.split_steps(restored); threaded=false,
+        actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
             onstep=(_, event) -> check_error(restored, event)))
         @test dense(expected.mps) ≈ dense(actual.mps)
         @test run.progress.completed_sweeps == 2
@@ -105,12 +105,12 @@ end
             environments=environments, error_measure=measure,
             stopping=CostTolerance(atol=threshold, rtol=1e12, min_sweeps=2))
         run = initialize_split(target, initial, algorithm)
-        fetch(start_run(PMPSLab.split_steps(run); threaded=false))
+        fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false))
         expected_error = measure === :exact ? exact_error : local_error
         @test run.progress.converged == (expected_error < threshold)
         restored = restore_split(ExperimentLab.copy_state(run), target)
         events = PMPSLab.SplitProgress[]
-        fetch(start_run(PMPSLab.split_steps(restored); threaded=false,
+        fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
             onstep=(_, event) -> push!(events, event)))
         @test isempty(events)
         @test restored.progress.converged == run.progress.converged

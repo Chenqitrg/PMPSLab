@@ -1,8 +1,14 @@
 """Configuration for splitting each two-physical-leg MPS site into a pair of sites."""
 abstract type AbstractSplit <: ExperimentLab.AbstractAlgorithmConfig end
 
-"""Algorithm-owned numerical workspace. ExperimentLab owns execution status."""
-abstract type AbstractSplitState end
+"""
+Algorithm-owned split workspace implementing `ExperimentLab.algorithm_steps`.
+The generator yields algorithm-owned AbstractLogEvent values at safe pause/capture
+boundaries and returns a named tuple containing `mps`, the optimized paired
+single-physical-leg PeriodicMPS. Additional result fields are algorithm-specific.
+Each implementation logs its own events; ExperimentLab owns execution control.
+"""
+abstract type AbstractSplitState <: ExperimentLab.AbstractAlgorithmState end
 
 """
     initialize_split(target, algorithm::AbstractSplit)
@@ -11,16 +17,6 @@ Create an algorithm's AbstractSplitState. The target is read-only. Algorithms
 may also support an explicit initial approximation as a second argument.
 """
 function initialize_split end
-
-"""
-    split_steps(state::AbstractSplitState)
-
-Return a ResumableFunctions generator yielding algorithm-owned AbstractLogEvent
-values at safe pause/capture boundaries. Return a named tuple containing `mps`,
-the optimized paired single-physical-leg PeriodicMPS. Additional result fields
-are algorithm-specific. Each implementation logs its own events.
-"""
-function split_steps end
 
 """
     restore_split(snapshot, target; algorithm)

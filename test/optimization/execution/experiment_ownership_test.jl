@@ -23,7 +23,7 @@ end
     mktempdir() do path
         store = DataStore(path)
         config = ExperimentLab.record_algorithm!(store, algorithm)
-        generator = PMPSLab.split_steps(state)
+        generator = ExperimentLab.algorithm_steps(state)
         session = start_run(store, config, generator; threaded=false,
             onstep=(session, event) -> begin
                 # Read immediately: the log must already be flushed before onstep.
@@ -50,7 +50,7 @@ end
         saved = load_snapshot(store, only(ExperimentLab.records(store, :snapshot)))
         @test saved.progress.completed_updates == 3
         restored = PMPSLab.restore_split(saved, target)
-        recovered = fetch(start_run(PMPSLab.split_steps(restored); threaded=false))
+        recovered = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
         @test dense(recovered.mps) ≈ dense(result.mps)
         @test recovered.progress.completed_updates == 6
         @test saved.progress.completed_updates == 3

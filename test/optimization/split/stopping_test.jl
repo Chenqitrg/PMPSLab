@@ -77,7 +77,7 @@ end
         stopping=ThrowingStoppingCriterion(),
     )
     run = PMPSLab.initialize_split(target, algorithm)
-    session = start_run(PMPSLab.split_steps(run); threaded=false)
+    session = start_run(ExperimentLab.algorithm_steps(run); threaded=false)
     @test_throws CapturedException fetch(session)
     @test run_status(session) == ExperimentLab.FAILED
     @test run.progress.completed_updates == 4

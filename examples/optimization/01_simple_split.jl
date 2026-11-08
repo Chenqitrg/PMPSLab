@@ -22,7 +22,7 @@ algorithm = ALSSplit(
 )
 # 4. the split algorithm's generator expresses ALS; ExperimentLab drives its site updates.
 state = PMPSLab.initialize_split(target, algorithm)
-session = ExperimentLab.start_run(PMPSLab.split_steps(state); threaded=false)
+session = ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false)
 result = fetch(session)
 # The blocking shortcut is equivalent: result = split(target, algorithm).
 approximation = result.mps

@@ -27,7 +27,7 @@ end
 function collect_split(target, algorithm)
     events = SplitProgress[]
     state = PMPSLab.initialize_split(target, algorithm)
-    result = fetch(start_run(PMPSLab.split_steps(state);
+    result = fetch(start_run(ExperimentLab.algorithm_steps(state);
         onstep=(_, event) -> push!(events, event), threaded=false))
     return result, events
 end

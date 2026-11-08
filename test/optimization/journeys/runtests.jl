@@ -35,7 +35,7 @@ function test_cdl_restart(store, config, execution, target, expected; steps)
                  if ExperimentLab.describe(ref).kind == "snapshot")
     restored = PMPSLab.restore_split(ExperimentLab.load_snapshot(store, saved), target)
     offset = Ref(Int64(0))
-    session = ExperimentLab.start_run(store, config, PMPSLab.split_steps(restored);
+    session = ExperimentLab.start_run(store, config, ExperimentLab.algorithm_steps(restored);
         label="resumed", initial_state=origin, threaded=false,
         onstep=(session, progress) -> begin
             check_flushed_step(store, session, progress, offset)
@@ -80,7 +80,7 @@ end
             config = ExperimentLab.record_algorithm!(store, algorithm; label)
             state = PMPSLab.initialize_split(target, initial, algorithm)
             offset = Ref(Int64(0))
-            session = ExperimentLab.start_run(store, config, PMPSLab.split_steps(state);
+            session = ExperimentLab.start_run(store, config, ExperimentLab.algorithm_steps(state);
                 label, initial_state=source, threaded=false,
                 onstep=(session, progress) -> begin
                     check_flushed_step(store, session, progress, offset)

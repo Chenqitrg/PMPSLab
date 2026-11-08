@@ -57,14 +57,14 @@ function _finish_update!(
 end
 
 """
-    split_steps(state::SplitState)
+    algorithm_steps(state::SplitState)
 
 Run ALS, yielding `state.progress` after each complete site update and cache
 refresh. ExperimentLab handles pause/cancel requests between yields. Capture
 `state` at those boundaries to restart from disk. Returns `(mps, progress)` as
 a named tuple; the MPS is the workspace's approximation, without an extra copy.
 """
-@resumable function split_steps(run::SplitState)::SplitProgress
+@resumable function algorithm_steps(run::SplitState)::SplitProgress
     while !isnothing(run.pending_iteration)
         position, cursor = run.pending_iteration
         following = iterate(run.sweep, cursor)
