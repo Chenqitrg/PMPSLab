@@ -13,7 +13,7 @@ rng = Xoshiro(20261102)
 N, d, D = 4, 2, 2
 mps = rand(rng, PeriodicMPS, ComplexF64, N, d, D)
 
-# Read: src/lift.jl.
+# Read: src/representation/lift.jl.
 # lift(mps, 2) concatenates two copies of the tensor sequence into a larger ring.
 # This is a finite lift. It does not convert the state to an infinite MPS.
 # Tensor objects may be shared; use deepcopy for independent mutation experiments.

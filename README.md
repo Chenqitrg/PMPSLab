@@ -1,6 +1,6 @@
 # PMPSLab
 
-Finite periodic MPS storage, tensor spaces, constructors, direct contraction, gauge insertion, and lifting to MPSKit representations.
+Periodic MPS representations and numerical operations: construction, contraction, transfer environments, norms, gauge fixing, and conversion to MPSKit representations.
 
 ## Use
 
@@ -14,7 +14,7 @@ paired = contract_pairs(mps)
 
 ## Review order
 
-Start with the [example index](examples/README.md). Nine independent files each
+Start with the [example index](examples/README.md). The representation examples each
 demonstrate one feature and point to the implementation to review. Begin with
 construction, then periodic indexing.
 
@@ -22,10 +22,12 @@ construction, then periodic indexing.
 julia --project=. examples/01_construction.jl
 ```
 
-1. `container.jl`: indexing, storage, and consistency.
-2. `constructors.jl`, `cdl.jl`: construction and examples.
-3. `contraction.jl`: direct contraction and pairing.
-4. `lift.jl`: MPSKit conversion.
+1. `representation/container.jl`: indexing, storage, and consistency.
+2. `representation/constructors.jl`, `representation/cdl.jl`: construction and examples.
+3. `contractions/contraction.jl`: direct contraction and pairing.
+4. `representation/lift.jl`: MPSKit conversion.
+5. `gauge/`: projector construction and in-place gauge fixing.
+6. `environments/`: periodic transfers, caches, overlaps and normalization.
 
 All source files are in `src/`; focused regression tests live in `test/`.
 
@@ -59,7 +61,7 @@ remain unchanged.
 
 ## Dependencies and local tests
 
-Uses TensorKit, MPSKit, and Random. Transfer environments and gauge-fixing algorithms live in separate sibling packages.
+Uses TensorKit and MPSKit for tensors and canonicalization, TransferMatricesLab for local transfer operators, PeriodicProductsLab for cached products, and ExperimentLab for numerical configuration interchange. Gauge fixing and transfer environments are part of PMPSLab; no additional package is needed to use them.
 
 From this repository:
 
@@ -67,10 +69,18 @@ From this repository:
 julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
 ```
 
+## Consolidation
+
+GaugeFixingLab and TransferEnvironmentsLab are now part of PMPSLab. Their
+numerical methods, configuration identities, tests and examples use the PMPSLab
+namespace. No compatibility aliases are provided. The original local Git
+repositories are preserved in `../.retired-labs/`, including pending changes;
+active consumers no longer depend on them.
+
 ## Ownership and package rename
 
 This package owns `PeriodicMPS`, its indexing and constructors, tensor-space
-queries, direct contraction, gauge insertion, and MPSKit conversion. Optimization
+queries, contractions, transfer environments, norms, gauge fixing, and MPSKit conversion. Optimization
 belongs to [MPSSplitLab](../MPSSplitLab); load both for splitting workflows.
 See the [package architecture](../MPSSplitLab/docs/architecture.md).
 

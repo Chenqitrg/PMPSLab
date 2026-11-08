@@ -11,7 +11,7 @@ using TensorKit
 # You can also call rand(PeriodicMPS, ComplexF64, N, d, D).
 rng = Xoshiro(20261102)
 
-# Read: src/constructors.jl and src/container.jl.
+# Read: src/representation/constructors.jl and src/representation/container.jl.
 # rand is extended by PMPSLab to construct N random site tensors.
 # Each site maps right virtual space to (left virtual ⊗ physical) space.
 # N: site count; d: physical dimension; D: virtual bond dimension.

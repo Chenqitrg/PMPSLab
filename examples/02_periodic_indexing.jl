@@ -12,7 +12,7 @@ using MPSKit: left_virtualspace, right_virtualspace
 # You can also call rand(PeriodicMPS, ComplexF64, N, d, D).
 rng = Xoshiro(20261102)
 
-# Read: src/constructors.jl and src/container.jl
+# Read: src/representation/constructors.jl and src/representation/container.jl
 # A site tensor has the shape (left virtual ⊗ physical) ← right virtual.
 # Integer positions select tensors. Query bond spaces using MPSKit functions:
 # right_virtualspace(mps, i) is the space between sites i and i+1.

@@ -15,7 +15,7 @@ N, d, D = 4, 2, 2
 mps = rand(rng, PeriodicMPS, ComplexF64, N, d, D)
 state = dense(mps)
 
-# Read: src/container.jl, setindex!; src/contraction.jl, contract_pairs
+# Read: src/representation/container.jl, setindex!; src/contractions/contraction.jl, contract_pairs
 # A replacement site must match both neighboring virtual spaces.
 # @test_throws checks expected errors, allowing the walkthrough to continue.
 

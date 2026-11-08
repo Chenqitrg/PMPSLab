@@ -13,7 +13,7 @@ rng = Xoshiro(20261102)
 N, d, D = 4, 2, 2
 mps = rand(rng, PeriodicMPS, ComplexF64, N, d, D)
 
-# Read: src/container.jl, map_tensors.
+# Read: src/representation/container.jl, map_tensors.
 # Scaling each of N tensors by α scales the dense state by α^N.
 # The original tensors are unchanged for this out-of-place scaling function.
 # For an independent tensor copy, use map_tensors(copy, mps).

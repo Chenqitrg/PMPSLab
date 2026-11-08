@@ -15,7 +15,7 @@ rng = Xoshiro(20261102)
 N, d, D = 4, 2, 2
 mps = rand(rng, PeriodicMPS, ComplexF64, N, d, D)
 
-# Read: src/contraction.jl, dense
+# Read: src/contractions/contraction.jl, dense
 # For ordinary complex spaces, fixing each physical index gives a D×D matrix.
 # The corresponding wavefunction amplitude is tr(A₁[p₁] ⋯ Aₙ[pₙ]).
 # This reference uses ordinary arrays, rather than PMPSLab contractions.

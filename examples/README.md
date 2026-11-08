@@ -12,15 +12,15 @@ julia --project=. examples/01_construction.jl
 
 | File | Feature | Implementation to review |
 | --- | --- | --- |
-| [01_construction.jl](01_construction.jl) | Random, all-ones, and multiple-physical-leg construction | [constructors.jl](../src/constructors.jl) |
-| [02_periodic_indexing.jl](02_periodic_indexing.jl) | Periodic site indices and MPSKit left/right space queries | [container.jl](../src/container.jl) |
-| [03_dense_contraction.jl](03_dense_contraction.jl) | Full contraction checked against ordinary matrix traces | [contraction.jl](../src/contraction.jl) |
-| [04_pair_contraction.jl](04_pair_contraction.jl) | Adjacent pairing and physical-leg ordering | [contraction.jl](../src/contraction.jl) |
-| [05_gauge_insertion.jl](05_gauge_insertion.jl) | Cancellation of a unitary gauge pair | [container.jl](../src/container.jl) |
-| [06_validation.jl](06_validation.jl) | Invalid bond dimensions, pairing, and noninteger site indices | [container.jl](../src/container.jl), [contraction.jl](../src/contraction.jl) |
-| [07_tensor_mapping.jl](07_tensor_mapping.jl) | Applying a function to each tensor | [container.jl](../src/container.jl) |
-| [08_finite_lift.jl](08_finite_lift.jl) | Repeating a finite unit cell | [lift.jl](../src/lift.jl) |
-| [09_symmetry.jl](09_symmetry.jl) | Z₂-graded spaces and state-preserving pairing | [constructors.jl](../src/constructors.jl), [contraction.jl](../src/contraction.jl) |
+| [01_construction.jl](01_construction.jl) | Random, all-ones, and multiple-physical-leg construction | [constructors.jl](../src/representation/constructors.jl) |
+| [02_periodic_indexing.jl](02_periodic_indexing.jl) | Periodic site indices and MPSKit left/right space queries | [container.jl](../src/representation/container.jl) |
+| [03_dense_contraction.jl](03_dense_contraction.jl) | Full contraction checked against ordinary matrix traces | [contraction.jl](../src/contractions/contraction.jl) |
+| [04_pair_contraction.jl](04_pair_contraction.jl) | Adjacent pairing and physical-leg ordering | [contraction.jl](../src/contractions/contraction.jl) |
+| [05_gauge_insertion.jl](05_gauge_insertion.jl) | Cancellation of a unitary gauge pair | [container.jl](../src/representation/container.jl) |
+| [06_validation.jl](06_validation.jl) | Invalid bond dimensions, pairing, and noninteger site indices | [container.jl](../src/representation/container.jl), [contraction.jl](../src/contractions/contraction.jl) |
+| [07_tensor_mapping.jl](07_tensor_mapping.jl) | Applying a function to each tensor | [container.jl](../src/representation/container.jl) |
+| [08_finite_lift.jl](08_finite_lift.jl) | Repeating a finite unit cell | [lift.jl](../src/representation/lift.jl) |
+| [09_symmetry.jl](09_symmetry.jl) | Z₂-graded spaces and state-preserving pairing | [constructors.jl](../src/representation/constructors.jl), [contraction.jl](../src/contractions/contraction.jl) |
 
 The `@test` statements check the behavior demonstrated by each example.
 `@test_throws` verifies an expected error without stopping the example.
@@ -35,3 +35,9 @@ To run all examples together, the original walkthrough path remains a short runn
 ```sh
 julia --project=. examples/review_pmps.jl
 ```
+
+## Numerical operations
+
+After the representation examples, review [gauge fixing](gauge/README.md) and
+[transfer environments](environments/README.md). Each example runs independently
+from the PMPSLab project and can be evaluated at the REPL.

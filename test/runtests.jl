@@ -18,3 +18,6 @@ include("dense_two_physical_legs_test.jl")
     state = one_mps(ComplexF64, 4, 2, 1)
     @test dense(PMPSLab.pair_contraction(state)) == dense(contract_pairs(state))
 end
+
+include("gauge/runtests.jl")
+include("environments/runtests.jl")

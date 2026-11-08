@@ -16,7 +16,7 @@ mps = rand(rng, PeriodicMPS, ComplexF64, N, d, D)
 state = dense(mps)
 state_array = convert(Array, state)
 
-# Read: src/contraction.jl, contract_pairs
+# Read: src/contractions/contraction.jl, contract_pairs
 # Four one-physical-leg tensors become two two-physical-leg tensors.
 # No truncation or optimization occurs here.
 

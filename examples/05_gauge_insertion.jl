@@ -16,7 +16,7 @@ N, d, D = 4, 2, 2
 mps = rand(rng, PeriodicMPS, ComplexF64, N, d, D)
 state = dense(mps)
 
-# Read: src/container.jl, insert_gauge!, mul_left_virtual, mul_right_virtual
+# Read: src/representation/container.jl, insert_gauge!, mul_left_virtual, mul_right_virtual
 # The left tensor absorbs U; the right tensor absorbs U†. Since U U† = I,
 # their contraction is unchanged. Use deepcopy before a mutation experiment.
 # General insert_gauge! inputs need not be inverses: arbitrary projectors can
