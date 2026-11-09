@@ -1,3 +1,5 @@
+# Adapted from TNRKit.jl's src/schemes/btrg.jl (pseudopow).
+# Copyright (c) 2025 Victor Vanthilt. MIT license; see THIRD_PARTY_NOTICES.md.
 # Pseudo-power: suppresses small singular values to avoid 1/0 blowup
 function pseudopow(t::DiagonalTensorMap, a::Real; tol = eps(scalartype(t))^(3 / 4))
     t′ = copy(t)

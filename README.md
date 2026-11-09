@@ -113,7 +113,25 @@ PMPSLab retains UUID `671cd7e2-a4a1-40fd-ad7d-501014e12597` and version `0.1.0`.
 
 ## Origin
 
-This research code builds on TensorKit.jl and MPSKit.jl; the numerical work also
-draws on TNRKit.jl where applicable. Credit remains with those projects and their
-authors and contributors. Earlier standalone package history is preserved in the
-retired repositories.
+This research code builds on TensorKit.jl and MPSKit.jl. We are grateful to their
+authors and contributors, and to the
+[TNRKit.jl](https://github.com/QuantumKitHub/TNRKit.jl) community, whose LoopTNR
+work has been a valuable reference for the periodic MPS and optimization components.
+
+The idea of separating algorithm configuration from the iterator that drives
+execution comes from Zhengyuan Yue's [TRG implementation](https://github.com/Yue-Zhengyuan/TNRKit.jl/blob/9cc5088bcca55ff9c5a72403764acfe8e9ceeb21/src/schemes/trg.jl)
+and its [Renormalizer iterator](https://github.com/Yue-Zhengyuan/TNRKit.jl/blob/9cc5088bcca55ff9c5a72403764acfe8e9ceeb21/src/schemes/renormalizer.jl)
+in his TNRKit fork. We are grateful to him for sharing this design and for the
+helpful discussions that informed this work.
+
+We also thank Zhengyuan Yue for his discussions on
+[MPS conventions and algorithm interfaces](https://github.com/QuantumKitHub/TNRKit.jl/pull/104)
+and his [review and suggestions on nuclear-norm regularization](https://github.com/QuantumKitHub/TNRKit.jl/pull/144#discussion_r2922211049).
+
+Earlier standalone package history is preserved in the retired repositories.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
+The `pseudopow` helper includes code adapted from TNRKit.jl; its upstream
+copyright and MIT license are retained in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
