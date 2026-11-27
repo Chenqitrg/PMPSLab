@@ -56,6 +56,18 @@ function _finish_update!(
     return run.progress
 end
 
+# Complete one site update, including cache refresh, progress and sweep stopping.
+# The caller owns logging and must not advance a finished workspace.
+function _step!(run::SplitState)::SplitProgress
+    isnothing(run.pending_iteration) && throw(ArgumentError("split has no pending update"))
+    position, cursor = run.pending_iteration
+    following = iterate(run.sweep, cursor)
+    started = time()
+
+    _, local_cost = update!(run, position)
+    return _finish_update!(run, position, following, local_cost, started)
+end
+
 """
     algorithm_steps(state::SplitState)
 
@@ -66,12 +78,7 @@ a named tuple; the MPS is the workspace's approximation, without an extra copy.
 """
 @resumable function algorithm_steps(run::SplitState)::SplitProgress
     while !isnothing(run.pending_iteration)
-        position, cursor = run.pending_iteration
-        following = iterate(run.sweep, cursor)
-        started = time()
-
-        _, local_cost = update!(run, position)
-        progress = _finish_update!(run, position, following, local_cost, started)
+        progress = _step!(run)
         _log_split_progress(progress)
         @yield progress
     end

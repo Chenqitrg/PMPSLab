@@ -9,8 +9,18 @@ struct SplitSnapshot{M<:PeriodicMPS,A<:ALSSplit,T,R}
     regularization::R
 end
 
-# capture(ref, state) calls this directly: tensor buffers are copied exactly once.
-function ExperimentLab.copy_state(state::SplitState)
+"""
+    snapshot(state::SplitState)
+
+Copy the approximation, algorithm and stopping/regularization state into a
+`SplitSnapshot`. Capture before execution, between completed site updates, or
+after completion; do not copy a state while another task is updating it.
+
+The snapshot owns its tensors and excludes numerical caches and the target.
+Use `restore_split(saved, target)` with the original target to rebuild a workspace.
+This function does not start a session or write files.
+"""
+function snapshot(state::SplitState)::SplitSnapshot
     return SplitSnapshot(
         PeriodicMPS([copy(t) for t in state.approximation]),
         deepcopy(state.algorithm),
@@ -21,6 +31,9 @@ function ExperimentLab.copy_state(state::SplitState)
         deepcopy(state.regularization),
     )
 end
+
+# ExperimentLab attaches execution metadata; PMPS owns the numerical copy.
+ExperimentLab.copy_state(state::SplitState)::SplitSnapshot = snapshot(state)
 
 # Reconstruct the cursor from the completed update count. Only the lightweight
 # traversal is replayed: no tensor updates, measurements, callbacks or logs.

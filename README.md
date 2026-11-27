@@ -34,6 +34,19 @@ The blocking `split` entry point uses the same generator.
 `AbstractSplitState` subtypes `ExperimentLab.AbstractAlgorithmState`; custom split
 implementations extend the same `ExperimentLab.algorithm_steps` generic.
 
+Capture numerical restart data with `PMPSLab.snapshot(state)` before execution,
+between completed updates, or after completion:
+
+```julia
+state = PMPSLab.initialize_split(target, algorithm)
+saved = PMPSLab.snapshot(state)
+restored = PMPSLab.restore_split(saved, target)
+```
+
+The snapshot owns its tensors and contains no numerical caches. Restore with the
+original target to rebuild those caches. Saving the snapshot to disk is the
+caller's responsibility; ExperimentLab's `capture(ref, state)` uses the same copy.
+
 ## Review order
 
 Start with the [example index](examples/README.md). The representation examples each
