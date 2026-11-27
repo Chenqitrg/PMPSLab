@@ -35,7 +35,7 @@ public NoStopping, CostTolerance, CostConvergence
 public AbstractSplit, AbstractSplitState, AbstractInitialization
 public AbstractStoppingCriterion, check_convergence
 public SplitState, initialize_split, SplitProgress
-public SplitSnapshot, restore_split
+public SplitSnapshot, snapshot, restore_split
 
 include("representation/container.jl")
 include("representation/show.jl")

@@ -15,8 +15,10 @@ generator, first `import ExperimentLab: algorithm_steps`, then define
 `@resumable function algorithm_steps(...)`; the macro requires an unqualified name.
 The details below describe the current ALS implementation.
 
-`algorithm_steps` updates one site, refreshes caches, records numerical progress,
-logs a `SplitProgress` through Julia Logging, then yields it. At termination it returns `(mps=..., progress=...)`. The recorded entry point
+The internal `_step!` function updates one site, refreshes caches and commits
+progress, including stopping checks at completed sweeps. `algorithm_steps` calls
+it, logs the returned `SplitProgress` through Julia Logging, then yields it.
+At termination it returns `(mps=..., progress=...)`. The recorded entry point
 `start_run(store, algorithm_ref, algorithm_steps(state))` owns execution records and
 JSONL logs. Use `onstep(session, update)` to capture numerical state or request a
 pause. ExperimentLab handles failures and finalization.
@@ -26,14 +28,15 @@ and logs. `exact_error` is `nothing` unless this step actually measured it.
 The previous stopping error and patience counter stay in `SplitState`, outside
 public progress. Numerical convergence never reads logs.
 
-Use `capture(ref, state)` directly. PMPSLab specializes
-`ExperimentLab.copy_state` to produce a detached cache-free `SplitSnapshot`.
+Use `PMPSLab.snapshot(state)` to produce a detached cache-free `SplitSnapshot`
+without a session or storage backend. For ExperimentLab records, use
+`capture(ref, state)`; its `ExperimentLab.copy_state` hook delegates to `snapshot`.
 Restoration is `restore_split(saved, target)`; the snapshot carries its own
 configuration. It does not replay old logs. This preserves per-site restart,
 including backward scans and convergence patience, with one tensor copy at capture.
 
-Snapshots must be captured inside the callback, after an acknowledged pause, or
-after completion. The original target is required when restoring; matching spaces
+Snapshots can be captured before execution, inside the callback, after an
+acknowledged pause, or after completion. The original target is required when restoring; matching spaces
 do not imply matching tensor values.
 
 See [the recorded example](../../examples/optimization/execution/02_recorded_split.jl).

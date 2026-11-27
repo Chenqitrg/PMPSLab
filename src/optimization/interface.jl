@@ -21,7 +21,7 @@ function initialize_split end
 """
     restore_split(snapshot, target; algorithm)
 
-Restore the state captured by ExperimentLab.copy_state at a yielded boundary.
+Restore the state captured by `snapshot` at a completed update boundary.
 Validate the supplied configuration against the snapshot and rebuild workspaces
 from the read-only target. The next generator must not replay completed updates.
 Implementations may default `algorithm` to a configuration stored in the snapshot.
