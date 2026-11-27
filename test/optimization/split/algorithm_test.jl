@@ -30,7 +30,7 @@ using TensorKit: MatrixAlgebraKit
 
     for configuration in configurations
         copied = deepcopy(configuration)
-        @test configuration isa ExperimentLab.AbstractAlgorithmConfig
+        @test PMPSLab.Configurations.is_option(typeof(configuration))
         @test configuration == copied
         @test isequal(configuration, copied)
         @test hash(configuration) == hash(copied)
@@ -43,35 +43,6 @@ using TensorKit: MatrixAlgebraKit
     )
     @test algorithm == deepcopy(algorithm)
     @test hash(algorithm) == hash(deepcopy(algorithm))
-end
-
-@testset "algorithm configurations — editable automatic display" begin
-    initialization = GaugeInitialization()
-    ansatz_text = sprint(show, MIME"text/plain"(), initialization)
-    @test startswith(ansatz_text, "PMPSLab.GaugeInitialization\n")
-    @test occursin("initialization: PMPSLab.SVDInitialization", ansatz_text)
-    @test occursin("gauge_fix: PMPSLab.ProjectorGaugeFix", ansatz_text)
-    @test occursin("MatrixAlgebraKit.notrunc()", ansatz_text)
-    @test isequal(include_string(@__MODULE__, "@config " * repr(ansatz_text)), initialization)
-    @test isequal(include_string(@__MODULE__, sprint(show, initialization)), initialization)
-    @test isequal(include_string(@__MODULE__, sprint(show, LUSolve())), LUSolve())
-    @test sprint(show, MIME"text/plain"(), initialization; context=:compact=>true) == "GaugeInitialization(...)"
-
-    split_algorithm = ALSSplit(;
-        initialization,
-        sweep=CircularSweep(; max_sweeps=1),
-        solver=CholeskySolve(),
-    )
-    split_text = sprint(show, MIME"text/plain"(), split_algorithm)
-    @test occursin("solver: TensorLinearSolveLab.CholeskySolve()", split_text)
-    @test occursin("normal: PMPSLab.DenseTransferPolicy()", split_text)
-    @test occursin("stopping: PMPSLab.NoStopping()", split_text)
-    @test isequal(include_string(@__MODULE__, "@config " * repr(split_text)), split_algorithm)
-
-    uncommon_truncation = SVDInitialization(; trunc=truncrank(2) | truncerror(; rtol=1e-8))
-    shown = sprint(show, MIME"text/plain"(), uncommon_truncation)
-    @test occursin("Display only", shown)
-    @test occursin("trunc: TruncationUnion(...)", shown)
 end
 
 @testset "split — SVDInitialization, circular sweep, exact solve" begin
@@ -97,7 +68,7 @@ end
     for st in LatticeIteratorLab.sweep_states(CircularSweep(; max_sweeps=1), 4)
         update!(ctx, st)
     end
-    @test squared_distance(ctx.approximation, B0) ≈ 0 atol=1e-10
+    @test squared_distance(ctx.iterate, B0) ≈ 0 atol=1e-10
 end
 
 @testset "split — RandomInitialization + Z2 spaces, zigzag sweep" begin
@@ -126,11 +97,11 @@ end
             ZigzagSweep(; max_sweeps=2),
         )
         ctx = test_split_state(mpsA, initial_approximation(mpsA, initialization); solver=LUSolve())
-        previous_cost = squared_distance(mpsA, ctx.approximation)
+        previous_cost = squared_distance(mpsA, ctx.iterate)
 
-        for st in LatticeIteratorLab.sweep_states(sweep, length(ctx.approximation))
+        for st in LatticeIteratorLab.sweep_states(sweep, length(ctx.iterate))
             _, local_cost = update!(ctx, st)
-            exact_cost = squared_distance(mpsA, ctx.approximation)
+            exact_cost = squared_distance(mpsA, ctx.iterate)
             @test local_cost ≈ exact_cost rtol=1e-9 atol=1e-9
             @test exact_cost <= previous_cost + 1e-9 * max(previous_cost, 1.0)
             previous_cost = exact_cost

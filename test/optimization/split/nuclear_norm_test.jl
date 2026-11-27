@@ -1,6 +1,6 @@
 using PMPSLab: NuclearNorm
 using Test, LinearAlgebra, Random, TensorKit, PMPSLab
-import LatticeIteratorLab, TensorLinearSolveLab, ExperimentLab
+import LatticeIteratorLab, TensorLinearSolveLab
 
 @testset "Nuclear norm configuration is available" begin
     @test isdefined(PMPSLab, :NuclearNorm)

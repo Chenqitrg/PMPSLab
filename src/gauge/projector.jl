@@ -2,7 +2,7 @@
 # Projector-based periodic gauge fixing
 # ------------------------------------------------------------------------------
 
-abstract type AbstractGaugeFix <: AbstractAlgorithmConfig end
+abstract type AbstractGaugeFix end
 
 """
     ProjectorGaugeFix(;

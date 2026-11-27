@@ -4,7 +4,7 @@
 Base type for optional algorithm stopping criteria.
 Concrete criteria implement [`check_convergence`](@ref) at completed sweep boundaries.
 """
-abstract type AbstractStoppingCriterion <: ExperimentLab.AbstractAlgorithmConfig end
+abstract type AbstractStoppingCriterion <: AI.StoppingCriterion end
 
 """
     NoStopping()
@@ -128,4 +128,76 @@ function check_convergence(criterion::CostConvergence, previous, current, sweeps
     converged = sweeps >= criterion.min_sweeps &&
         stable_comparisons >= criterion.consecutive_sweeps
     return converged, stable_comparisons
+end
+
+# Each criterion owns its history, including when nested in an A.I. criterion group.
+mutable struct CostStoppingState <: AI.StoppingCriterionState
+    at_iteration::Int
+    last_error::Union{Nothing,Float64}
+    stable_comparisons::Int
+    last_sweep::Int
+end
+
+function AI.initialize_state(
+        ::SplitProblem, ::AbstractSplit, ::AbstractStoppingCriterion,
+    )::CostStoppingState
+    return CostStoppingState(-1, nothing, 0, 0)
+end
+
+function AI.initialize_state!(
+        ::SplitProblem, ::AbstractSplit, ::AbstractStoppingCriterion, state::CostStoppingState,
+    )::CostStoppingState
+    state.at_iteration = -1
+    state.last_error = nothing
+    state.stable_comparisons = 0
+    state.last_sweep = 0
+    return state
+end
+
+AI.indicates_convergence(::Type{CostTolerance})::Bool = true
+AI.indicates_convergence(::Type{CostConvergence})::Bool = true
+
+function AI.is_finished!(
+        ::SplitProblem, algorithm::AbstractSplit, state::AbstractSplitState,
+        criterion::AbstractStoppingCriterion, history::CostStoppingState,
+    )::Bool
+    AI.is_active(criterion, history) && return true
+    progress = state.progress
+    if progress.sweep_completed && progress.completed_sweeps > history.last_sweep
+        current = algorithm.error_measure === :exact ? progress.exact_error : progress.local_cost
+        converged, stable = check_convergence(
+            criterion, history.last_error, current, progress.completed_sweeps, history.stable_comparisons,
+        )
+        history.last_error = current
+        history.last_sweep = progress.completed_sweeps
+        history.stable_comparisons = stable
+        converged && (history.at_iteration = state.iteration)
+    end
+    return AI.is_active(criterion, history)
+end
+
+function AI.is_finished!(
+        ::SplitProblem, ::AbstractSplit, state::AbstractSplitState,
+        criterion::NoStopping, history::CostStoppingState,
+    )::Bool
+    isnothing(state.pending_iteration) && (history.at_iteration = state.iteration)
+    return AI.is_active(criterion, history)
+end
+
+AI.is_finished(::SplitProblem, ::AbstractSplit, ::AbstractSplitState,
+    criterion::AbstractStoppingCriterion, history::CostStoppingState)::Bool = AI.is_active(criterion, history)
+
+function AI.get_reason(criterion::AbstractStoppingCriterion, history::CostStoppingState)::Union{Nothing,String}
+    AI.is_active(criterion, history) || return nothing
+    return "Cost converged after $(history.last_sweep) sweeps.\n"
+end
+
+function AI.get_reason(criterion::NoStopping, history::CostStoppingState)::Union{Nothing,String}
+    AI.is_active(criterion, history) || return nothing
+    return "Completed the configured traversal after $(history.at_iteration) site updates.\n"
+end
+
+function Base.summary(io::IO, criterion::AbstractStoppingCriterion, history::CostStoppingState)::Nothing
+    print(io, nameof(typeof(criterion)), ": ", AI.is_active(criterion, history) ? "reached" : "not reached")
+    return nothing
 end

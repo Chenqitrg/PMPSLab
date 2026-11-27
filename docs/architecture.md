@@ -13,8 +13,8 @@ separate source directories for review.
 | `src/gauge/` | Projector construction and gauge fixing |
 | `src/optimization/algorithm/` | Initialization, stopping and regularization policies |
 | `src/optimization/als/` | Local equations, workspaces and site updates |
-| `src/execution/` | Split log events, blocking entry point and numerical snapshots |
-| `src/configuration.jl` | JSON names and composed configuration registry |
+| `src/execution/` | Native A.I. initialization, execution and numerical snapshots |
+| `src/configuration.jl` | Value hashing for typed options |
 
 Local transfer constructors still accept site tensors; they do not require a
 PeriodicMPS. Environments adapt MPS values to PeriodicProductsLab's generic
@@ -22,17 +22,21 @@ product caches. Optimization uses those operations without cross-package bridges
 
 ## External responsibilities
 
-- **ExperimentLab** owns configuration interchange, sessions, pause/resume,
-  data records, storage and record-bound logs. It has no tensor dependencies.
+- **AlgorithmsInterface** supplies the algorithm/state lifecycle and stopping criteria.
+- **DrWatson** can cache experiment results and record source metadata outside PMPSLab.
 - **PeriodicProductsLab** owns ordered products, cached environments and invalidation.
 - **LatticeIteratorLab** supplies update positions and sweep ordering.
 - **TensorLinearSolveLab** supplies local tensor equation solvers.
 - **LoopTNRLab** composes MPS optimization with lattice filtering and RG steps.
 
-PMPSLab yields `SplitProgress` after each completed site update. LoopTNRLab
-forwards those events unchanged and emits its own RG/filtering events.
-ExperimentLab controls execution at the yield boundaries. A numerical snapshot
-captures the tensors and iteration state; derived caches are rebuilt on restore.
+PMPSLab stores `SplitProgress` after each completed site update. Applications can
+inspect the state, measure tensors or save a snapshot between calls to `AI.step!`.
+A snapshot captures tensors, traversal and stopping history; caches are rebuilt on
+restore. `AI.solve!` resets a workspace, so resume with a snapshot or the manual loop.
+
+The legacy generator, configuration registry and recording integration have been
+removed. DrWatson provides caching, not a replacement execution controller.
+See [execution details](optimization/execution-extensions.md).
 
 ## Review path
 
@@ -44,5 +48,5 @@ For algorithm code, read [the split review guide](optimization/split_review.md).
 
 The default exports cover common MPS operations and `split`/`ALSSplit`.
 Specialized transfer representations, initialization policies, regularization,
-and generator/recovery APIs are public qualified names, such as
-`PMPSLab.SVDInitialization` and `ExperimentLab.algorithm_steps`.
+and initialization/recovery APIs are public qualified names, such as
+`PMPSLab.SVDInitialization` and `PMPSLab.SplitProblem`.

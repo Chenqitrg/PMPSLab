@@ -6,21 +6,21 @@ struct DomainlessSweep <: LatticeIteratorLab.AbstractSweep end
     algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=1), solver=CholeskySolve())
     run = PMPSLab.initialize_split(target, algorithm)
     @test run.progress.completed_updates == 0
-    session = start_run(ExperimentLab.algorithm_steps(run); threaded=false,
-        onstep=(_, event) -> begin
+    result = run_split!(run;
+        onstep=function check_boundary(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
             if event.completed_updates == 1
                 @test (event.site, event.sweep, event.direction) == (1, 1, "forward")
                 @test run.progress.completed_updates == 1
-                @test run.normal_cache.left[2] ≈ DenseTransferMatrix(run.approximation[1])
+                @test run.normal_cache.left[2] ≈ DenseTransferMatrix(run.iterate[1])
                 @test first(run.pending_iteration) == SweepState{Forward}(2, 0)
             end
+            return nothing
         end)
-    result = fetch(session)
-    @test result.mps === run.approximation
+    @test result.mps === run.iterate
     @test result.progress.completed_updates == 4
     @test result.progress.completed_sweeps == 1
     @test Base.summarysize(result.progress) < 256
-    @test run_status(session) == ExperimentLab.COMPLETED
+    @test AI.is_finished(PMPSLab.SplitProblem(target), algorithm, run)
     @test dense(split(target, algorithm).mps) ≈ dense(result.mps)
 end
 

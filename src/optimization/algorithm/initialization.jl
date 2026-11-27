@@ -1,4 +1,4 @@
-abstract type AbstractInitialization <: ExperimentLab.AbstractAlgorithmConfig end
+abstract type AbstractInitialization end
 
 """
     RandomInitialization(; virtual_spaces)

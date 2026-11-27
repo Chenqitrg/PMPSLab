@@ -2,7 +2,8 @@
 using PMPSLab: SVDInitialization
 using PMPSLab
 import LatticeIteratorLab, TensorLinearSolveLab
-import PeriodicProductsLab, ExperimentLab
+import PeriodicProductsLab
+import AlgorithmsInterface as AI
 using TensorKit: truncrank
 using Random: seed!
 using Test: @test
@@ -15,7 +16,7 @@ algorithm = ALSSplit(
     solver=TensorLinearSolveLab.LUSolve(),
 )
 state = PMPSLab.initialize_split(target, algorithm)
-before = deepcopy(state.approximation)
+before = deepcopy(state.iterate)
 
 # Inspect the workspace for this review. Application code can simply call split.
 # PMPSLab constructs site transfers from MPS tensors.
@@ -32,27 +33,19 @@ normal_environment = PeriodicProductsLab.environment(normal_cache, 1)
 @test normal_environment isa PMPSLab.DenseTransferMatrix
 @show transfer normal_cache
 
-# the split algorithm builds the local equation from these environments, delegates the
-# solve to TensorLinearSolveLab, then refreshes the affected caches itself.
-# ExperimentLab invokes onstep after the generator yields a completed update.
+# Perform exactly one site update through the public A.I. protocol.
+problem = PMPSLab.SplitProblem(target)
 initial_error = PMPSLab.squared_distance(target, before)
-session = ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false,
-    onstep=(_, entry) -> begin
-        if entry.completed_updates == 1
-            updated = state.approximation
-            exact_error = PMPSLab.squared_distance(target, updated)
-            @test entry.site == 1
-            @test entry === state.progress
-            @test state.progress.completed_updates == 1
-            @test all(updated[i] == before[i] for i in 2:4)
-            @test exact_error <= initial_error + 1e-9 * max(initial_error, 1.0)
-            @test isapprox(entry.local_cost, exact_error; atol=1e-9, rtol=1e-9)
-            println("Updated site: ", entry.site)
-            println("Squared error: ", initial_error, " -> ", exact_error)
-        end
-    end)
-result = fetch(session)
-# This checks the reported local cost against an independent full-period
-# contraction. Equality is expected here because the environment policies are exact.
-# To stay at a selected site for REPL inspection, see execution/01_controlled_execution.jl.
+@test !AI.is_finished!(problem, algorithm, state)
+AI.increment!(state)
+AI.step!(problem, algorithm, state)
+entry = state.progress
+exact_error = PMPSLab.squared_distance(target, state.iterate)
+@test entry.site == 1
+@test entry.completed_updates == 1
+@test all(state.iterate[i] == before[i] for i in 2:4)
+@test exact_error <= initial_error + 1e-9 * max(initial_error, 1.0)
+@test isapprox(entry.local_cost, exact_error; atol=1e-9, rtol=1e-9)
+@show entry.site initial_error exact_error
+# No background task advances the state after this script returns.
 nothing

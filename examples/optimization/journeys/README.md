@@ -3,8 +3,10 @@
 Start with [11_cdl_nnr.jl](../11_cdl_nnr.jl). This is a physical integration check,
 not an extra optimizer or a general convergence guarantee.
 
+Use an experiment environment containing PMPSLab, DrWatson, JLD2 and JSON.
+
 ```sh
-OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1 julia --project=. examples/optimization/11_cdl_nnr.jl
+OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1 julia --project=/path/to/experiment examples/optimization/11_cdl_nnr.jl
 python3 examples/optimization/journeys/read_cdl_json.py /the/path/printed/by/julia
 ```
 
@@ -27,12 +29,10 @@ pair ranks equal to one at relative tolerance `1e-6`, and rank-one projection
 change below `1e-16`. ALS must retain its internal channels. The optimizer must
 leave allocated bond dimensions and caller-owned inputs unchanged.
 
-It also checks flushing inside each site callback, pause/resume, recovery from
-sweep 25, and execution/measurement ownership. A Julia JSON reader checks a
-separate copy containing only JSON/JSONL files, including per-step cost, duration,
-site, sweep and penalty. No Python or permanent output directory is required;
-temporary files are removed automatically. The 100-sweep example remains useful
-for inspecting saved artifacts and comparing the default NNR schedule as well.
+The test also saves a numerical checkpoint at sweep 25, restores it and compares
+the final tensors with the uninterrupted result. A JSON-only reader checks
+site/sweep order, costs, penalty and physical measurements. Temporary files are
+removed automatically. The 100-sweep example also compares the default NNR schedule.
 
 ## Physical question
 
@@ -64,47 +64,18 @@ error must be read together with them. These are local singular spectra, not
 CFT scaling dimensions. Even rank-one spectra mean *effective* removal within
 numerical tolerance, not automatic storage-space compression.
 
-## Storage and frontend journey
+## Storage and inspection
 
-The example generates and snapshots the input under a fixture configuration,
-then links each optimization execution to that input state. It stores one
-measurement at the initial state and after sweeps 1, 5, 10, 20, 50 and 100.
-Every site update is separately written to the execution's JSONL log. The callback
-reads that file during execution and verifies that its latest step is already
-flushed and has the correct execution owner.
+The application runs an A.I. loop and collects progress and scientific
+measurements explicitly. DrWatson's `tagsave` stores results with source metadata;
+JLD2 stores a numerical checkpoint at sweep 50. Restoring it finishes the remaining
+400 updates and must reproduce the uninterrupted tensors.
 
-The slow-decay run pauses after site 3. The application exports its live Session
-view, then resumes it. Snapshots at sweeps 50 and 100 include the NNR auxiliary
-and dual tensors. A new execution restores sweep 50, finishes the remaining 400
-site updates, and is compared with the uninterrupted result.
+The application writes a compact JSON summary for each run.
+[read_cdl_json.py](read_cdl_json.py) reads those summaries with Python's standard
+library, without loading Julia or tensor payloads. Tensor equality on restart is
+checked by Julia; JSON consumers can only inspect the exported measurements.
 
-[read_cdl_json.py](read_cdl_json.py) uses only Python's standard library and
-JSON/JSONL files: it does not import Julia or open a tensor/JLD2 payload. It follows
-configuration → execution → state → measurement links, verifies step sequences,
-reads spectra, checks ownership of both execution and measurement logs, and
-checks the application-exported pause/resume views. It writes:
-
-- `frontend_summary.json`: machine-readable collected evidence.
-- `frontend_report.md`: a compact human-readable comparison and limitations.
-
-Tensor-level equality on restart is checked by Julia; the JSON reader can inspect
-that exported check and verify links, but cannot independently recompute tensors.
-
-## Boundaries this test makes visible
-
-- Progress and measurement data are separate. A frontend can plot spectra only
-  after the application schedules and stores those measurements.
-- `ExecutionRef.status` remains `running` during a pause. To show `paused`, an
-  application must publish `ExperimentLab.describe(session)`; reading the index
-  alone is insufficient. The example exports `paused_view.json` and
-  `completed_view.json` to make this explicit.
-- Each Lab configuration node carries a stable `type` and a `parameters` object,
-  including empty strategies. Third-party values use their own field conversions.
-  This identifies configurations but is not a frontend form schema.
-- A completed execution can contain unconverged local solves. The reader reports
-  warnings and solver-failure counts instead of treating `completed` as a
-  numerical-success certificate.
-- `duration` is the numerical site-update duration. It excludes callback
-  measurements, snapshot writes, and log I/O; summing it is not wall-clock runtime.
-- Snapshot references and binary paths are visible in JSON. Tensor contents
-  remain Julia-only, intentionally.
+There is no session database, automatic measurement scheduling or persistent pause
+status. The application decides where to stop, what to save and how to name runs.
+Step duration covers numerical work and excludes measurements and storage.

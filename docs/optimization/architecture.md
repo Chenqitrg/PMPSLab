@@ -1,17 +1,18 @@
 # Optimization architecture
 
-See the [package architecture](../architecture.md) for the complete source layout.
-Optimization is part of PMPSLab; it shares MPS values, transfers, environments
-and gauge operations directly.
+PMPSLab owns tensors, local split equations, transfer environments and numerical
+restart data. AlgorithmsInterface owns the common problem/algorithm/state protocol
+and solver driver. Experiment scripts own persistence, measurements and history.
 
-Read `src/optimization/algorithm/config.jl`, then
-`src/optimization/als/iteration.jl`. Follow `update!` into `update.jl`,
-`workspace.jl` and `local_equation.jl` in the same directory.
-`src/execution/run.jl` registers site events and provides the blocking shortcut;
-`src/execution/snapshot.jl` captures numerical state and rebuilds caches.
+Read `src/optimization/interface.jl` for the A.I. types, then
+`src/optimization/algorithm/config.jl` for `ALSSplit`. The site update is
+`AI.step!` in `src/optimization/als/iteration.jl`; it delegates tensor solves and
+cache refresh to `update.jl`. `src/execution/run.jl` implements initialization,
+stopping queries, finalization and the `split` convenience call.
 
-The generator is driven by ExperimentLab. `split(target, algorithm)` waits for
-completion. `start_run(algorithm_steps(state))` adds pause/resume control;
-`start_run(store, algorithm_ref, algorithm_steps(state))` also associates logs with
-an execution. Snapshot capture remains an explicit callback choice.
-See [execution integration](execution-extensions.md).
+Stopping criteria live in `src/optimization/algorithm/stopping.jl`. Their mutable
+history belongs to the state, including when criteria are nested in A.I. groups.
+`src/execution/snapshot.jl` copies that history and reconstructs traversal and caches.
+
+See [execution integration](execution-extensions.md) for manual control, callbacks,
+checkpoint boundaries and the distinction between reset and resume.

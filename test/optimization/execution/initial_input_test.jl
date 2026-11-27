@@ -12,24 +12,24 @@ using PMPSLab: squared_distance, TruncatedTransferPolicy
     algorithm = ALSSplit(; sweep=CircularSweep(; max_sweeps=1), solver=LUSolve())
     run = initialize_split(target, initial, algorithm)
     @test length(run.sweep) == 4
-    @test run.approximation !== initial
-    @test all(run.approximation[i] !== initial[i] for i in eachindex(initial))
-    fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
-        onstep=(_, event) -> begin
+    @test run.iterate !== initial
+    @test all(run.iterate[i] !== initial[i] for i in eachindex(initial))
+    run_split!(run; onstep=function check_owned_input(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
             if event.completed_updates == 1
                 @test dense(initial) == dense(original)
-                @test squared_distance(target, run.approximation) <= squared_distance(target, initial) + 1e-10
+                @test squared_distance(target, run.iterate) <= squared_distance(target, initial) + 1e-10
             end
-        end))
+            return nothing
+        end)
     result = split(target, initial, algorithm)
     inplace = deepcopy(initial)
     borrowed = initialize_split(target, inplace, algorithm; copy_initial=false)
-    @test borrowed.approximation === inplace
+    @test borrowed.iterate === inplace
     first_tensor = inplace[1]
-    borrowed_result = fetch(start_run(ExperimentLab.algorithm_steps(borrowed); threaded=false,
-        onstep=(_, event) -> begin
+    borrowed_result = run_split!(borrowed; onstep=function check_borrowed_input(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
             event.completed_updates == 1 && @test inplace[1] !== first_tensor
-        end))
+            return nothing
+        end)
     @test borrowed_result.mps === inplace
     @test dense(inplace) ≈ dense(result.mps)
     direct = deepcopy(initial)
@@ -54,8 +54,8 @@ end
         algorithm = ALSSplit(; sweep=CircularSweep(; max_sweeps=2), solver=LUSolve(),
             environments=policy, error_measure=measure)
         run = initialize_split(target, initial, algorithm)
-        snapshots = [ExperimentLab.copy_state(run)]
-        function check_error(active, record)
+        snapshots = [PMPSLab.snapshot(run)]
+        function check_error(active::PMPSLab.SplitState, record::PMPSLab.SplitProgress)::Nothing
             @test record === active.progress
             if !record.sweep_completed
                 @test isnothing(record.exact_error)
@@ -66,21 +66,24 @@ end
                 @test record.sweep == 1
                 @test record.local_cost == active.progress.local_cost
                 if measure == :exact
-                    @test record.exact_error ≈ norm(dense(target) - dense(active.approximation))^2
+                    @test record.exact_error ≈ norm(dense(target) - dense(active.iterate))^2
                     @test !isapprox(record.exact_error, record.local_cost; rtol=1e-5)
                 else
                     @test isnothing(record.exact_error)
                 end
             end
+            return nothing
         end
-        expected = fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
-            onstep=(_, event) -> begin
+        expected = run_split!(run; onstep=function capture_error(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
                 check_error(run, event)
-                event.completed_updates == 3 && push!(snapshots, ExperimentLab.copy_state(run))
-            end))
+                event.completed_updates == 3 && push!(snapshots, PMPSLab.snapshot(run))
+                return nothing
+            end)
         restored = restore_split(snapshots[end], target)
-        actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
-            onstep=(_, event) -> check_error(restored, event)))
+        actual = run_split!(restored; onstep=function check_restored_error(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
+            check_error(restored, event)
+            return nothing
+        end)
         @test dense(expected.mps) ≈ dense(actual.mps)
         @test run.progress.completed_sweeps == 2
     end
@@ -103,15 +106,17 @@ end
     for measure in (:local, :exact)
         algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=2), solver=LUSolve(),
             environments=environments, error_measure=measure,
-            stopping=CostTolerance(atol=threshold, rtol=1e12, min_sweeps=2))
+            stopping_criterion=CostTolerance(atol=threshold, rtol=1e12, min_sweeps=2))
         run = initialize_split(target, initial, algorithm)
-        fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false))
+        run_split!(run)
         expected_error = measure === :exact ? exact_error : local_error
         @test run.progress.converged == (expected_error < threshold)
-        restored = restore_split(ExperimentLab.copy_state(run), target)
+        restored = restore_split(PMPSLab.snapshot(run), target)
         events = PMPSLab.SplitProgress[]
-        fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
-            onstep=(_, event) -> push!(events, event)))
+        run_split!(restored; onstep=function collect_events(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
+            push!(events, event)
+            return nothing
+        end)
         @test isempty(events)
         @test restored.progress.converged == run.progress.converged
     end

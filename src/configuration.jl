@@ -1,32 +1,17 @@
-# Stable JSON identities live outside numerical configuration structs.
-const CONFIG_REGISTRY = ExperimentLab.ConfigRegistry(
-    ExperimentLab.ConfigRegistry(
-        "PMPSLab.ProjectorGaugeFix" => ProjectorGaugeFix,
-        "PMPSLab.DenseTransferPolicy" => DenseTransferPolicy,
-        "PMPSLab.TruncatedTransferPolicy" => TruncatedTransferPolicy,
-        "PMPSLab.RandomInitialization" => RandomInitialization,
-        "PMPSLab.IdentityInitialization" => IdentityInitialization,
-        "PMPSLab.SVDInitialization" => SVDInitialization,
-        "PMPSLab.GaugeInitialization" => GaugeInitialization,
-        "PMPSLab.NoStopping" => NoStopping,
-        "PMPSLab.CostTolerance" => CostTolerance,
-        "PMPSLab.CostConvergence" => CostConvergence,
-        "PMPSLab.NoRegularization" => NoRegularization,
-        "PMPSLab.GeometricDecay" => GeometricDecay,
-        "PMPSLab.NuclearNorm" => NuclearNorm,
-        "PMPSLab.SplitEnvironmentPolicy" => SplitEnvironmentPolicy,
-        "PMPSLab.ALSSplit" => ALSSplit,
-    ),
-    ExperimentLab.config_registry(LatticeIteratorLab.AbstractUpdate),
-    ExperimentLab.config_registry(TensorLinearSolveLab.AbstractSolve),
-)
+# Configurations.@option supplies fieldwise equality; keep hashing consistent with it.
+function _hash_fields(config::T, seed::UInt)::UInt where {T}
+    result = hash(T, seed)
+    for field in fieldnames(T)
+        result = hash(getfield(config, field), result)
+    end
+    return result
+end
 
-ExperimentLab.config_registry(::Type{<:AbstractInitialization}) = CONFIG_REGISTRY
-ExperimentLab.config_registry(::Type{<:AbstractStoppingCriterion}) = CONFIG_REGISTRY
-ExperimentLab.config_registry(::Type{<:AbstractRegularization}) = CONFIG_REGISTRY
-ExperimentLab.config_registry(::Type{<:GeometricDecay}) = CONFIG_REGISTRY
-ExperimentLab.config_registry(::Type{<:SplitEnvironmentPolicy}) = CONFIG_REGISTRY
-ExperimentLab.config_registry(::Type{<:AbstractSplit}) = CONFIG_REGISTRY
-
-ExperimentLab.config_registry(::Type{<:AbstractGaugeFix}) = CONFIG_REGISTRY
-ExperimentLab.config_registry(::Type{<:AbstractTransferPolicy}) = CONFIG_REGISTRY
+Base.hash(config::AbstractSplit, seed::UInt)::UInt = _hash_fields(config, seed)
+Base.hash(config::AbstractStoppingCriterion, seed::UInt)::UInt = _hash_fields(config, seed)
+Base.hash(config::AbstractInitialization, seed::UInt)::UInt = _hash_fields(config, seed)
+Base.hash(config::AbstractRegularization, seed::UInt)::UInt = _hash_fields(config, seed)
+Base.hash(config::AbstractTransferPolicy, seed::UInt)::UInt = _hash_fields(config, seed)
+Base.hash(config::AbstractGaugeFix, seed::UInt)::UInt = _hash_fields(config, seed)
+Base.hash(config::GeometricDecay, seed::UInt)::UInt = _hash_fields(config, seed)
+Base.hash(config::SplitEnvironmentPolicy, seed::UInt)::UInt = _hash_fields(config, seed)

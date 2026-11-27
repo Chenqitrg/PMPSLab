@@ -1,27 +1,20 @@
 # Small, dense CDL diagnostics for the journey example, not an optimization step.
 using Configurations: @option
 using TensorKit, LinearAlgebra
-import MPSKit, ExperimentLab
+import MPSKit
 
-@option struct CDLFixture <: ExperimentLab.AbstractAlgorithmConfig
+@option struct CDLFixture
     seed::Int = 716
     sites::Int = 4
     corner_dimension::Int = 2
     normalize::Bool = true
 end
 
-@option struct CDLDiagnostics <: ExperimentLab.AbstractMeasurement
+@option struct CDLDiagnostics
     rank_rtol::Float64 = 1e-6
 end
 
-const CDL_CONFIGS = ExperimentLab.ConfigRegistry(
-    "CDLJourney.Fixture" => CDLFixture,
-    "CDLJourney.Diagnostics" => CDLDiagnostics,
-)
-ExperimentLab.config_registry(::Type{CDLFixture}) = CDL_CONFIGS
-ExperimentLab.config_registry(::Type{CDLDiagnostics}) = CDL_CONFIGS
-
-struct CDLResult <: ExperimentLab.AbstractMeasurementResult
+struct CDLResult
     target_squared_norm::Float64
     relative_squared_error::Float64
     relative_singular_values::Vector{Vector{Float64}}
@@ -32,12 +25,12 @@ struct CDLResult <: ExperimentLab.AbstractMeasurementResult
     rank1_target_error::Float64
 end
 
-function pair_singular_values(tensor)
+function pair_singular_values(tensor::AbstractTensorMap)::Vector{Float64}
     _, S, _, _ = svd_trunc(tensor, MPSKit.DefaultAlgorithm(trunc=MPSKit.TruncationStrategy()))
     return sort!(reduce(vcat, [collect(block.diag) for (_, block) in blocks(S)]); rev=true)
 end
 
-function ExperimentLab.measure(definition::CDLDiagnostics, input::NamedTuple)
+function measure(definition::CDLDiagnostics, input::NamedTuple)::CDLResult
     target, mps = input.target, input.mps
     spectra = [pair_singular_values(isodd(i) ? mps[i] : repartition(mps[i], 1, 2))
                for i in eachindex(mps)]

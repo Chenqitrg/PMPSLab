@@ -21,7 +21,7 @@ algorithm = ALSSplit(
     solver=TensorLinearSolveLab.LUSolve(),
     environments=SplitEnvironmentPolicy(mixed=mixed_policy),
     error_measure=:exact,
-    stopping=CostConvergence(atol=1e-10, rtol=1e-8),
+    stopping_criterion=CostConvergence(atol=1e-10, rtol=1e-8),
 )
 result = split(target, initial, algorithm)
 approximation = result.mps

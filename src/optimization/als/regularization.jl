@@ -21,16 +21,16 @@ _cost_scale(state::SplitState) =
 
 # Normalized target A/s^2 and approximation B/s, where C=<A|A> and s=C^(1/(2n)).
 # Scaling the local equation is equivalent and avoids copying the whole target.
-function _site_scale(state::SplitState)
+function _site_scale(state::SplitState)::Real
     C = real(state.target_squared_norm)
-    return C^(one(C) / (2length(state.approximation)))
+    return C^(one(C) / (2length(state.iterate)))
 end
 
 # Numerical kernels and progress use the same penalty rounded to tensor precision.
-function _penalty(state::SplitState)
+function _penalty(state::SplitState)::Union{Nothing,Real}
     xi = _penalty(state.algorithm.regularization, state.progress.completed_sweeps)
     isnothing(xi) && return nothing
-    R = real(scalartype(state.approximation[1]))
+    R = real(scalartype(state.iterate[1]))
     value = R(xi)
     isfinite(value) && value > 0 || throw(ArgumentError(
         "NNR penalty must be finite and positive in tensor precision $R; got $xi"))
@@ -81,9 +81,9 @@ function _threshold_pair_bond(tensor::AbstractTensorMap, site::Int, threshold::R
 end
 
 _update_regularization!(::Nothing, state::SplitState, site::Int) = nothing
-function _update_regularization!(buffers::NuclearNormState, state::SplitState, site::Int)
+function _update_regularization!(buffers::NuclearNormState, state::SplitState, site::Int)::Nothing
     xi = _penalty(state)
-    normalized = state.approximation[site] / _site_scale(state)
+    normalized = state.iterate[site] / _site_scale(state)
     auxiliary = _threshold_pair_bond(normalized - buffers.dual[site] / xi, site, xi)
     buffers.auxiliary[site] = auxiliary
     buffers.dual[site] += xi * (auxiliary - normalized)

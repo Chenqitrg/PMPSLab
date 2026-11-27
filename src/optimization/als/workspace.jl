@@ -7,8 +7,9 @@ Before the first update, counts are zero and site/cost fields are `nothing`.
 when `error_measure=:exact`, and is `nothing` on all other updates.
 For NNR, costs are normalized; multiply by `cost_scale` for original-scale squared
 errors. `penalty` is the xi used in this update, or `nothing` for ordinary ALS.
+`converged` is updated by the next stopping check, after `AI.step!` returns.
 """
-Base.@kwdef struct SplitProgress <: ExperimentLab.AbstractLogEvent
+Base.@kwdef struct SplitProgress
     completed_updates::Int = 0
     completed_sweeps::Int = 0
     site::Union{Nothing,Int} = nothing
@@ -29,27 +30,30 @@ const SplitPendingIteration = Union{Nothing,Tuple{LatticeIteratorLab.SweepState,
     SplitState
 
 Numerical workspace: tensors, caches, traversal and stopping-rule memory.
-`progress` is the latest completed update. ExperimentLab owns the session lifecycle.
+`progress` is the latest completed update. Stopping is checked before the next
+update, as required by AlgorithmsInterface; `checked_iteration` prevents repeated
+queries from advancing convergence patience twice.
 """
-mutable struct SplitState{A<:ALSSplit,T<:PeriodicMPS,M<:PeriodicMPS,NC,MC,E,S,R} <: AbstractSplitState
+mutable struct SplitState{A<:ALSSplit,T<:PeriodicMPS,M<:PeriodicMPS,NC,MC,E,S,R,C<:AI.StoppingCriterionState} <: AbstractSplitState
     algorithm::A
     target::T
-    approximation::M
+    iterate::M
     normal_cache::NC
     mixed_cache::MC
     target_squared_norm::E
     sweep::S
     pending_iteration::SplitPendingIteration
     progress::SplitProgress
-    last_error::Union{Nothing,Float64}
-    stable_comparisons::Int
+    iteration::Int
+    checked_iteration::Int
+    stopping_criterion_state::C
     regularization::R
 end
 
 # Each two-physical-leg target tensor maps to two approximation tensors.
 target_site_for(site::Int) = cld(site, 2)
-paired_approximation(state::SplitState, site::Int) =
-    iseven(site) ? state.approximation[site - 1] : state.approximation[site + 1]
+paired_approximation(state::SplitState, site::Int)::AbstractTensorMap =
+    iseven(site) ? state.iterate[site - 1] : state.iterate[site + 1]
 
 function _validate_initial(target::PeriodicMPS, initial::PeriodicMPS)
     all(t -> numout(t) == 3 && numin(t) == 1, target) ||
@@ -97,8 +101,8 @@ end
 # directly instead of allocating zero buffers that would immediately be discarded.
 function _build_split_state(
         target::PeriodicMPS, approximation::PeriodicMPS, algorithm::ALSSplit,
-        target_squared_norm::Number, regularization,
-    )
+        target_squared_norm::Number, regularization::R,
+    )::SplitState where {R}
     sweep = LatticeIteratorLab.sweep_states(algorithm.sweep, length(approximation))
     normal_cache = build_transfer_cache(
         approximation, approximation, algorithm.environments.normal,
@@ -116,8 +120,9 @@ function _build_split_state(
         sweep,
         iterate(sweep),
         SplitProgress(),
-        nothing, # No previous sweep error.
-        0,       # No stable comparisons yet.
+        0,
+        -1,
+        AI.initialize_state(SplitProblem(target), algorithm, algorithm.stopping_criterion),
         regularization,
     )
 end

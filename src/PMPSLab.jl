@@ -3,9 +3,7 @@ module PMPSLab
 using TensorKit, LinearAlgebra
 using Configurations: @option
 using MPSKit: GenericMPSTensor, PeriodicVector, TruncationStrategy
-using ExperimentLab: ExperimentLab, AbstractAlgorithmConfig
-import ExperimentLab: algorithm_steps
-using ResumableFunctions: ResumableFunctions, @resumable, @yield
+import AlgorithmsInterface as AI
 import Base: split
 import TensorKit: scalartype
 import MPSKit: left_virtualspace, right_virtualspace, physicalspace
@@ -32,7 +30,7 @@ public rebuild_left_transfer_cache!, rebuild_right_transfer_cache!
 public RandomInitialization, IdentityInitialization, SVDInitialization, GaugeInitialization
 public SplitEnvironmentPolicy, NuclearNorm, NoRegularization, GeometricDecay
 public NoStopping, CostTolerance, CostConvergence
-public AbstractSplit, AbstractSplitState, AbstractInitialization
+public SplitProblem, AbstractSplit, AbstractSplitState, AbstractInitialization
 public AbstractStoppingCriterion, check_convergence
 public SplitState, initialize_split, SplitProgress
 public SplitSnapshot, snapshot, restore_split
@@ -67,8 +65,8 @@ include("optimization/als/local_equation.jl")
 include("optimization/als/regularization.jl")
 include("optimization/als/update.jl")
 include("optimization/als/iteration.jl")
-include("execution/run.jl")
 include("execution/snapshot.jl")
+include("execution/run.jl")
 include("configuration.jl")
 
 end

@@ -1,6 +1,6 @@
 using PMPSLab: SplitEnvironmentPolicy, NuclearNorm
 using Test, Random, Logging, TensorKit, PMPSLab
-import ExperimentLab, LatticeIteratorLab, TensorLinearSolveLab, PeriodicProductsLab
+import LatticeIteratorLab, TensorLinearSolveLab, PeriodicProductsLab
 
 @testset "NNR local solves preserve the tensor precision before storage" begin
     Random.seed!(714)
@@ -13,9 +13,9 @@ import ExperimentLab, LatticeIteratorLab, TensorLinearSolveLab, PeriodicProducts
         tensor, cost = PMPSLab._solve_local_update(state, first(state.pending_iteration))
         @test scalartype(tensor) === T
         @test isfinite(cost)
-        result = with_logger(NullLogger()) do
-            fetch(ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false))
-        end
+        result = with_logger(function run_quietly()::NamedTuple{(:mps,:progress)}
+            return run_split!(state)
+        end, NullLogger())
         @test all(scalartype(t) === T for t in result.mps)
         @test all(scalartype(t) === T for t in state.regularization.auxiliary)
         @test all(scalartype(t) === T for t in state.regularization.dual)
@@ -57,7 +57,7 @@ end
         environments=SplitEnvironmentPolicy(normal=policy))
     state = PMPSLab.initialize_split(target, algorithm)
     transfer = PeriodicProductsLab.environment(state.normal_cache, 1)
-    x = transpose(state.approximation[1], ((2,), (1, 3)))
+    x = transpose(state.iterate[1], ((2,), (1, 3)))
     rhs = PMPSLab._split_norm_action(2x, transfer)
     direct_bytes, wrapped_bytes = unregularized_solve_allocations(solver, x, transfer, rhs)
     # Allow small wrapper overhead, but not extra tensor-sized temporaries.

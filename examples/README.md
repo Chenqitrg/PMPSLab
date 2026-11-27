@@ -46,7 +46,7 @@ from the PMPSLab project and can be evaluated at the REPL.
 
 - [Local transfers](transfers/README.md): construction, composition and truncation.
 - [Optimization](optimization/README.md): initialization, site updates, convergence,
-  nuclear-norm regularization, and ExperimentLab-controlled execution.
+  nuclear-norm regularization, and AlgorithmsInterface-controlled execution.
 
 All examples use this repository's root environment. No retired sibling package
 is needed. Start the optimization review with

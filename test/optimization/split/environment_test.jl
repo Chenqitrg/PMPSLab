@@ -1,10 +1,10 @@
 using PMPSLab: TruncatedTransferMatrix
-function test_factored_split_environments(mpsA, mpsB)
+function test_factored_split_environments(mpsA::PeriodicMPS, mpsB::PeriodicMPS)::Nothing
     ctx = test_split_state(mpsA, mpsB)
 
     for site in (1, 2)
         pa = target_site_for(site)
-        x = transpose(ctx.approximation[site], ((2,), (1, 3)))
+        x = transpose(ctx.iterate[site], ((2,), (1, 3)))
         A = ctx.target[target_site_for(site)]
         paired_approximationᴴ = paired_approximation(ctx, site)'
 
@@ -52,7 +52,7 @@ end
     truncated_BB = TruncatedTransferMatrix(dense_BB, TruncationStrategy())
     dense_AB = environment(ctx.mixed_cache, pa)
     truncated_AB = TruncatedTransferMatrix(dense_AB, TruncationStrategy())
-    x0 = transpose(ctx.approximation[site], ((2,), (1, 3)))
+    x0 = transpose(ctx.iterate[site], ((2,), (1, 3)))
     W = PMPSLab._split_rhs(
         truncated_AB, ctx.target[target_site_for(site)], paired_approximation(ctx, site)', site
     )

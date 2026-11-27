@@ -1,7 +1,7 @@
 """Solve one site and refresh affected caches using the workspace's configuration."""
-function update!(state::SplitState, position::LatticeIteratorLab.SweepState)
+function update!(state::SplitState, position::LatticeIteratorLab.SweepState)::Tuple{AbstractTensorMap,Real}
     tensor, cost = _solve_local_update(state, position)
-    state.approximation[position.site] = tensor
+    state.iterate[position.site] = tensor
     _refresh_split_caches!(state, position)
     _update_regularization!(state.regularization, state, position.site)
     return tensor, cost
@@ -11,10 +11,10 @@ end
 
 function _solve_local_update(
         ctx::SplitState, state::LatticeIteratorLab.SweepState
-    )
+    )::Tuple{AbstractTensorMap,Real}
     approximation_site = state.site
-    1 <= approximation_site <= length(ctx.approximation) ||
-        throw(BoundsError(ctx.approximation, approximation_site))
+    1 <= approximation_site <= length(ctx.iterate) ||
+        throw(BoundsError(ctx.iterate, approximation_site))
     target_site = target_site_for(approximation_site)
     normal_environment = PeriodicProductsLab.environment(ctx.normal_cache, approximation_site)
     mixed_environment = PeriodicProductsLab.environment(ctx.mixed_cache, target_site)
@@ -24,7 +24,7 @@ function _solve_local_update(
         mixed_environment, target, paired, approximation_site
     )
     initial = transpose(
-        ctx.approximation[approximation_site], ((2,), (1, 3))
+        ctx.iterate[approximation_site], ((2,), (1, 3))
     )
     solution = _regularized_solution(
         ctx.regularization, ctx, approximation_site, initial, normal_environment, rhs,
@@ -47,9 +47,9 @@ _pair_completed(st::LatticeIteratorLab.SweepState{LatticeIteratorLab.Backward}) 
 function _refresh_split_caches!(
         ctx::SplitState,
         st::LatticeIteratorLab.SweepState{D},
-    ) where {D}
+    )::Nothing where {D}
     environments = ctx.algorithm.environments
-    if (D === LatticeIteratorLab.Forward && st.site == length(ctx.approximation)) ||
+    if (D === LatticeIteratorLab.Forward && st.site == length(ctx.iterate)) ||
        (D === LatticeIteratorLab.Backward && st.site == 1)
         # Boundary steps skip incremental cache advances, so report both changed transfers here
         # before an incremental rebuild decides which cached products to reuse.
@@ -58,26 +58,26 @@ function _refresh_split_caches!(
         if D === LatticeIteratorLab.Forward
             rebuild_right_transfer_cache!(
                 ctx.normal_cache,
-                ctx.approximation,
-                ctx.approximation,
+                ctx.iterate,
+                ctx.iterate,
                 environments.normal,
             )
             rebuild_right_transfer_cache!(
                 ctx.mixed_cache,
-                ctx.approximation,
+                ctx.iterate,
                 ctx.target,
                 environments.mixed,
             )
         else
             rebuild_left_transfer_cache!(
                 ctx.normal_cache,
-                ctx.approximation,
-                ctx.approximation,
+                ctx.iterate,
+                ctx.iterate,
                 environments.normal,
             )
             rebuild_left_transfer_cache!(
                 ctx.mixed_cache,
-                ctx.approximation,
+                ctx.iterate,
                 ctx.target,
                 environments.mixed,
             )
@@ -86,8 +86,8 @@ function _refresh_split_caches!(
     end
 
     normal_transfer = transfer_at(
-        ctx.approximation,
-        ctx.approximation,
+        ctx.iterate,
+        ctx.iterate,
         st.site,
         environments.normal,
     )
@@ -96,7 +96,7 @@ function _refresh_split_caches!(
     target_site = target_site_for(st.site)
     if _pair_completed(st)
         mixed_transfer = transfer_at(
-            ctx.approximation,
+            ctx.iterate,
             ctx.target,
             target_site,
             environments.mixed,
