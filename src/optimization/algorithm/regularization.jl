@@ -1,4 +1,4 @@
-abstract type AbstractRegularization <: ExperimentLab.AbstractAlgorithmConfig end
+abstract type AbstractRegularization end
 
 """Ordinary ALS without regularization or automatic cost normalization."""
 Configurations.@option struct NoRegularization <: AbstractRegularization end
@@ -10,7 +10,7 @@ Penalty on sweep k (starting at zero): max(minimum, initial * factor^k).
 A complete LatticeIteratorLab sweep is one ring for CircularSweep and one round trip
 for ZigzagSweep. Set minimum=0 for the paper's unclamped decay.
 """
-Configurations.@option struct GeometricDecay <: ExperimentLab.AbstractAlgorithmConfig
+Configurations.@option struct GeometricDecay
     initial::Float64 = 1e-5
     factor::Float64 = 0.8
     minimum::Float64 = 1e-7

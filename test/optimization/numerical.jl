@@ -3,7 +3,8 @@ using LatticeIteratorLab: SweepState, Forward, Backward
 using PeriodicProductsLab
 using TensorLinearSolveLab
 # Run independently: julia --project=. -e 'using Pkg; Pkg.test(test_args=["numerical"])'
-using Test, PMPSLab, ExperimentLab
+using Test, PMPSLab
+import AlgorithmsInterface as AI
 include("module_boundary_test.jl")
 include("accessors_test.jl")
 include("split/runtests.jl")

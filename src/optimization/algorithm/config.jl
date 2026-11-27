@@ -15,7 +15,7 @@ right-hand-side environment.
 Configurations.@option struct SplitEnvironmentPolicy{
         N<:AbstractTransferPolicy,
         M<:AbstractTransferPolicy,
-    } <: ExperimentLab.AbstractAlgorithmConfig
+    }
     normal::N = DenseTransferPolicy()
     mixed::M = DenseTransferPolicy()
 end
@@ -23,7 +23,7 @@ end
 """
     ALSSplit(; sweep, solver, initialization=SVDInitialization(),
              environments=SplitEnvironmentPolicy(), regularization=NoRegularization(),
-             stopping=NoStopping(),
+             stopping_criterion=NoStopping(),
              error_measure=:local)
 
 Optimize a paired single-physical-leg approximation of a two-physical-leg MPS.
@@ -39,32 +39,34 @@ subject to floating-point roundoff. Both values are recorded separately.
 Configurations.@option struct ALSSplit{
         I<:AbstractInitialization, S<:LatticeIteratorLab.AbstractSweep,
         V<:TensorLinearSolveLab.AbstractSolve, E<:SplitEnvironmentPolicy,
-        R<:AbstractRegularization, C<:AbstractStoppingCriterion,
+        R<:AbstractRegularization, C<:AI.StoppingCriterion,
     } <: AbstractSplit
     initialization::I = SVDInitialization()
     sweep::S
     solver::V
     environments::E = SplitEnvironmentPolicy()
     regularization::R = NoRegularization()
-    stopping::C = NoStopping()
+    stopping_criterion::C = NoStopping()
     error_measure::Symbol = :local
     function ALSSplit{I,S,V,E,R,C}(
             initialization::I, sweep::S, solver::V, environments::E,
-            regularization::R, stopping::C, error_measure::Symbol,
-        ) where {I,S,V,E,R,C}
+            regularization::R, stopping_criterion::C, error_measure::Symbol,
+        )::ALSSplit{I,S,V,E,R,C} where {I,S,V,E,R,C}
         error_measure in (:local, :exact) || throw(ArgumentError(
             "error_measure must be :local or :exact, got $error_measure"))
         return new{I,S,V,E,R,C}(
-            initialization, sweep, solver, environments, regularization, stopping, error_measure,
+            initialization, sweep, solver, environments, regularization, stopping_criterion, error_measure,
         )
     end
 end
 
-ALSSplit(initialization::I, sweep::S, solver::V, environments::E,
-         regularization::R, stopping::C, error_measure::Symbol) where {I,S,V,E,R,C} =
-    ALSSplit{I,S,V,E,R,C}(
-        initialization, sweep, solver, environments, regularization, stopping, error_measure,
+function ALSSplit(initialization::I, sweep::S, solver::V, environments::E,
+        regularization::R, stopping_criterion::C, error_measure::Symbol,
+    )::ALSSplit{I,S,V,E,R,C} where {I,S,V,E,R,C}
+    return ALSSplit{I,S,V,E,R,C}(
+        initialization, sweep, solver, environments, regularization, stopping_criterion, error_measure,
     )
+end
 
 # JSON represents symbols as strings; the algorithm owns this field conversion.
-Configurations.from_dict(::Type{<:ALSSplit}, ::Type{Symbol}, value::AbstractString) = Symbol(value)
+Configurations.from_dict(::Type{<:ALSSplit}, ::Type{Symbol}, value::AbstractString)::Symbol = Symbol(value)

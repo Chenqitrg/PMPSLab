@@ -1,6 +1,7 @@
 # Run from PMPSLab: julia --project=. examples/optimization/04_sweep_order.jl
 using PMPSLab
-import LatticeIteratorLab, TensorLinearSolveLab, ExperimentLab
+import LatticeIteratorLab, TensorLinearSolveLab
+import AlgorithmsInterface as AI
 using Test: @test
 using Random: seed!
 
@@ -24,11 +25,15 @@ algorithm = ALSSplit(sweep=LatticeIteratorLab.ZigzagSweep(max_sweeps=2),
     solver=TensorLinearSolveLab.CholeskySolve())
 state = PMPSLab.initialize_split(target, algorithm)
 visited_sites = Int[]
-session = ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false,
-    onstep=(_, event) -> push!(visited_sites, event.site))
-result = fetch(session)
+problem = PMPSLab.SplitProblem(target)
+while !AI.is_finished!(problem, algorithm, state)
+    AI.increment!(state)
+    AI.step!(problem, algorithm, state)
+    push!(visited_sites, state.progress.site)
+end
+result = AI.finalize_state!(problem, algorithm, state)
 @test visited_sites == [position.site for position in zigzag]
-@test ExperimentLab.run_status(session) == ExperimentLab.COMPLETED
+@test result.progress.completed_sweeps == 2
 # A sweep state describes an upcoming update. completed_sweeps counts full
 # sweeps before that update; 0 labels the first sweep. The scheme also records
 # the direction used by the cache refresh. Constructing a sweep does no numerical work.

@@ -1,90 +1,118 @@
-using Test, PMPSLab, LatticeIteratorLab, TensorLinearSolveLab
-import ExperimentLab
+using Test, PMPSLab, TensorKit, LatticeIteratorLab, TensorLinearSolveLab
+import AlgorithmsInterface as AI
 
-@testset "The ExperimentLab generator remains the public execution interface" begin
-    @test PMPSLab.AbstractSplitState <: ExperimentLab.AbstractAlgorithmState
-    @test parentmodule(ExperimentLab.algorithm_steps) === ExperimentLab
-    @test !isdefined(PMPSLab, :split_steps)
-    for name in (:step!, :isfinished, :split_result, :split_progress, :SplitContext, :SplitResult, :SplitUpdate)
-        @test !isdefined(PMPSLab, name)
-    end
+@testset "PMPS implements the native algorithm interface" begin
+    @test PMPSLab.AbstractSplit <: AI.Algorithm
+    @test PMPSLab.AbstractSplitState <: AI.State
+    @test PMPSLab.AbstractStoppingCriterion <: AI.StoppingCriterion
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
+    problem = PMPSLab.SplitProblem(target)
     algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=1), solver=CholeskySolve())
-    state = PMPSLab.initialize_split(target, algorithm)
-    @test state isa ExperimentLab.AbstractAlgorithmState
-    @test !hasproperty(state.progress, :stable_comparisons)
-    @test !hasproperty(state.progress, :last_error)
-    @test eltype(ExperimentLab.algorithm_steps(state)) === PMPSLab.SplitProgress
+    state = @inferred AI.initialize_state(problem, algorithm)
+    @test problem isa AI.Problem
+    @test state.iteration == state.progress.completed_updates == 0
+    @test !AI.is_finished!(problem, algorithm, state)
+
+    # A.I. owns the iteration counter; step! performs exactly one numerical update.
+    untouched = [copy(state.iterate[i]) for i in 2:4]
+    AI.increment!(state)
+    @test_logs @test (@inferred AI.step!(problem, algorithm, state)) === state
+    @test state.progress.completed_updates == state.iteration == 1
+    @test state.progress.site == 1
+    @test all(state.iterate[i] == untouched[i - 1] for i in 2:4)
+    @test (@inferred AI.finalize_state!(problem, algorithm, state)).mps === state.iterate
+
+    # A checkpoint starts a fresh driver at the next site, without replaying site 1.
+    saved = @inferred PMPSLab.snapshot(state)
+    continued = @inferred AI.solve(problem, algorithm; snapshot=saved)
+    @test continued.progress.completed_updates == 4
+    @test dense(continued.mps) ≈ dense(target)
+    @test saved.progress.completed_updates == 1
+    @test all(saved.approximation[i] !== state.iterate[i] for i in 1:4)
+
+    # solve! resets counters from the supplied iterate; it is not checkpoint resume.
+    result = @inferred AI.solve!(problem, algorithm, state)
+    @test result.progress.completed_updates == state.iteration == 4
+    @test dense(result.mps) ≈ dense(target)
+    @test_throws ArgumentError AI.step!(problem, algorithm, state)
 end
 
-@testset "A numerical step advances one site without logging" begin
+@testset "Native criteria compose with sweep convergence" begin
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    for sweep in (CircularSweep(max_sweeps=1), ZigzagSweep(max_sweeps=1))
-        algorithm = ALSSplit(; sweep, solver=CholeskySolve(), error_measure=:exact)
-        state = PMPSLab.initialize_split(target, algorithm)
-        untouched = [copy(state.approximation[i]) for i in 2:4]
+    problem = PMPSLab.SplitProblem(target)
+    rule = PMPSLab.CostConvergence(atol=1e-8, min_sweeps=2, consecutive_sweeps=1)
+    for sweep in (CircularSweep(max_sweeps=5), ZigzagSweep(max_sweeps=5))
+        algorithm = ALSSplit(; sweep, solver=CholeskySolve(),
+            stopping_criterion=AI.StopWhenAny(rule, AI.StopAfterIteration(100)))
+        state = @inferred AI.initialize_state(problem, algorithm)
+        @test state.stopping_criterion_state isa AI.StoppingCriterionState
+        while !AI.is_finished!(problem, algorithm, state)
+            AI.increment!(state)
+            AI.step!(problem, algorithm, state)
+            # Saving before the next stopping check must preserve the pending check.
+            saved = PMPSLab.snapshot(state)
+            restored = @inferred PMPSLab.restore_split(saved, target)
+            @test AI.is_finished!(problem, algorithm, restored) == AI.is_finished!(problem, algorithm, state)
+        end
+        @test state.progress.completed_sweeps == 2
+        @test state.progress.completed_updates == (sweep isa CircularSweep ? 8 : 12)
+        @test state.progress.converged
+        @test AI.indicates_convergence(algorithm, state)
+        @test !isempty(AI.get_active_stopping_criteria(algorithm, state))
+    end
 
-        # The numerical operation commits one update; its caller owns logging.
-        progress = @test_logs @inferred PMPSLab._step!(state)
-        @test progress === state.progress
-        @test progress.completed_updates == 1
-        @test progress.site == 1
-        @test progress.completed_sweeps == 0
-        @test isnothing(progress.exact_error)
-        @test all(state.approximation[i] == untouched[i - 1] for i in 2:4)
+    # A generic iteration budget may stop mid-sweep and does not imply convergence.
+    algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=5), solver=CholeskySolve(),
+        stopping_criterion=AI.StopAfterIteration(2))
+    state = AI.initialize_state(problem, algorithm)
+    result = AI.solve!(problem, algorithm, state)
+    @test result.progress.completed_updates == 2
+    @test result.progress.completed_sweeps == 0
+    @test !result.progress.converged
+    @test !AI.indicates_convergence(algorithm, state)
+    restored = PMPSLab.restore_split(PMPSLab.snapshot(state), target)
+    @test AI.is_finished!(problem, algorithm, restored)
+    @test isnothing(restored.pending_iteration)
+end
 
-        # Switching to the existing driver must continue at site 2, not replay site 1.
-        events = collect(ExperimentLab.algorithm_steps(state))
-        expected_sites = sweep isa CircularSweep ? [2, 3, 4] : [2, 3, 4, 3, 2]
-        @test getfield.(events, :site) == expected_sites
-        @test state.progress.completed_updates == length(expected_sites) + 1
-        @test state.progress.completed_sweeps == 1
-        @test state.progress.exact_error ≈ 0 atol=1e-12
-        @test dense(state.approximation) ≈ dense(target)
-
-        # A finished workspace cannot accidentally perform another update.
-        @test_throws ArgumentError PMPSLab._step!(state)
+@testset "Native convergence checkpoints can stop before a sweep boundary" begin
+    target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
+    problem = PMPSLab.SplitProblem(target)
+    # A generic convergence quantity may be satisfied initially or after one site.
+    quantity = function remaining(::PMPSLab.SplitProblem, ::ALSSplit, state::PMPSLab.SplitState)::Int
+        return -state.iteration
+    end
+    for steps in (0, 1)
+        algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=2), solver=CholeskySolve(),
+            stopping_criterion=AI.StopWhenBelow(quantity, -steps))
+        state = @inferred AI.initialize_state(problem, algorithm)
+        result = @inferred AI.solve!(problem, algorithm, state)
+        @test result.progress.completed_updates == steps
+        @test result.progress.completed_sweeps == 0
+        @test result.progress.converged
+        saved = @inferred PMPSLab.snapshot(state)
+        restored = @inferred PMPSLab.restore_split(saved, target)
+        @test AI.is_finished!(problem, algorithm, restored)
+        @test restored.progress === result.progress
+        @test (@inferred AI.solve(problem, algorithm; snapshot=saved)).progress === result.progress
     end
 end
 
-@testset "PMPS snapshots restore without an ExperimentLab session" begin
+@testset "A stopping check evaluates its quantity once" begin
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-    for regularization in (PMPSLab.NoRegularization(), PMPSLab.NuclearNorm())
-        algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=2),
-            solver=CholeskySolve(), regularization=regularization)
-        state = PMPSLab.initialize_split(target, algorithm)
-        saved = @inferred PMPSLab.snapshot(state)
-        @test saved.progress.completed_updates == 0
-
-        # Capture a noninitial boundary using only PMPS operations.
-        @inferred PMPSLab._step!(state)
-        saved = @inferred PMPSLab.snapshot(state)
-        legacy = @inferred ExperimentLab.copy_state(state)
-        @test saved.progress.completed_updates == 1
-        @test legacy.progress === saved.progress
-        @test legacy.algorithm == saved.algorithm
-        @test dense(legacy.approximation) == dense(saved.approximation)
-        before = dense(saved.approximation)
-
-        # Both capture entry points must own their tensors and regularization buffers.
-        @test all(saved.approximation[i] !== state.approximation[i] for i in 1:4)
-        @test all(legacy.approximation[i] !== state.approximation[i] for i in 1:4)
-        if regularization isa PMPSLab.NuclearNorm
-            for field in (:auxiliary, :dual)
-                @test all(getproperty(saved.regularization, field)[i] !==
-                    getproperty(state.regularization, field)[i] for i in 1:4)
-            end
-        end
-
-        restored = PMPSLab.restore_split(saved, target)
-        for run in (state, restored)
-            while !isnothing(run.pending_iteration)
-                @inferred PMPSLab._step!(run)
-            end
-        end
-        @test state.progress.completed_updates == restored.progress.completed_updates == 8
-        @test dense(restored.approximation) ≈ dense(state.approximation)
-        @test dense(saved.approximation) == before
-        @test saved.progress.completed_updates == 1
+    problem = PMPSLab.SplitProblem(target)
+    calls = Ref(0)
+    function remaining_updates(::PMPSLab.SplitProblem, ::ALSSplit, state::PMPSLab.SplitState)::Int
+        calls[] += 1
+        return 1 - state.iteration
     end
+    algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=2), solver=CholeskySolve(),
+        stopping_criterion=AI.StopWhenBelow(remaining_updates, 0))
+    state = AI.initialize_state(problem, algorithm)
+    @test !AI.is_finished!(problem, algorithm, state)
+    @test calls[] == 1
+    AI.increment!(state)
+    AI.step!(problem, algorithm, state)
+    @test AI.is_finished!(problem, algorithm, state)
+    @test calls[] == 2
 end

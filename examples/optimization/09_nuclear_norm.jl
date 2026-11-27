@@ -1,7 +1,6 @@
 # Run from PMPSLab: julia --project=. examples/optimization/09_nuclear_norm.jl
 using PMPSLab
-using ExperimentLab: @config
-import ExperimentLab, LatticeIteratorLab, TensorLinearSolveLab
+import LatticeIteratorLab, TensorLinearSolveLab
 using Random: seed!
 using Test: @test
 
@@ -10,25 +9,15 @@ target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
 target[1] *= 11 # Deliberately not normalized.
 original = deepcopy(target)
 
-# The NNR parameters form one subtree; the solver and sweep are reused.
-algorithm = @config """
-PMPSLab.ALSSplit
-├─ sweep: LatticeIteratorLab.CircularSweep
-│  └─ max_sweeps: 8
-├─ solver: TensorLinearSolveLab.CholeskySolve()
-├─ regularization: PMPSLab.NuclearNorm
-│  └─ schedule: PMPSLab.GeometricDecay
-│     ├─ initial: 1.0e-5
-│     ├─ factor: 0.8
-│     └─ minimum: 1.0e-7
-└─ error_measure: :exact
-"""
+# Ordinary nested constructors also work before A.I.'s tree-input PR is merged.
+algorithm = ALSSplit(
+    sweep=LatticeIteratorLab.CircularSweep(max_sweeps=8),
+    solver=TensorLinearSolveLab.CholeskySolve(),
+    regularization=PMPSLab.NuclearNorm(
+        schedule=PMPSLab.GeometricDecay(initial=1e-5, factor=0.8, minimum=1e-7)),
+    error_measure=:exact,
+)
 display(algorithm)
-
-# An external registry gives JSON nodes stable names without adding fields to
-# these configurations. The root and every nested Lab configuration are named.
-ExperimentLab.writeconfig(stdout, algorithm)
-# {"type":"PMPSLab.ALSSplit","parameters":{"sweep":{...}, ...}}
 
 result = split(target, algorithm)
 

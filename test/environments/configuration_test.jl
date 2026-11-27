@@ -1,15 +1,9 @@
+using Configurations: to_dict, from_dict
 
-import ExperimentLab
-
-@testset "PMPSLab configuration identities" begin
-    for config in (DenseTransferPolicy(), TruncatedTransferPolicy(), TruncatedTransferPolicy(trunc=truncrank(3))), defaults in (true, false)
-        registry = ExperimentLab.config_registry(typeof(config))
-        record = ExperimentLab.config_record(registry, config; include_defaults=defaults)
-        @test record["type"] == "PMPSLab." * string(nameof(typeof(config)))
-        @test haskey(record, "parameters")
-        io = IOBuffer()
-        ExperimentLab.writeconfig(io, config; include_defaults=defaults)
-        text = String(take!(io))
-        @test isequal(ExperimentLab.readconfig(IOBuffer(text), typeof(config)), config)
+@testset "transfer options preserve truncation" begin
+    for original in (DenseTransferPolicy(), TruncatedTransferPolicy(), TruncatedTransferPolicy(trunc=truncrank(3))),
+        include_defaults in (true, false)
+        parameters = to_dict(original; include_defaults)
+        @test isequal(from_dict(typeof(original), parameters), original)
     end
 end

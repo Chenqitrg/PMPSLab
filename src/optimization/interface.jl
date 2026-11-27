@@ -1,14 +1,17 @@
 """Configuration for splitting each two-physical-leg MPS site into a pair of sites."""
-abstract type AbstractSplit <: ExperimentLab.AbstractAlgorithmConfig end
+abstract type AbstractSplit <: AI.Algorithm end
 
 """
-Algorithm-owned split workspace implementing `ExperimentLab.algorithm_steps`.
-The generator yields algorithm-owned AbstractLogEvent values at safe pause/capture
-boundaries and returns a named tuple containing `mps`, the optimized paired
-single-physical-leg PeriodicMPS. Additional result fields are algorithm-specific.
-Each implementation logs its own events; ExperimentLab owns execution control.
+Numerical workspace implementing AlgorithmsInterface's state and step interfaces.
+`iterate` is the current MPS; `iteration` counts the site update being performed
+or last performed. `progress.completed_updates` counts successfully committed updates.
 """
-abstract type AbstractSplitState <: ExperimentLab.AbstractAlgorithmState end
+abstract type AbstractSplitState <: AI.State end
+
+"""Read-only target for a split. The algorithm supplies its initialization policy."""
+struct SplitProblem{T<:PeriodicMPS} <: AI.Problem
+    target::T
+end
 
 """
     initialize_split(target, algorithm::AbstractSplit)
@@ -23,7 +26,7 @@ function initialize_split end
 
 Restore the state captured by `snapshot` at a completed update boundary.
 Validate the supplied configuration against the snapshot and rebuild workspaces
-from the read-only target. The next generator must not replay completed updates.
+from the read-only target. Continuing must not replay completed updates.
 Implementations may default `algorithm` to a configuration stored in the snapshot.
 """
 function restore_split end

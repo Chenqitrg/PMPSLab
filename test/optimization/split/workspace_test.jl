@@ -5,7 +5,7 @@ using PMPSLab: DenseTransferMatrix, SVDInitialization
     mpsA = contract_pairs(rand(PeriodicMPS, ComplexF64, 4, d, D))
     ctx = test_split_state(mpsA, mpsB)
 
-    @test ctx.approximation[1] == mpsB[1]
+    @test ctx.iterate[1] == mpsB[1]
     @test paired_approximation(ctx, 1) == mpsB[2]
     @test paired_approximation(ctx, 2) == mpsB[1]
     @test ctx.target[target_site_for(1)] == mpsA[1]
@@ -32,7 +32,7 @@ end
 
     _, cost = update!(ctx, SweepState{Forward}(1, 0))
     @test isfinite(cost)
-    @test ctx.normal_cache.left[2] ≈ DenseTransferMatrix(ctx.approximation[1])
+    @test ctx.normal_cache.left[2] ≈ DenseTransferMatrix(ctx.iterate[1])
 end
 
 @testset "update! — SweepState is the site source" begin
@@ -42,8 +42,8 @@ end
     _, cost = update!(ctx, SweepState{Forward}(2, 0))
     @test isfinite(cost)
     @test ctx.normal_cache.left[3] ≈
-          DenseTransferMatrix(ctx.approximation[1]) *
-          DenseTransferMatrix(ctx.approximation[2])
+          DenseTransferMatrix(ctx.iterate[1]) *
+          DenseTransferMatrix(ctx.iterate[2])
     @test_throws BoundsError update!(
         ctx, SweepState{Forward}(0, 0)
     )
@@ -59,8 +59,8 @@ end
     old_ab_left = copy(ab_left_slot)
 
     update!(ctx, SweepState{Forward}(1, 0))
-    @test !(ctx.approximation[1] ≈ old1)
-    @test ctx.normal_cache.left[2] ≈ DenseTransferMatrix(ctx.approximation[1])
+    @test !(ctx.iterate[1] ≈ old1)
+    @test ctx.normal_cache.left[2] ≈ DenseTransferMatrix(ctx.iterate[1])
     @test ctx.mixed_cache.left[2] === ab_left_slot
     @test ctx.mixed_cache.left[2] ≈ old_ab_left
     @test ctx.mixed_cache.left_valid_through == 0
@@ -69,13 +69,13 @@ end
 
     update!(ctx, SweepState{Forward}(2, 0))
     @test ctx.normal_cache.left[3] ≈
-          DenseTransferMatrix(ctx.approximation[1]) *
-          DenseTransferMatrix(ctx.approximation[2])
+          DenseTransferMatrix(ctx.iterate[1]) *
+          DenseTransferMatrix(ctx.iterate[2])
     @test ctx.mixed_cache.left[2] === ab_left_slot
     @test ctx.mixed_cache.left[2] ≈ DenseTransferMatrix(
-        ctx.approximation[1], ctx.approximation[2], ctx.target[1]
+        ctx.iterate[1], ctx.iterate[2], ctx.target[1]
     )
-    @test space(ctx.approximation[2]) == space(mpsB[2])
+    @test space(ctx.iterate[2]) == space(mpsB[2])
 end
 
 @testset "update! — out-of-order sites fail before using stale caches" begin
@@ -84,11 +84,11 @@ end
     ctx = test_split_state(mpsA, mpsB)
 
     update!(ctx, SweepState{Forward}(1, 0))
-    old3 = copy(ctx.approximation[3])
+    old3 = copy(ctx.iterate[3])
     @test_throws StaleCacheError update!(
         ctx, SweepState{Forward}(3, 0)
     )
-    @test ctx.approximation[3] == old3
+    @test ctx.iterate[3] == old3
 
     # Completing the original pair performs the one mixed-transfer contraction
     # required by the ordinary sweep and restores the forward validity frontier.
@@ -105,7 +105,7 @@ end
     B_init[1] = rand(ComplexF64, space(B0[1]))
     ctx = test_split_state(A, B_init)
     update!(ctx, SweepState{Forward}(1, 0))
-    @test ctx.approximation[1] ≈ B0[1] rtol=1e-10
+    @test ctx.iterate[1] ≈ B0[1] rtol=1e-10
 end
 
 @testset "local solve leaves tensors and cached environments unchanged" begin
@@ -116,7 +116,7 @@ end
     state = SweepState{Forward}(1, 0)
     tensor, cost = PMPSLab._solve_local_update(ctx, state)
     @test isfinite(cost)
-    @test all(ctx.approximation[i] == before.approximation[i] for i in eachindex(approximation))
+    @test all(ctx.iterate[i] == before.iterate[i] for i in eachindex(approximation))
     @test all(ctx.target[i] == before.target[i] for i in eachindex(target))
     for (cache, original) in ((ctx.normal_cache, before.normal_cache), (ctx.mixed_cache, before.mixed_cache))
         @test cache.left_valid_through == original.left_valid_through

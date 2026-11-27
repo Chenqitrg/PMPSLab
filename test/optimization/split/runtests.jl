@@ -4,7 +4,8 @@ using LatticeIteratorLab: SweepState, Forward, Backward
 using PeriodicProductsLab
 using TensorLinearSolveLab
 using Test, Random, Logging
-using PMPSLab, ExperimentLab
+using PMPSLab
+import AlgorithmsInterface as AI
 using PMPSLab: SplitProgress, AbstractStoppingCriterion
 using PMPSLab: update!
 using PeriodicProductsLab
@@ -23,12 +24,24 @@ function test_split_state(target, approximation;
     return PMPSLab.initialize_split(target, approximation, algorithm; copy_initial=false)
 end
 
-# History collection is a test consumer of onstep, not part of numerical state.
-function collect_split(target, algorithm)
+# Test consumer of the public A.I. protocol. Production execution uses AI.solve.
+function run_split!(state::PMPSLab.SplitState; onstep::F=Returns(nothing))::NamedTuple{(:mps,:progress)} where {F}
+    problem, algorithm = PMPSLab.SplitProblem(state.target), state.algorithm
+    while !AI.is_finished!(problem, algorithm, state)
+        AI.increment!(state)
+        AI.step!(problem, algorithm, state)
+        onstep(state, state.progress)
+    end
+    return AI.finalize_state!(problem, algorithm, state)
+end
+
+function collect_split(target::PeriodicMPS, algorithm::ALSSplit)::Tuple{NamedTuple,Vector{SplitProgress}}
     events = SplitProgress[]
     state = PMPSLab.initialize_split(target, algorithm)
-    result = fetch(start_run(ExperimentLab.algorithm_steps(state);
-        onstep=(_, event) -> push!(events, event), threaded=false))
+    result = run_split!(state; onstep=function collect_progress(::PMPSLab.SplitState, event::SplitProgress)::Nothing
+        push!(events, event)
+        return nothing
+    end)
     return result, events
 end
 

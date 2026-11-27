@@ -74,16 +74,16 @@ end
         initialization=SVDInitialization(),
         sweep=CircularSweep(; max_sweeps=2),
         solver=CholeskySolve(),
-        stopping=ThrowingStoppingCriterion(),
+        stopping_criterion=ThrowingStoppingCriterion(),
     )
     run = PMPSLab.initialize_split(target, algorithm)
-    session = start_run(ExperimentLab.algorithm_steps(run); threaded=false)
-    @test_throws CapturedException fetch(session)
-    @test run_status(session) == ExperimentLab.FAILED
+    @test_throws ErrorException run_split!(run)
     @test run.progress.completed_updates == 4
     @test first(run.pending_iteration) == SweepState{Forward}(1, 1)
-    @test_throws ArgumentError resume!(session)
-
+    # A failed check must remain pending, without advancing tensors or its history.
+    @test_throws ErrorException AI.is_finished!(PMPSLab.SplitProblem(target), algorithm, run)
+    @test run.stopping_criterion_state.last_sweep == 0
+    @test run.progress.completed_updates == 4
 end
 
 @testset "ALSSplit — cost convergence stops at complete sweeps" begin
@@ -99,7 +99,7 @@ end
             initialization=SVDInitialization(),
             sweep,
             solver=CholeskySolve(),
-            stopping=CostConvergence(;
+            stopping_criterion=CostConvergence(;
                 atol=1e-10,
                 rtol=0,
                 min_sweeps=2,
@@ -121,7 +121,7 @@ end
         initialization=SVDInitialization(),
         sweep=CircularSweep(; max_sweeps=10),
         solver=CholeskySolve(),
-        stopping=CostConvergence(;
+        stopping_criterion=CostConvergence(;
             atol=1e-10,
             rtol=0,
             min_sweeps=4,
@@ -137,7 +137,7 @@ end
         initialization=algorithm.initialization,
         sweep=CircularSweep(; max_sweeps=2),
         solver=algorithm.solver,
-        stopping=CostConvergence(;
+        stopping_criterion=CostConvergence(;
             atol=1e-10,
             rtol=0,
             min_sweeps=3,

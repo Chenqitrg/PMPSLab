@@ -1,6 +1,6 @@
 # PMPSLab
 
-Periodic MPS construction, contraction, transfer matrices, gauge fixing and optimization in Julia. ALS splitting supports nuclear-norm regularization, per-site progress, pause/resume and numerical snapshots through ExperimentLab.
+Periodic MPS construction, contraction, transfer matrices, gauge fixing and optimization in Julia. ALS splitting supports nuclear-norm regularization, per-site progress, manual stepping and numerical snapshots through AlgorithmsInterface.
 
 ## Use
 
@@ -16,6 +16,7 @@ paired = contract_pairs(mps)
 
 ```julia
 using PMPSLab
+import AlgorithmsInterface as AI
 import LatticeIteratorLab, TensorLinearSolveLab
 
 target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
@@ -23,16 +24,16 @@ algorithm = ALSSplit(
     initialization=PMPSLab.SVDInitialization(),
     sweep=LatticeIteratorLab.CircularSweep(max_sweeps=2),
     solver=TensorLinearSolveLab.CholeskySolve())
-result = split(target, algorithm)
+result = AI.solve(PMPSLab.SplitProblem(target), algorithm)
 result.mps       # Optimized MPS with paired single-physical-leg sites.
 result.progress  # Last completed site update.
 ```
 
-Use `ExperimentLab.algorithm_steps(PMPSLab.initialize_split(target, algorithm))` with
-ExperimentLab when you need callbacks, pause/resume, recorded logs or snapshots.
-The blocking `split` entry point uses the same generator.
-`AbstractSplitState` subtypes `ExperimentLab.AbstractAlgorithmState`; custom split
-implementations extend the same `ExperimentLab.algorithm_steps` generic.
+`ALSSplit <: AlgorithmsInterface.Algorithm` and
+`SplitState <: AlgorithmsInterface.State`. The convenience function
+`split(target, algorithm)` calls `AI.solve`. For control between site updates,
+use `AI.initialize_state`, `AI.is_finished!`, `AI.increment!` and `AI.step!`.
+See [execution and restart](docs/optimization/execution-extensions.md) for a complete loop.
 
 Capture numerical restart data with `PMPSLab.snapshot(state)` before execution,
 between completed updates, or after completion:
@@ -45,7 +46,8 @@ restored = PMPSLab.restore_split(saved, target)
 
 The snapshot owns its tensors and contains no numerical caches. Restore with the
 original target to rebuild those caches. Saving the snapshot to disk is the
-caller's responsibility; ExperimentLab's `capture(ref, state)` uses the same copy.
+caller's responsibility. DrWatson can cache complete runs in an experiment project;
+it is not required by PMPSLab.
 
 ## Review order
 
@@ -64,7 +66,7 @@ julia --project=. examples/01_construction.jl
 5. `gauge/`: projector construction and in-place gauge fixing.
 6. `transfers/` and `environments/`: local operators, periodic caches, overlaps and norms.
 7. `optimization/`: split policies, local equations and site updates.
-8. `execution/`: ExperimentLab integration and numerical restart.
+8. `execution/`: A.I. integration and numerical restart.
 
 All source files are in `src/`; focused regression tests live in `test/`.
 
@@ -100,8 +102,8 @@ remain unchanged.
 
 Uses TensorKit and MPSKit for tensors and canonicalization, MatrixAlgebraKit for
 factorizations, PeriodicProductsLab for cached products, LatticeIteratorLab for sweep
-ordering, TensorLinearSolveLab for local solves, and ExperimentLab for
-configuration, execution, persistence and logging. Keep the Lab dependencies
+ordering, TensorLinearSolveLab for local solves, and AlgorithmsInterface for
+execution and stopping. Keep the Lab dependencies
 as sibling checkouts. Julia 1.12 or later is required.
 
 From this repository:
@@ -118,8 +120,10 @@ tests and examples use the PMPSLab namespace. The original local Git repositorie
 are preserved in `../.retired-labs/`; active environments do not load them.
 No compatibility aliases or serialized-checkpoint migration are provided.
 
-LoopTNRLab remains responsible for lattice operations and RG. ExperimentLab
-remains independent of tensor algorithms. See [the architecture](docs/architecture.md)
+LoopTNRLab remains responsible for lattice operations and RG. Legacy configuration
+registries, generator sessions and recorded-run APIs have been retired. Existing
+serialized records require their original environment. ExperimentLab remains a
+transitive dependency of the sweep and solver packages until those migrate. See [the architecture](docs/architecture.md)
 and [the example index](examples/README.md) for review paths.
 
 PMPSLab retains UUID `671cd7e2-a4a1-40fd-ad7d-501014e12597` and version `0.1.0`.

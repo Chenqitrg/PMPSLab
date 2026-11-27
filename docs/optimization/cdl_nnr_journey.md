@@ -1,5 +1,9 @@
 # CDL NNR journey: observed results
 
+This is a historical report of the former recording integration. The current
+example uses native A.I. stepping, DrWatson metadata and application-owned JSON;
+its current storage format is described in the journey guide below.
+
 Run date: 2026-11-07. Numerical implementation: PMPSLab commit `e916f18`.
 Julia 1.12.5, one Julia thread, one BLAS thread. No package versions changed.
 The reproducible entry point is [example 11](../../examples/optimization/11_cdl_nnr.jl); see its

@@ -12,7 +12,7 @@ algorithm = ALSSplit(
     sweep=LatticeIteratorLab.CircularSweep(max_sweeps=6),
     solver=TensorLinearSolveLab.CholeskySolve(),
     error_measure=:exact,
-    stopping=CostConvergence(atol=1e-10, rtol=1e-8, min_sweeps=2, consecutive_sweeps=1),
+    stopping_criterion=CostConvergence(atol=1e-10, rtol=1e-8, min_sweeps=2, consecutive_sweeps=1),
 )
 result = split(target, algorithm)
 approximation = result.mps

@@ -24,7 +24,8 @@ Read **01 → 03 → 07 → 08**, then the two execution examples.
 | PMPSLab environments | Construct transfers/caches from MPS; evaluate distance | 03: `transfer_at`; 07: `TruncatedTransferPolicy` |
 | PeriodicProductsLab | Store partial products and provide a site's environment | 03: inspect the actual split cache and call `environment` |
 | PMPSLab gauge operations | Gauge fixing applied during initialization | 08: explicit `gaugefix!` and equivalent `GaugeInitialization` |
-| ExperimentLab | Drive steps, pause/resume, own logs and persist snapshots | execution/01 and execution/02 |
+| AlgorithmsInterface | Initialize, step, stop and solve | 01 and execution/01 |
+| DrWatson | Reuse cached experiment results | execution/02 |
 
 PMPSLab supplies the local split equations and decides when to update each
 cache. You pass policies to it; you do not need to drive its caches manually.
@@ -44,28 +45,28 @@ visible. The ordinary application entry point remains `split(target, algorithm)`
 | [07 Exact error](07_exact_error.jl) | How does a transfer policy affect the local estimate? |
 | [08 Gauge initialization](08_gauge_initialization.jl) | How does split initialization reuse gauge fixing? |
 | [09 Nuclear norm](09_nuclear_norm.jl) | How do nested NNR settings and automatic normalization work? |
-| [10 NNR restart](10_nuclear_norm_restart.jl) | How are auxiliary tensors preserved by ordinary ExperimentLab snapshots? |
+| [10 NNR restart](10_nuclear_norm_restart.jl) | How are auxiliary tensors preserved by PMPS snapshots? |
 | [11 CDL journey](11_cdl_nnr.jl) | Does NNR remove redundant internal channels, and can a JSON-only reader verify the run? |
-| [12 Configuration JSON](12_configuration_json.jl) | How are all nested Lab configurations named and restored? |
+| [12 Configuration JSON](12_configuration_json.jl) | How do application settings in JSON construct an algorithm? |
 
-The numerical examples run synchronously; controlled execution uses ExperimentLab. For the source reading
+The numerical examples run synchronously; controlled execution uses the A.I. lifecycle. For the source reading
 order, see [the focused review guide](../../docs/optimization/split_review.md).
 
-Example 11 records three 100-sweep comparisons, pauses at site 3, and resumes a
-saved run from sweep 50. Its [journey guide](journeys/README.md) explains the
+Example 11 records three 100-sweep comparisons, saves a checkpoint and resumes from sweep 50. Its [journey guide](journeys/README.md) explains the
 physical checks and the independent Python JSON reader. It runs separately
 from the lightweight examples and is not a benchmark of runtime performance.
 
 ## Optional execution
 
-[Controlled execution](execution/01_controlled_execution.jl) leaves the session
-paused after site 2, before site 3 starts. Inspect `state` and `session` in the
-REPL, then execute the commented `resume!` and `fetch` lines to finish.
-It uses the PMPSLab root environment, like the numerical examples:
+[Controlled execution](execution/01_controlled_execution.jl) stops the loop
+after site 2, before site 3 starts. Inspect `state` in the REPL and continue the
+same loop to finish. It uses the root environment:
 
 ```sh
 julia --project=. -i examples/optimization/execution/01_controlled_execution.jl
 ```
 
-`execution/02_recorded_split.jl` demonstrates ExperimentLab-owned JSONL history,
-a single-copy numerical capture, and restart from disk.
+`execution/02_recorded_split.jl` demonstrates DrWatson's `produce_or_load`: the
+second call reuses the first result. Run it in an experiment environment with
+PMPSLab, DrWatson and JLD2 installed. Example 11 additionally needs JSON; example
+12 needs JSON. These storage packages are not PMPSLab runtime dependencies.

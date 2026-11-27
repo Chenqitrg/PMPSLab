@@ -1,34 +1,23 @@
-using PMPSLab
-import ExperimentLab, LatticeIteratorLab, TensorLinearSolveLab
+# Run in an experiment environment with PMPSLab, DrWatson and JLD2.
+using PMPSLab, DrWatson, JLD2, Random
+import LatticeIteratorLab, TensorLinearSolveLab
 
-# The algorithm owns numerical state; ExperimentLab owns its records and logs.
-target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
-algorithm = ALSSplit(sweep=LatticeIteratorLab.CircularSweep(max_sweeps=1), solver=TensorLinearSolveLab.CholeskySolve())
-state = PMPSLab.initialize_split(target, algorithm)
-store = ExperimentLab.DataStore(mktempdir())
-config = ExperimentLab.record_algorithm!(store, algorithm)
-session = ExperimentLab.start_run(store, config, ExperimentLab.algorithm_steps(state); threaded=false,
-    onstep=(session, event) -> begin
-        if event.completed_updates == 2
-            ref = ExperimentLab.record_state!(store, session.execution; step=event.completed_updates)
-            # Copies the approximation once and omits derived contraction caches.
-            ExperimentLab.save_snapshot!(store, ExperimentLab.capture(ref, state))
-        end
-    end)
-result = fetch(session)
-@show result.progress.completed_updates # 4; no history is retained in result.
-ExperimentLab.showtree(store)
-println()
+function compute_split(settings::NamedTuple)::Dict{String,Any}
+    Random.seed!(settings.seed)
+    target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
+    algorithm = ALSSplit(sweep=LatticeIteratorLab.CircularSweep(max_sweeps=settings.sweeps),
+        solver=TensorLinearSolveLab.CholeskySolve())
+    result = split(target, algorithm)
+    return Dict("settings" => settings, "mps" => result.mps, "progress" => result.progress)
+end
 
-# Every update was written as a registered event in this execution's JSONL file.
-logfile = joinpath(store.path, ExperimentLab.info(store, session.execution)["log_path"])
-@show logfile
-println(first(readlines(logfile)))
-
-saved_ref = only(ExperimentLab.records(store, :snapshot))
-saved = ExperimentLab.load_snapshot(store, saved_ref)
-restored = PMPSLab.restore_split(saved, target)
-@show restored.progress.completed_updates # 2
-recovered = fetch(ExperimentLab.start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
-@assert dense(recovered.mps) ≈ dense(result.mps)
+settings = (seed=1234, sweeps=2, revision="demo-v1")
+output = mktempdir()
+data, file = produce_or_load(compute_split, settings, output; tag=false)
+reused, reused_file = produce_or_load(compute_split, settings, output; tag=false)
+@assert file == reused_file
+@assert dense(data["mps"]) == dense(reused["mps"])
+@show file data["progress"]
+# For real experiments, identify the target and code/environment in the cache key.
+# Git tagging records provenance; it does not automatically invalidate old results.
 nothing

@@ -18,14 +18,16 @@ using PMPSLab: TruncatedTransferMatrix, SVDInitialization, SplitEnvironmentPolic
     @test environment(run.normal_cache, 1) isa TruncatedTransferMatrix
     @test environment(run.mixed_cache, 1) isa TruncatedTransferMatrix
 
-    snapshots = [ExperimentLab.copy_state(run)]
-    expected = fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
-        onstep=(_, event) -> event.completed_updates == 1 && push!(snapshots, ExperimentLab.copy_state(run))))
+    snapshots = [PMPSLab.snapshot(run)]
+    expected = run_split!(run; onstep=function capture_first(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
+        event.completed_updates == 1 && push!(snapshots, PMPSLab.snapshot(run))
+        return nothing
+    end)
     run = restore_split(snapshots[end], mpsA)
     @test environment(run.normal_cache, 1) isa TruncatedTransferMatrix
     @test environment(run.mixed_cache, 1) isa TruncatedTransferMatrix
 
-    result = fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false))
+    result = run_split!(run)
     @test dense(result.mps) ≈ dense(expected.mps)
     mpsB = result.mps
     progress = result.progress

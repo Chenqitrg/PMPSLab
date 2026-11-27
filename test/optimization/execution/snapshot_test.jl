@@ -6,17 +6,21 @@ using PMPSLab: RandomInitialization, SVDInitialization
         algorithm = ALSSplit(sweep=sweep, solver=LUSolve(),
             initialization=SVDInitialization(trunc=truncrank(1)))
         run = initialize_split(target, algorithm)
-        snapshots = [ExperimentLab.copy_state(run)]
-        expected = fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
-            onstep=(_, _) -> push!(snapshots, ExperimentLab.copy_state(run))))
+        snapshots = [PMPSLab.snapshot(run)]
+        expected = run_split!(run; onstep=function capture_boundary(::PMPSLab.SplitState, ::PMPSLab.SplitProgress)::Nothing
+            push!(snapshots, PMPSLab.snapshot(run))
+            return nothing
+        end)
         for (index, saved) in enumerate(snapshots)
             boundary = index - 1
             @test saved.progress.completed_updates == boundary
-            @test all(saved.approximation[i] !== run.approximation[i] for i in 1:4)
+            @test all(saved.approximation[i] !== run.iterate[i] for i in 1:4)
             restored = restore_split(saved, target)
             visited_updates = Int[]
-            actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
-                onstep=(_, event) -> push!(visited_updates, event.completed_updates)))
+            actual = run_split!(restored; onstep=function collect_updates(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
+                push!(visited_updates, event.completed_updates)
+                return nothing
+            end)
             @test visited_updates == collect(boundary+1:expected.progress.completed_updates)
             @test dense(actual.mps) ≈ dense(expected.mps)
             @test actual.progress.completed_updates == expected.progress.completed_updates
@@ -30,20 +34,22 @@ end
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=1), solver=CholeskySolve())
     run = initialize_split(target, algorithm)
-    snapshots = [ExperimentLab.copy_state(run)]
-    fetch(start_run(ExperimentLab.algorithm_steps(run); threaded=false,
-        onstep=(_, event) -> event.completed_updates == 1 && push!(snapshots, ExperimentLab.copy_state(run))))
+    snapshots = [PMPSLab.snapshot(run)]
+    run_split!(run; onstep=function capture_first(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
+        event.completed_updates == 1 && push!(snapshots, PMPSLab.snapshot(run))
+        return nothing
+    end)
     saved = snapshots[end]
     before = copy(saved.approximation[1])
-    run.approximation[1] *= 2
+    run.iterate[1] *= 2
     @test saved.approximation[1] == before
     restored = restore_split(saved, target)
-    restored.approximation[1] *= 3
+    restored.iterate[1] *= 3
     @test saved.approximation[1] == before
     incompatible = rand(PeriodicMPS, ComplexF64, 2, (3, 3), 1)
     @test_throws DimensionMismatch restore_split(saved, incompatible)
     bad = SplitSnapshot(saved.approximation, saved.algorithm, saved.target_spaces,
-        PMPSLab.SplitProgress(completed_updates=1, site=4), saved.last_error, saved.stable_comparisons, saved.regularization)
+        PMPSLab.SplitProgress(completed_updates=1, site=4), saved.stopping_criterion_state, saved.checked_iteration, saved.regularization)
     @test_throws ArgumentError restore_split(bad, target)
 end
 
@@ -54,21 +60,21 @@ end
     algorithm = ALSSplit(initialization=RandomInitialization(virtual_spaces=fill(v, 4)),
         sweep=CircularSweep(max_sweeps=1), solver=LUSolve())
     state = initialize_split(target, algorithm)
-    saved = ExperimentLab.copy_state(state)
+    saved = PMPSLab.snapshot(state)
     restored = restore_split(saved, target)
-    @test dense(restored.approximation) == dense(state.approximation)
-    @test all(space(restored.approximation[i]) == space(state.approximation[i]) for i in 1:4)
+    @test dense(restored.iterate) == dense(state.iterate)
+    @test all(space(restored.iterate[i]) == space(state.iterate[i]) for i in 1:4)
 end
 
 @testset "Snapshot progress has one authoritative traversal count" begin
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=1), solver=CholeskySolve())
     state = initialize_split(target, algorithm)
-    saved = ExperimentLab.copy_state(state)
+    saved = PMPSLab.snapshot(state)
     @test !hasproperty(saved, :pending_iteration)
     @test restore_split(saved, target).progress === saved.progress
-    fetch(start_run(ExperimentLab.algorithm_steps(state); threaded=false))
-    saved = ExperimentLab.copy_state(state)
+    run_split!(state)
+    saved = PMPSLab.snapshot(state)
     for bad in (
         (@set saved.progress.completed_updates = -1),
         (@set saved.progress.completed_updates = 5),
@@ -76,7 +82,7 @@ end
         (@set saved.progress.site = 1),
         (@set saved.progress.direction = "backward"),
         (@set saved.progress.sweep_completed = false),
-        (@set saved.stable_comparisons = 10),
+        (@set saved.stopping_criterion_state.stable_comparisons = 10),
     )
         @test_throws ArgumentError restore_split(bad, target)
     end
@@ -102,12 +108,14 @@ end
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(sweep=SpacedCursorSweep(), solver=CholeskySolve())
     state = initialize_split(target, algorithm)
-    snapshots = [ExperimentLab.copy_state(state)]
-    expected = fetch(start_run(ExperimentLab.algorithm_steps(state); threaded=false,
-        onstep=(_, _) -> push!(snapshots, ExperimentLab.copy_state(state))))
+    snapshots = [PMPSLab.snapshot(state)]
+    expected = run_split!(state; onstep=function capture_cursor(::PMPSLab.SplitState, ::PMPSLab.SplitProgress)::Nothing
+        push!(snapshots, PMPSLab.snapshot(state))
+        return nothing
+    end)
     for saved in snapshots
         restored = restore_split(saved, target)
-        actual = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false))
+        actual = run_split!(restored)
         @test actual.progress.completed_updates == 4
         @test dense(actual.mps) ≈ dense(expected.mps)
     end
@@ -117,12 +125,14 @@ end
     target = rand(PeriodicMPS, ComplexF64, 2, (2, 2), 1)
     algorithm = ALSSplit(sweep=CircularSweep(max_sweeps=0), solver=CholeskySolve())
     state = initialize_split(target, algorithm)
-    restored = restore_split(ExperimentLab.copy_state(state), target)
+    restored = restore_split(PMPSLab.snapshot(state), target)
     events = PMPSLab.SplitProgress[]
-    result = fetch(start_run(ExperimentLab.algorithm_steps(restored); threaded=false,
-        onstep=(_, event) -> push!(events, event)))
+    result = run_split!(restored; onstep=function collect_events(::PMPSLab.SplitState, event::PMPSLab.SplitProgress)::Nothing
+        push!(events, event)
+        return nothing
+    end)
     @test result isa NamedTuple{(:mps, :progress)}
-    @test result.mps === restored.approximation
+    @test result.mps === restored.iterate
     @test result.progress.completed_updates == 0
     @test isnothing(result.progress.site)
     @test isempty(events)

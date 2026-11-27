@@ -6,15 +6,15 @@ using Accessors: @set, @reset
         initialization=GaugeInitialization(),
         sweep=CircularSweep(; max_sweeps=40),
         solver=LDLTSolve(),
-        stopping=CostTolerance(; atol=1e-9, rtol=1e-2, min_sweeps=5),
+        stopping_criterion=CostTolerance(; atol=1e-9, rtol=1e-2, min_sweeps=5),
     )
 
     modified = algorithm
     @reset modified.sweep.max_sweeps = 60
-    @reset modified.stopping.atol = 1e-10
+    @reset modified.stopping_criterion.atol = 1e-10
     @test modified.sweep.max_sweeps == 60
-    @test modified.stopping.atol == 1e-10
-    @test modified.stopping.rtol == algorithm.stopping.rtol
+    @test modified.stopping_criterion.atol == 1e-10
+    @test modified.stopping_criterion.rtol == algorithm.stopping_criterion.rtol
     @test modified.environments === algorithm.environments
 
     replacement_trunc = algorithm.initialization.gauge_fix.trunc
@@ -22,7 +22,7 @@ using Accessors: @set, @reset
     @test retruncated.initialization.initialization.trunc == replacement_trunc
 
     @test algorithm.sweep.max_sweeps == 40
-    @test algorithm.stopping.atol == 1e-9
+    @test algorithm.stopping_criterion.atol == 1e-9
 end
 
 @testset "Accessors — concrete strategy replacement" begin
@@ -30,11 +30,11 @@ end
         initialization=GaugeInitialization(),
         sweep=CircularSweep(; max_sweeps=40),
         solver=LDLTSolve(),
-        stopping=CostTolerance(; atol=1e-9, rtol=1e-2, min_sweeps=5),
+        stopping_criterion=CostTolerance(; atol=1e-9, rtol=1e-2, min_sweeps=5),
     )
-    modified = @set algorithm.stopping = NoStopping()
+    modified = @set algorithm.stopping_criterion = NoStopping()
 
-    @test modified.stopping isa NoStopping
+    @test modified.stopping_criterion isa NoStopping
     @test typeof(modified) !== typeof(algorithm)
     @test modified.initialization === algorithm.initialization
 end
@@ -44,11 +44,11 @@ end
         initialization=GaugeInitialization(),
         sweep=CircularSweep(; max_sweeps=40),
         solver=LDLTSolve(),
-        stopping=CostTolerance(; atol=1e-9, rtol=1e-2, min_sweeps=5),
+        stopping_criterion=CostTolerance(; atol=1e-9, rtol=1e-2, min_sweeps=5),
     )
 
     @test_throws ArgumentError @set algorithm.unknown = 1
     @test_throws ArgumentError @set algorithm.sweep.max_sweeps = -1
-    @test_throws ArgumentError @set algorithm.stopping.min_sweeps = 1
+    @test_throws ArgumentError @set algorithm.stopping_criterion.min_sweeps = 1
 
 end

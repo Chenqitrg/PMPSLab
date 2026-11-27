@@ -1,47 +1,22 @@
-# Run from PMPSLab: julia --project=. examples/optimization/12_configuration_json.jl
-using PMPSLab: GaugeInitialization, SplitEnvironmentPolicy, NuclearNorm, CostTolerance
-using PMPSLab
-import ExperimentLab, LatticeIteratorLab, TensorLinearSolveLab
+# Run in an experiment environment with PMPSLab and JSON.
+using PMPSLab, JSON
+import LatticeIteratorLab, TensorLinearSolveLab
 using Test: @test
 
-# Each package names its own configuration types. PMPSLab composes those
-# registries, so applications do not need to repeat the registrations.
+# The application chooses its portable parameter schema. It does not encode Julia types.
+settings = Dict("sweeps" => 4, "initial_penalty" => 0.01, "decay" => 0.95)
+file = joinpath(mktempdir(), "settings.json")
+write(file, JSON.json(settings))
+loaded = JSON.parsefile(file)
+@test loaded == settings
+
 algorithm = ALSSplit(
-    initialization=GaugeInitialization(),
-    sweep=LatticeIteratorLab.CircularSweep(max_sweeps=4),
+    sweep=LatticeIteratorLab.CircularSweep(max_sweeps=loaded["sweeps"]),
     solver=TensorLinearSolveLab.CholeskySolve(),
-    environments=SplitEnvironmentPolicy(mixed=PMPSLab.TruncatedTransferPolicy()),
-    regularization=NuclearNorm(),
-    stopping=CostTolerance(atol=1e-8, rtol=1e-6),
+    regularization=PMPSLab.NuclearNorm(schedule=PMPSLab.GeometricDecay(
+        initial=loaded["initial_penalty"], factor=loaded["decay"])),
 )
-
-directory = mktempdir()
-path = joinpath(directory, "algorithm.json")
-ExperimentLab.writeconfig(path, algorithm)
-println(read(path, String))
-
-# The root, sweep, solver, initialization, policies, regularizer and stopping
-# rule each have a stable type name, even when they have no parameters.
-registry = ExperimentLab.config_registry(typeof(algorithm))
-document = ExperimentLab.config_record(registry, algorithm)
-@show document["type"]
-@show document["parameters"]["solver"]
-@show document["parameters"]["regularization"]["parameters"]["schedule"]
-
-# Supplying the concrete type also identifies third-party field types, such as
-# MatrixAlgebraKit truncation policies, for their existing conversion hooks.
-restored = ExperimentLab.readconfig(path, typeof(algorithm))
-@test isequal(restored, algorithm)
-
-# If all fields can be inferred, the registry alone is sufficient.
-policy_path = joinpath(directory, "environments.json")
-environments = SplitEnvironmentPolicy()
-ExperimentLab.writeconfig(policy_path, environments)
-@test ExperimentLab.readconfig(policy_path, registry) == environments
-
-# record_algorithm! uses the same JSON representation automatically.
-store = ExperimentLab.DataStore(joinpath(directory, "experiment"))
-ref = ExperimentLab.record_algorithm!(store, algorithm)
-@test ExperimentLab.info(store, ref)["config"] == document
-@show path
+@test algorithm.regularization.schedule.factor == 0.95
+# Use JLD2 when the complete Julia algorithm, including third-party criteria, is needed.
+@show file algorithm
 nothing

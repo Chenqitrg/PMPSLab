@@ -1,7 +1,8 @@
 # Run from PMPSLab: julia --project=. examples/optimization/01_simple_split.jl
 using PMPSLab: SVDInitialization
 using PMPSLab
-import LatticeIteratorLab, TensorLinearSolveLab, ExperimentLab
+import LatticeIteratorLab, TensorLinearSolveLab
+import AlgorithmsInterface as AI
 using Random: seed!
 using Test: @test
 
@@ -20,10 +21,8 @@ algorithm = ALSSplit(
     sweep=sweep,
     solver=solver,
 )
-# 4. the split algorithm's generator expresses ALS; ExperimentLab drives its site updates.
-state = PMPSLab.initialize_split(target, algorithm)
-session = ExperimentLab.start_run(ExperimentLab.algorithm_steps(state); threaded=false)
-result = fetch(session)
+# 4. AlgorithmsInterface drives PMPSLab's site updates.
+result = AI.solve(PMPSLab.SplitProblem(target), algorithm)
 # The blocking shortcut is equivalent: result = split(target, algorithm).
 approximation = result.mps
 
